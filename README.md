@@ -1,323 +1,167 @@
 # Berlin Urban Intelligence
 
-**Version 0.1.0 — verified integrated research platform**
+**Version 0.1.0**
 
-Berlin Urban Intelligence is an agent-extensible urban intelligence and digital-twin research platform for Berlin. It connects independently testable domain agents through versioned canonical contracts, explicit provenance, quality and freshness semantics, semantic relationships, deterministic orchestration and explicit scenario modelling.
+Berlin Urban Intelligence is a research-oriented, agent-extensible urban intelligence and digital-twin integration platform for Berlin. It integrates heterogeneous urban sources behind typed canonical contracts, preserves provenance/quality/freshness semantics, and supports deterministic cross-domain workflows and explicit hypothetical scenarios without fabricating missing production data.
 
-The project is inspired by broad architectural principles demonstrated by **The World Avatar**—specialised agents, semantic interoperability, provenance and composable derivations—but is independently implemented for Berlin. It is not affiliated with The World Avatar, Cambridge CARES or the University of Cambridge.
+## Overview
 
-## Design goals
+The platform currently integrates selected mobility, environmental exposure, heat, energy and resilience capabilities. Its central design requirement is semantic traceability: an observation, official model output, forecast, derived result and scenario value remain distinguishable throughout processing and presentation.
 
-The platform is designed around a few non-negotiable rules:
+The repository is the maintained integration layer. Historical standalone prototypes are reference/migration inputs, not runtime dependencies.
 
-- real production inputs are never replaced with fabricated urban data;
-- observed, official-modelled, forecast, derived and scenario states remain distinguishable;
-- source attribution, units, UTC timestamps and spatial reference are explicit;
-- source availability is separate from freshness and last-known-good state;
-- scenarios never overwrite the baseline state;
-- cross-domain analysis remains explainable and does not collapse uncertainty into a synthetic city score;
-- deterministic agent execution is the core; an LLM is not required for execution.
+Start with the [documentation index](docs/index.md), [project overview](docs/overview.md) and [objectives/scope](docs/objectives-and-scope.md).
 
-## Architecture
+## Motivation
 
-```text
-verified urban sources
-        |
-        v
- source adapters
-        |
-        v
- canonical state + provenance + quality
-        |
-  +-----+---------+---------+---------+---------+
-  |               |         |         |         |
-Live State     Mobility   Exposure   Heat     Energy
-  |               |         |         |         |
-  +---------------+---------+----+----+---------+
-                               |
-                         Resilience
-                               |
-                     Scenario Engine
-                               |
-              Deterministic Orchestrator
-                               |
-                  FastAPI + MapLibre UI
+Urban sources differ in update cadence, spatial resolution, authority, quality and epistemic meaning. Treating all inputs as interchangeable values can make stale data appear current, models appear measured, or unavailable domains appear complete through undocumented defaults.
 
-               + semantic RDF projection
-               + dependency/freshness model
-               + atomic runtime/reference stores
-```
+Berlin Urban Intelligence makes those distinctions part of the executable data contract. See [Motivation](docs/motivation.md).
 
-The standalone portfolio repositories remain historical/reference prototypes. This repository is the maintained integration layer; reusable ideas are reimplemented behind common contracts rather than imported as runtime dependencies.
+## Key capabilities
 
-## Implemented capabilities
-
-| Area | Status |
+| Area | Current implementation |
 |---|---|
-| Shared contracts | Versioned observations, forecasts, derived/scenario values, official-model features, facilities, transit stops and network contracts |
-| Provenance / quality | First-class provider, dataset, source URL, timestamps, agent/model identity, licence, quality notes and RDF PROV-O lineage |
-| Time / units / CRS | UTC enforcement, explicit numeric units, validated CRS/GeoJSON and EPSG:25833 metric calculations |
-| Live State Agent | Cross-domain health aggregation with graceful degradation and no master score |
-| Mobility Agent | VBB GTFS-Realtime decoding plus static GTFS stop/reference ingestion |
-| Exposure Agent | Official Berlin LQI ingestion, including the current station-envelope API schema and provisional-quality handling |
-| Heat Agent | DWD 10-minute observations plus Berlin Climate Analysis 2022 official-modelled reference features |
-| Energy Agent | Berlin grid-load evaluation/forecast boundary with dataset fingerprints, chronological holdout evaluation and persisted forecasts |
-| Energy models | Persistence, seasonal-naive, Ridge and HistGradientBoosting candidates; reported metrics come from real holdout predictions |
-| Resilience Agent | Multi-edge NetworkX routing, accessibility, facility-to-network snapping and immutable disruption overlays |
-| Reference acquisition | Berlin WFS facilities/climate, VBB static GTFS and optional OSM road-network acquisition with last-known-good retention |
-| Scenario Engine | Explicit hypothetical heat, network, energy and infrastructure parameters |
-| Integrated assessment | Heat, energy and resilience dimensions combined without a fabricated composite score |
-| Orchestrator | Deterministic typed workflow planning **and execution**; no LLM required |
-| Knowledge layer | RDF/SOSA/PROV-O/QUDT projection, ontology/SHACL artefacts and semantic export |
-| Runtime state | Atomic runtime, reference and energy JSON stores plus generated RDF artefacts |
-| API | Versioned FastAPI surface, OpenAPI, pagination/resource limits and operation IDs |
-| Dashboard | React/TypeScript/MapLibre research UI with map layers, observations, provenance inspection, orchestration and explicit hypothetical assessment controls |
-| CI | Ruff, strict mypy, pytest, ontology/knowledge validation, data/secret guards, OpenAPI, `npm ci`, frontend tests/build, Docker builds and a running Compose HTTP smoke test |
+| Canonical contracts | Frozen Pydantic models with explicit data state, quality, UTC time, units, CRS and provenance. |
+| Live acquisition | Independent Berlin air-quality, DWD and VBB GTFS-Realtime refresh with source status and last-known-good semantics. |
+| Reference acquisition | Official facility/climate WFS data, VBB static GTFS and optional OSM road topology. |
+| Domain agents | Live State, Mobility, Exposure, Heat, Energy and Resilience agents with machine-readable descriptors/health. |
+| Energy | Chronological holdout evaluation against persistence/seasonal baselines plus Ridge/gradient boosting; fingerprint-bound one-step forecast artefacts. |
+| Resilience | Multi-edge weighted routing, route comparison, facility snapping and accessibility under immutable scenario overlays. |
+| Scenarios | Explicit bounded heat, energy-demand, network-disruption and infrastructure-degradation scenarios. |
+| Orchestration | Five fixed deterministic workflow mappings; no LLM is required for execution. |
+| Cross-domain assessment | Independent Heat/Energy/Resilience dimensions with explicit unavailable/error state and no composite score. |
+| Semantic layer | RDF projection with project ontology, PROV-O/SOSA usage, SHACL artefacts and version-controlled SPARQL query. |
+| Interfaces | FastAPI backend and React/TypeScript/MapLibre research dashboard. |
+| Verification | Strict type/lint/format gates, backend/frontend tests, semantic/data/secret guards and running Compose HTTP smoke test. |
 
-A missing source remains missing. There is no production fallback to generated temperatures, delays, pollution, energy demand, infrastructure state or model metrics.
+Capabilities can be conditional on data. Energy remains unavailable until a Berlin-scoped evaluation/forecast artefact is created; Resilience routing requires a persisted network snapshot.
 
-## Data sources
+## System architecture
 
-The maintained source registry is [`config/sources.yaml`](config/sources.yaml). Current source boundaries include:
+```mermaid
+flowchart LR
+    S[External sources] --> A[Adapters]
+    A --> C[Canonical contracts]
+    C --> G[Domain agents]
+    G --> P[Runtime / reference / energy stores]
+    P --> X[Scenario + analysis]
+    P --> O[Deterministic orchestration]
+    P --> K[RDF projection]
+    P --> API[FastAPI]
+    X --> API
+    O --> API
+    API --> UI[React / MapLibre]
+```
 
-- **Berliner Luftgütemessnetz** — official LQI/air-quality REST data; current automatic values remain provisional. Licence: DL-DE-BY-2.0.
-- **VBB** — official GTFS static data and GTFS-Realtime. Licence: CC BY 4.0.
-- **DWD Open Data / CDC** — 10-minute meteorological observations; the default live path uses Berlin-Tempelhof station `00433` and preserves DWD missing-value semantics.
-- **Berlin Climate Analysis 2022** — official WFS features ingested as `official_modelled`, never as live observations. Licence: DL-DE-Zero-2.0.
-- **Berlin hospitals and fire stations** — official WFS facility identity/location references. Published location does not imply live operational availability.
-- **OpenStreetMap** — optional Berlin road-network reference under ODbL; explicitly qualified as community-maintained rather than authoritative infrastructure truth.
-- **Stromnetz Berlin** — Berlin grid-load source boundary used by the explicit energy evaluation/forecast workflow. The published network-level curve is not relabelled as total Berlin electricity demand.
-- **UCI household electricity dataset** — methodology/reference only; it is one household in Sceaux, France and is never presented as Berlin state.
+Provider acquisition is explicit and separate from HTTP request handling. The API loads persisted snapshots at process startup. See [Architecture](docs/architecture/overview.md), [components](docs/architecture/components.md) and [data flow](docs/architecture/data-flow.md).
 
-A live verification on **2026-09-14** successfully reached the three realtime/current sources used by `refresh_live.py`: Berlin air quality, DWD and VBB GTFS-Realtime. All three were reported `available`, and their accepted data were `valid` for freshness at that run; the smoke test produced 70 canonical observations. This is a point-in-time operational verification, not a guarantee of future provider availability.
-
-See [`docs/data-sources.md`](docs/data-sources.md) for source semantics and limitations.
-
-## Epistemic states
-
-Canonical objects can explicitly communicate what kind of knowledge they represent:
+## Repository structure
 
 ```text
-observed
-official_modelled
-project_modelled
-forecast
-derived
-interpolated
-scenario
-unknown
-unavailable
-stale
+config/                         source registry
+data/                           generated/runtime data boundary
+docs/                           technical and research documentation
+frontend/                       React + TypeScript + MapLibre dashboard
+knowledge/                      ontology, SHACL and SPARQL artefacts
+scripts/                        acquisition/evaluation/validation commands
+src/berlin_urban_intelligence/  backend implementation
+tests/                          deterministic backend tests
 ```
 
-For example, a DWD temperature is `observed`; a Berlin Climate Analysis feature is `official_modelled`; an evaluated energy prediction is `forecast`; an accessibility result is `derived`; and a manually imposed temperature perturbation is `scenario`.
+See [Project structure](docs/implementation/project-structure.md).
 
-## Requirements and deterministic tests
+## Quick start
 
-Python **3.12+** is required by `pyproject.toml`.
+### Docker Compose
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-pip install -e ".[dev,live]"
-ruff format --check src tests scripts
-ruff check src tests scripts
-mypy src/berlin_urban_intelligence
-pytest --cov=berlin_urban_intelligence --cov-report=term-missing
-python scripts/validate_knowledge.py
-python scripts/check_production_data.py
-python scripts/check_secrets.py
-```
-
-Deterministic tests do not depend on external providers.
-
-## Acquire live/current state
-
-```bash
-python scripts/refresh_live.py
-```
-
-This independently refreshes Berlin air quality, DWD meteorology and VBB GTFS-Realtime, persists canonical state to `data/runtime/state.json`, writes RDF to `data/generated/latest.ttl`, and records availability/freshness per source. A failed source does not erase unrelated valid state or trigger synthetic replacement data.
-
-## Acquire reference layers
-
-```bash
-python scripts/refresh_reference.py
-```
-
-By default this acquires the official Berlin WFS reference layers and VBB static GTFS. OSM road-network acquisition is opt-in:
-
-```bash
-pip install -e ".[osm]"
-python scripts/refresh_reference.py --with-osm
-```
-
-OSMnx speed imputation is also opt-in via `--allow-osmnx-speed-imputation` and is recorded in provenance.
-
-## Evaluate and forecast Berlin grid-load data
-
-The energy workflow requires explicitly inspected input columns rather than guessing an upstream schema:
-
-```bash
-python scripts/evaluate_energy.py \
-  --input <stromnetz-berlin.csv-or-verified-url> \
-  --dataset "<inspected dataset title>" \
-  --timestamp-column "<timestamp column>" \
-  --value-column "<value column>" \
-  --unit MW
-```
-
-Evaluation is chronological and leakage-safe. Persistence and seasonal-naive baselines are always calculated; Ridge and HistGradientBoosting are evaluated on the same holdout. The selected candidate, metrics, dataset fingerprint and one-step forecast are persisted in `data/runtime/energy.json`.
-
-## API
-
-```bash
-uvicorn berlin_urban_intelligence.api.app:app --host 0.0.0.0 --port 8000
-```
-
-Important endpoints include:
-
-```text
-GET  /health
-GET  /ready
-GET  /api/v1/system
-GET  /api/v1/agents
-GET  /api/v1/agents/health
-GET  /api/v1/sources
-GET  /api/v1/source-status
-GET  /api/v1/state
-GET  /api/v1/observations
-GET  /api/v1/environment
-GET  /api/v1/heat
-GET  /api/v1/mobility
-GET  /api/v1/energy
-GET  /api/v1/facilities
-GET  /api/v1/climate-features
-GET  /api/v1/transport-stops
-GET  /api/v1/network/nodes
-GET  /api/v1/graph
-POST /api/v1/scenarios/validate
-POST /api/v1/orchestrate
-POST /api/v1/resilience/routes/compare
-POST /api/v1/resilience/accessibility
-POST /api/v1/assess
-```
-
-OpenAPI is served at `http://localhost:8000/docs`. API responses receive a server-generated `X-Operation-Id` for request correlation.
-
-## Dashboard
-
-The frontend has a committed lockfile and uses reproducible installation:
-
-```bash
-cd frontend
-npm ci
-npm test
-npm run build
-npm run dev
-```
-
-The dashboard displays agent health, canonical observations, epistemic state, quality and provenance; maps official facilities, VBB stops and official climate-model features; runs deterministic orchestration workflows; and exposes explicitly hypothetical heat assessment controls. Missing API data are shown as unavailable rather than replaced with demo values.
-
-## Docker / Compose
-
-```bash
-docker compose config
 docker compose run --rm refresh
 docker compose up --build backend frontend
 ```
 
 Then open:
 
-- Dashboard: `http://localhost:8080`
-- API/OpenAPI: `http://localhost:8000/docs`
+- dashboard: `http://localhost:8080`
+- OpenAPI: `http://localhost:8000/docs`
 
-CI builds both images, starts the composed backend/frontend stack, verifies the backend health endpoint, verifies the frontend, and verifies the proxied `/health` route.
+If you generate `reference.json` or another state file **after** the backend has started, restart the backend because state is loaded at startup:
 
-Generated runtime data remain under the local `./data` mount and are not committed as source data.
-
-## Verification status
-
-As of the 2026-09-14 release verification:
-
-- Ruff format: pass
-- Ruff lint: pass
-- strict mypy: pass
-- pytest + coverage execution: pass
-- ontology/knowledge validation: pass
-- production synthetic-data guard: pass
-- secret guard: pass
-- OpenAPI generation: pass
-- frontend `npm ci`: pass
-- frontend tests: pass
-- frontend production build: pass
-- Docker Compose configuration: pass
-- backend image build: pass
-- frontend image build: pass
-- running Compose HTTP smoke: pass
-- separate real live-source smoke for Berlin Air + DWD + VBB: pass
-
-Live-provider status is intentionally kept outside deterministic CI because external outages and schema changes are valid operational conditions rather than deterministic repository failures.
-
-## Repository structure
-
-```text
-src/berlin_urban_intelligence/
-  adapters/           external-source boundaries
-  agents/             domain agents
-  api/                FastAPI v1 surface
-  energy/             leakage-safe energy evaluation/forecast workflow
-  knowledge/          RDF projection code
-  orchestrator/       deterministic planning/execution + integrated assessment
-  runtime/            live/reference acquisition and persisted state
-  scenario_engine/    explicit hypothetical overlays
-  shared/             contracts, time, CRS, provenance, quality, dependencies
-knowledge/
-  ontology/           project vocabulary + SHACL shapes
-  queries/            SPARQL artefacts
-config/
-  sources.yaml        machine-readable source registry
-frontend/             React / TypeScript / MapLibre research UI
-docs/                 architecture, methods, limitations, ADRs, migrations
-scripts/              acquisition, evaluation and validation commands
-tests/                deterministic unit/integration tests
-.github/workflows/     deterministic CI + separate live-source smoke
+```bash
+docker compose restart backend
 ```
 
-## Prototype migration
+For local Python/Node installation, reference layers and optional OSM, see [Installation](docs/usage/installation.md) and [Quickstart](docs/usage/quickstart.md).
 
-Migration assessments are under [`docs/prototype-migrations/`](docs/prototype-migrations/).
+## Example workflow
 
-- Live Twin contributed patterns for semantic state, provenance, freshness and VBB/Berlin source boundaries.
-- Resilience Twin contributed topology/scenario separation and accessibility-analysis patterns.
-- Energy Twin contributed leakage-safe evaluation and baseline methodology, while its UCI data remains non-Berlin reference material.
-- Mobility, Environmental Exposure and Urban Heat standalone repositories were bootstrap/empty at assessment time and therefore did not provide substantive code to import.
+Acquire current state:
 
-## Scientific boundaries
+```bash
+python scripts/refresh_live.py
+```
 
-This project does **not** claim a universal Berlin health/resilience score, causal effects from cross-domain co-occurrence, precision unsupported by source resolution, authoritative completeness from OSM, live operational status from facility location datasets, or forecast performance that has not been calculated from held-out data.
+Acquire official reference layers and VBB static GTFS:
 
-See [`docs/limitations.md`](docs/limitations.md).
+```bash
+python scripts/refresh_reference.py
+```
+
+Run the API:
+
+```bash
+uvicorn berlin_urban_intelligence.api.app:app --host 0.0.0.0 --port 8000
+```
+
+Inspect domain/source health:
+
+```bash
+curl http://localhost:8000/api/v1/agents/health
+curl http://localhost:8000/api/v1/source-status
+```
+
+More examples, including scenarios and resilience requests: [Usage examples](docs/usage/examples.md).
+
+## Testing
+
+Backend CI uses Python 3.12 and runs formatting, linting, strict mypy, pytest with coverage reporting, ontology validation, production-data/secret guards and OpenAPI generation. Frontend CI uses Node 22, `npm ci`, Vitest and the production build. A final job builds/starts the Compose backend/frontend and verifies HTTP health/proxy behavior.
+
+External-provider compatibility is tested separately so upstream outages do not make deterministic tests nondeterministic. See [Testing strategy](docs/development/testing.md).
 
 ## Documentation
 
-- [`docs/architecture.md`](docs/architecture.md)
-- [`docs/agents.md`](docs/agents.md)
-- [`docs/data-sources.md`](docs/data-sources.md)
-- [`docs/data-model.md`](docs/data-model.md)
-- [`docs/knowledge-graph.md`](docs/knowledge-graph.md)
-- [`docs/provenance.md`](docs/provenance.md)
-- [`docs/orchestration.md`](docs/orchestration.md)
-- [`docs/scenarios.md`](docs/scenarios.md)
-- [`docs/testing.md`](docs/testing.md)
-- [`docs/deployment.md`](docs/deployment.md)
-- [`docs/integration.md`](docs/integration.md)
-- [`docs/limitations.md`](docs/limitations.md)
-- [`docs/world-avatar-comparison.md`](docs/world-avatar-comparison.md)
-- [`docs/adr/`](docs/adr/)
-- [`docs/prototype-migrations/`](docs/prototype-migrations/)
+The documentation is organized for external engineering/research use:
 
-## Licence note
+- [Documentation index](docs/index.md)
+- [Concepts and terminology](docs/concepts/terminology.md)
+- [Architecture](docs/architecture/overview.md)
+- [Data architecture](docs/data/overview.md)
+- [Implementation](docs/implementation/modules.md)
+- [Usage](docs/usage/quickstart.md)
+- [Development](docs/development/development-setup.md)
+- [Evaluation](docs/evaluation/methodology.md)
+- [Research/reproducibility](docs/research/reproducibility.md)
+- [Roadmap](docs/roadmap.md)
+- [Architecture Decision Records](docs/adr/)
 
-No project-source licence has been added automatically. External datasets retain their own licences and attribution requirements as recorded in the source registry and documentation.
+## Current status
+
+**Implemented:** typed cross-domain contracts; configured data adapters; live/reference acquisition; domain agents; scenario/resilience calculations; energy evaluation/forecast pipeline; deterministic orchestration; RDF projection; persisted snapshots; API/dashboard; CI/container verification.
+
+**Experimental/conditional:** live provider compatibility, OSM-backed routing, Berlin energy forecasting for explicitly supplied source publications, cross-domain scenario assessment.
+
+**Not currently implemented/claimed:** continuous streaming state, municipal operations/control, universal Berlin score, causal cross-domain inference, calibrated energy prediction intervals, persistent SPARQL service, distributed remote-agent protocol, API authentication/authorization, production-scale performance validation.
+
+Quantitative scientific evaluation is currently strongest in the energy workflow. Broader architecture/scenario/scalability evaluation remains future research. See [Evaluation results](docs/evaluation/results.md) and [limitations](docs/evaluation/limitations.md).
+
+## Roadmap
+
+Planned work is separated from current capability in [docs/roadmap.md](docs/roadmap.md). Items move to “implemented” only when code, tests and corresponding documentation exist.
+
+## Data sources and licences
+
+`config/sources.yaml` is the machine-readable source registry and documents provider scope, URLs, authority, licence/attribution and known limitations. External datasets retain their own licensing/attribution requirements. See [Data sources](docs/data/data-sources.md).
+
+## License
+
+No project-source licence is currently present in the repository. Do not infer a project-source licence from external dataset licences. A formal project-source licence should be added deliberately before redistribution/use terms are claimed.
