@@ -49,7 +49,10 @@ class VbbGtfsStaticClient:
 
 class VbbGtfsStaticAdapter:
     REQUIRED_FILES = ("stops.txt", "routes.txt", "trips.txt")
-    MAX_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
+    # Only these three files are decompressed by this adapter. Large unused members such as
+    # stop_times.txt and shapes.txt therefore must not make an otherwise valid archive fail the
+    # decompression safety check.
+    MAX_REQUIRED_UNCOMPRESSED_BYTES = 128 * 1024 * 1024
 
     @staticmethod
     def _reader(archive: ZipFile, name: str) -> csv.DictReader[str]:
@@ -67,9 +70,11 @@ class VbbGtfsStaticAdapter:
                 for required in self.REQUIRED_FILES:
                     if required not in names:
                         raise ValueError(f"GTFS archive missing required file: {required}")
-                total_size = sum(info.file_size for info in archive.infolist())
-                if total_size > self.MAX_UNCOMPRESSED_BYTES:
-                    raise ValueError("GTFS archive exceeds configured uncompressed size limit")
+                required_size = sum(archive.getinfo(name).file_size for name in self.REQUIRED_FILES)
+                if required_size > self.MAX_REQUIRED_UNCOMPRESSED_BYTES:
+                    raise ValueError(
+                        "GTFS files consumed by this adapter exceed configured uncompressed size limit"
+                    )
 
                 stops: list[UrbanEntity] = []
                 stop_reader = self._reader(archive, "stops.txt")
