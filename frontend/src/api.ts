@@ -14,6 +14,36 @@ export type Spatial = {
   geometry?: Geometry | null;
 };
 
+export type Provenance = {
+  provider: string;
+  dataset: string;
+  source_url: string;
+  original_identifier?: string | null;
+  observed_at?: string | null;
+  retrieved_at: string;
+  processed_at: string;
+  processing_method: string;
+  agent: string;
+  agent_version: string;
+  model_version?: string | null;
+  source_licence?: string | null;
+  quality_note?: string | null;
+  upstream_ids: string[];
+};
+
+export type Observation = {
+  id: string;
+  entity_id: string;
+  phenomenon: string;
+  value: unknown;
+  unit?: string | null;
+  observed_at: string;
+  state: string;
+  quality: string;
+  provenance: Provenance;
+  spatial?: Spatial | null;
+};
+
 export type UrbanEntity = {
   id: string;
   name?: string | null;
@@ -65,12 +95,76 @@ export type SystemResponse = {
   synthetic_production_fallback: boolean;
 };
 
+export type WorkflowKind =
+  | "urban_snapshot"
+  | "heat_energy"
+  | "mobility_exposure"
+  | "mobility_resilience"
+  | "heat_mobility_resilience";
+
+export type OrchestrationResponse = {
+  plan: {
+    workflow: WorkflowKind;
+    agents: string[];
+    requires_llm: false;
+    note: string;
+  };
+  execution: {
+    workflow: WorkflowKind;
+    generated_at: string;
+    status: string;
+    agent_health: Record<string, Health>;
+    missing_agents: string[];
+    requires_llm: false;
+    note: string;
+  };
+};
+
+export type AssessmentResponse = {
+  generated_at: string;
+  scenario_name: string;
+  heat: Record<string, unknown> | null;
+  energy: Record<string, unknown> | null;
+  resilience: Record<string, unknown> | null;
+  unavailable_dimensions: string[];
+  dimension_errors: Record<string, string>;
+  composite_score: null;
+  note: string;
+};
+
 export async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(path, { headers: { Accept: "application/json" } });
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`);
   }
   return (await response.json()) as T;
+}
+
+export async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`${response.status} ${response.statusText}${detail ? ` · ${detail}` : ""}`);
+  }
+  return (await response.json()) as T;
+}
+
+export function heatAssessmentRequest(deltaC: number): Record<string, unknown> {
+  if (!Number.isFinite(deltaC) || deltaC < -20 || deltaC > 20) {
+    throw new Error("Temperature delta must be between -20 and 20 Cel.");
+  }
+  return {
+    scenario: {
+      name: `Heat delta ${deltaC >= 0 ? "+" : ""}${deltaC} Cel`,
+      kinds: ["extreme_heat"],
+      temperature_delta_c: deltaC,
+      is_hypothetical: true,
+    },
+  };
 }
 
 export function displayValue(value: unknown, unit?: string | null): string {
