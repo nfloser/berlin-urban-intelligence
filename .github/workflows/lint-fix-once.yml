@@ -1,0 +1,160 @@
+name: Reviewed lint fixes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/lint-fix-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,live]'
+      - name: Apply reviewed corrections
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "src/berlin_urban_intelligence/adapters/berlin_wfs.py": [
+                  (
+                      '                f"feature type discovery expected exactly one match for {cleaned!r}, found {matches!r}"\n',
+                      '                "feature type discovery expected exactly one match for "\n'
+                      '                f"{cleaned!r}, found {matches!r}"\n',
+                  ),
+              ],
+              "src/berlin_urban_intelligence/agents/energy.py": [
+                  (
+                      '                "No validated Berlin grid-load dataset/model is configured; the UCI prototype is research-reference-only."\n',
+                      '                "No validated Berlin grid-load dataset/model is configured; "\n'
+                      '                "the UCI prototype is research-reference-only."\n',
+                  ),
+                  (
+                      '                    f"Evaluation {self._berlin_model_metric.model_id} is registered, but no matching "\n',
+                      '                    f"Evaluation {self._berlin_model_metric.model_id} is registered, "\n'
+                      '                    "but no matching "\n',
+                  ),
+              ],
+              "src/berlin_urban_intelligence/agents/exposure.py": [
+                  (
+                      '                quality_note="Current LQI uses automatic measurements that remain subject to quality control.",\n',
+                      '                quality_note=(\n'
+                      '                    "Current LQI uses automatic measurements that remain subject "\n'
+                      '                    "to quality control."\n'
+                      '                ),\n',
+                  ),
+              ],
+              "src/berlin_urban_intelligence/agents/heat.py": [
+                  (
+                      '        description="Measured meteorology and official urban-climate information with explicit state semantics.",\n',
+                      '        description=(\n'
+                      '            "Measured meteorology and official urban-climate information with "\n'
+                      '            "explicit state semantics."\n'
+                      '        ),\n',
+                  ),
+                  (
+                      '                "DWD now data have not completed final quality control; QN is retained in the source record."\n',
+                      '                "DWD now data have not completed final quality control; "\n'
+                      '                "QN is retained in the source record."\n',
+                  ),
+                  (
+                      '                processing_method="official Berlin WFS GeoJSON normalization with source properties preserved",\n',
+                      '                processing_method=(\n'
+                      '                    "official Berlin WFS GeoJSON normalization with source "\n'
+                      '                    "properties preserved"\n'
+                      '                ),\n',
+                  ),
+              ],
+              "src/berlin_urban_intelligence/agents/live_state.py": [
+                  (
+                      '            note="Overall status summarises availability only; unavailable domains are never replaced with synthetic values.",\n',
+                      '            note=(\n'
+                      '                "Overall status summarises availability only; unavailable domains "\n'
+                      '                "are never replaced with synthetic values."\n'
+                      '            ),\n',
+                  ),
+              ],
+              "src/berlin_urban_intelligence/agents/mobility.py": [
+                  (
+                      '        description="Berlin mobility state from verified VBB sources with explicit realtime coverage semantics.",\n',
+                      '        description=(\n'
+                      '            "Berlin mobility state from verified VBB sources with explicit "\n'
+                      '            "realtime coverage semantics."\n'
+                      '        ),\n',
+                  ),
+                  (
+                      '            note = "No trip updates were present; absence of realtime updates is not evidence of normal operation."\n',
+                      '            note = (\n'
+                      '                "No trip updates were present; absence of realtime updates is not "\n'
+                      '                "evidence of normal operation."\n'
+                      '            )\n',
+                  ),
+              ],
+              "src/berlin_urban_intelligence/agents/resilience.py": [
+                  (
+                      '    NetworkEdge,\n',
+                      '    NetworkEdge,\n    NetworkNode,\n',
+                  ),
+                  (
+                      '                quality_note="Dataset identity/location only; no claim of live operational availability.",\n',
+                      '                quality_note=(\n'
+                      '                    "Dataset identity/location only; no claim of live operational "\n'
+                      '                    "availability."\n'
+                      '                ),\n',
+                  ),
+                  (
+                      '        description="Network accessibility and disruption analysis over explicit network/facility inputs.",\n',
+                      '        description=(\n'
+                      '            "Network accessibility and disruption analysis over explicit "\n'
+                      '            "network/facility inputs."\n'
+                      '        ),\n',
+                  ),
+                  (
+                      '        for u, v in zip(path, path[1:]):\n',
+                      '        for u, v in zip(path, path[1:], strict=False):\n',
+                  ),
+              ],
+              "src/berlin_urban_intelligence/energy/workflow.py": [
+                  (
+                      '                "No prediction interval is emitted because no calibrated uncertainty method is implemented.",\n',
+                      '                "No prediction interval is emitted because no calibrated "\n'
+                      '                "uncertainty method is implemented.",\n',
+                  ),
+              ],
+              "src/berlin_urban_intelligence/orchestrator/assessment.py": [
+                  (
+                      '                    "INSUFFICIENT_DATA: persisted network nodes and critical facilities are required"\n',
+                      '                    "INSUFFICIENT_DATA: persisted network nodes and critical "\n'
+                      '                    "facilities are required"\n',
+                  ),
+              ],
+          }
+
+          for path_string, pairs in replacements.items():
+              path = Path(path_string)
+              text = path.read_text(encoding="utf-8")
+              for old, new in pairs:
+                  if old not in text:
+                      raise SystemExit(f"reviewed pattern missing in {path}: {old!r}")
+                  text = text.replace(old, new, 1)
+              path.write_text(text, encoding="utf-8")
+          PY
+          ruff format src tests scripts
+          ruff check src tests scripts
+      - name: Commit reviewed fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src tests scripts
+          git commit -m 'fix: resolve reviewed lint defects'
+          git push origin HEAD:main
