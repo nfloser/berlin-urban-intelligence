@@ -48,14 +48,87 @@ def _grade(value: Any) -> int:
     return grade
 
 
+def _station_envelope_records(payload: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """Normalise the current station envelope returned by ``/api/lqis/data``.
+
+    Since September 2026 the live endpoint has been observed returning objects shaped as
+    ``{"station": "mc010", "data": [{"component": "lqi", ...}, ...]}``.  The canonical
+    adapter contract remains one station/timestamp record containing the overall LQI grade and
+    optional component grades.  Component ``value`` fields are deliberately not interpreted as
+    pollutant concentrations here; the endpoint's explicit ``grade`` field is the only component
+    value projected into the LQI contract.
+    """
+
+    rows = payload.get("data")
+    if not isinstance(rows, list):
+        return None
+    row_dicts = [row for row in rows if isinstance(row, dict)]
+    if not row_dicts:
+        return []
+
+    station = _first(payload, "station", "station_code", "stationCode", "code")
+    lqi_rows = [
+        row
+        for row in row_dicts
+        if str(row.get("component") or "").strip().lower() == "lqi"
+        and _first(row, "grade", "value") is not None
+    ]
+    if not lqi_rows:
+        return []
+
+    output: list[dict[str, Any]] = []
+    for lqi_row in lqi_rows:
+        timestamp = _first(
+            lqi_row, "timestamp", "date", "datetime", "observed_at", "observedAt"
+        )
+        if timestamp is None:
+            continue
+        record_station = station or _first(
+            lqi_row, "station", "station_code", "stationCode", "code"
+        )
+        components: dict[str, Any] = {}
+        for row in row_dicts:
+            row_timestamp = _first(
+                row, "timestamp", "date", "datetime", "observed_at", "observedAt"
+            )
+            if str(row_timestamp) != str(timestamp):
+                continue
+            component = str(row.get("component") or "").strip().lower()
+            canonical = _COMPONENT_ALIASES.get(component)
+            component_grade = row.get("grade")
+            if canonical and component_grade is not None:
+                components[canonical] = component_grade
+        output.append(
+            {
+                "station": record_station,
+                "datetime": timestamp,
+                "grade": _first(lqi_row, "grade", "value"),
+                "components": components,
+            }
+        )
+    return output
+
+
 def extract_lqi_records(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, list):
-        return [item for item in payload if isinstance(item, dict)]
+        output: list[dict[str, Any]] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            normalised = _station_envelope_records(item)
+            if normalised is None:
+                output.append(item)
+            else:
+                output.extend(normalised)
+        return output
     if isinstance(payload, dict):
+        station_records = _station_envelope_records(payload)
+        if station_records is not None:
+            return station_records
         for key in ("data", "items", "results", "lqis"):
             value = payload.get(key)
             if isinstance(value, list):
-                return [item for item in value if isinstance(item, dict)]
+                return extract_lqi_records(value)
     raise ValueError("Unsupported Berlin LQI response envelope")
 
 
