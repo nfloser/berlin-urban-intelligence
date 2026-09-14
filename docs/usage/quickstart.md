@@ -98,6 +98,12 @@ curl http://localhost:8000/api/v1/climate-features
 
 Reference endpoints can legitimately be empty when the corresponding acquisition was not run or failed. An empty result is not automatically a software error.
 
+## Use the dashboard map
+
+The map shows only persisted, WGS84 reference features returned by the API. Its legend provides independent switches for critical facilities, VBB stops and official climate features; switching a layer changes only its visibility, never the underlying state. The colours identify the layer type rather than a risk level or live condition.
+
+A map can therefore remain visually unchanged after a workflow or heat assessment: workflows expose agent availability, and a heat assessment returns an explicitly hypothetical cross-domain result. Neither action mutates the observed/reference baseline or fabricates a spatial impact layer.
+
 ## Energy workflow
 
 Energy state is not created by `refresh_live.py`. It requires an explicit inspected input dataset:
