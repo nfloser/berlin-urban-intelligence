@@ -47,3 +47,19 @@ def configure_structured_logging(level: int = logging.INFO) -> None:
     logger.addHandler(handler)
     logger.setLevel(level)
     logger.propagate = False
+
+
+def structured_log(
+    logger: logging.Logger,
+    message: str,
+    **context: Any,
+) -> None:
+    """Emit one structured INFO record using the platform context field allow-list.
+
+    Unknown context keys are ignored by :class:`JsonFormatter`, which prevents request bodies,
+    query strings or arbitrary external payloads from accidentally entering structured logs.
+    """
+
+    configure_structured_logging()
+    safe_context = {key: value for key, value in context.items() if key in _CONTEXT_FIELDS}
+    logger.info(message, extra=safe_context)
