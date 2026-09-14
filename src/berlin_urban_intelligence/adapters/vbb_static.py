@@ -73,7 +73,8 @@ class VbbGtfsStaticAdapter:
                 required_size = sum(archive.getinfo(name).file_size for name in self.REQUIRED_FILES)
                 if required_size > self.MAX_REQUIRED_UNCOMPRESSED_BYTES:
                     raise ValueError(
-                        "GTFS files consumed by this adapter exceed configured uncompressed size limit"
+                        "GTFS files consumed by this adapter exceed the configured "
+                        "uncompressed size limit"
                     )
 
                 stops: list[UrbanEntity] = []
