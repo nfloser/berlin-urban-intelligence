@@ -120,6 +120,22 @@ export type OrchestrationResponse = {
   };
 };
 
+export type RouteComparisonResponse = {
+  origin: string;
+  destination: string;
+  scenario_name: string;
+  baseline_travel_time_s: number;
+  scenario_travel_time_s: number;
+  absolute_delta_s: number;
+  relative_delta_pct: number;
+  baseline_node_path: string[];
+  baseline_edge_ids: string[];
+  scenario_node_path: string[];
+  scenario_edge_ids: string[];
+  baseline_geometry: Geometry | null;
+  scenario_geometry: Geometry | null;
+};
+
 export type AssessmentResponse = {
   generated_at: string;
   scenario_name: string;
@@ -151,6 +167,27 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
     throw new Error(`${response.status} ${response.statusText}${detail ? ` · ${detail}` : ""}`);
   }
   return (await response.json()) as T;
+}
+
+export function networkDisruptionRequest(
+  origin: string,
+  destination: string,
+  closedEdge: string,
+): Record<string, unknown> {
+  const values = [origin, destination, closedEdge].map((value) => value.trim());
+  if (values.some((value) => value.length === 0)) {
+    throw new Error("Origin, destination and closed edge are required.");
+  }
+  return {
+    origin: values[0],
+    destination: values[1],
+    scenario: {
+      name: `Network disruption: ${values[2]}`,
+      kinds: ["network_disruption"],
+      closed_network_edges: [values[2]],
+      is_hypothetical: true,
+    },
+  };
 }
 
 export function heatAssessmentRequest(deltaC: number): Record<string, unknown> {
