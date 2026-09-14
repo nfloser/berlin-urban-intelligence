@@ -78,9 +78,7 @@ def _station_envelope_records(payload: dict[str, Any]) -> list[dict[str, Any]] |
 
     output: list[dict[str, Any]] = []
     for lqi_row in lqi_rows:
-        timestamp = _first(
-            lqi_row, "timestamp", "date", "datetime", "observed_at", "observedAt"
-        )
+        timestamp = _first(lqi_row, "timestamp", "date", "datetime", "observed_at", "observedAt")
         if timestamp is None:
             continue
         record_station = station or _first(
