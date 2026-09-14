@@ -172,22 +172,6 @@ function App() {
       upsert("route-baseline", baselineRouteData);
       upsert("route-scenario", scenarioRouteData);
 
-      if (!map.getLayer("route-baseline-line")) {
-        map.addLayer({
-          id: "route-baseline-line",
-          type: "line",
-          source: "route-baseline",
-          paint: { "line-color": "#dfe8f0", "line-width": 4, "line-opacity": 0.72 },
-        });
-      }
-      if (!map.getLayer("route-scenario-line")) {
-        map.addLayer({
-          id: "route-scenario-line",
-          type: "line",
-          source: "route-scenario",
-          paint: { "line-color": "#d85f70", "line-width": 5, "line-opacity": 0.9 },
-        });
-      }
       if (!map.getLayer("climate-fill")) {
         map.addLayer({
           id: "climate-fill",
@@ -215,6 +199,22 @@ function App() {
             "circle-stroke-color": "#ffffff",
             "circle-stroke-width": 1.5,
           },
+        });
+      }
+      if (!map.getLayer("route-baseline-line")) {
+        map.addLayer({
+          id: "route-baseline-line",
+          type: "line",
+          source: "route-baseline",
+          paint: { "line-color": "#dfe8f0", "line-width": 4, "line-opacity": 0.72 },
+        });
+      }
+      if (!map.getLayer("route-scenario-line")) {
+        map.addLayer({
+          id: "route-scenario-line",
+          type: "line",
+          source: "route-scenario",
+          paint: { "line-color": "#d85f70", "line-width": 5, "line-opacity": 0.9 },
         });
       }
       setVisibility("facilities-circle", visibleLayers.facilities);
