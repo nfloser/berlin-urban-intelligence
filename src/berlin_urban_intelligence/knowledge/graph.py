@@ -8,6 +8,7 @@ changing the canonical agent contracts.
 from __future__ import annotations
 
 import json
+from urllib.parse import quote
 
 from rdflib import RDF, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import PROV, XSD
@@ -31,7 +32,10 @@ QUDT = Namespace("http://qudt.org/schema/qudt/")
 
 
 def _resource(identifier: str) -> URIRef:
-    return RES[identifier.replace(":", "/")]
+    """Create a stable, valid resource URI from a canonical or human-readable identifier."""
+
+    path = quote(identifier.replace(":", "/"), safe="/-._~")
+    return RES[path]
 
 
 class KnowledgeGraph:
