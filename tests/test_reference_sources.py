@@ -54,9 +54,7 @@ def test_reference_refresh_selects_current_official_wfs_layers() -> None:
         f"ua_klimaanalyse_2022:{name}"
         for name in ReferenceRefreshCoordinator.CLIMATE_LAYER_LOCAL_NAMES
     ]
-    climate = FakeWfs(
-        ["ua_klimaanalyse_2022:aa_ua_lufttemp_alkisgeb_2022", *climate_names]
-    )
+    climate = FakeWfs(["ua_klimaanalyse_2022:aa_ua_lufttemp_alkisgeb_2022", *climate_names])
 
     state = ReferenceRefreshCoordinator(
         hospital_client=hospitals,
@@ -82,8 +80,7 @@ def _gtfs_archive(*, unused_size: int = 0, extra_trip_rows: int = 0) -> bytes:
     with ZipFile(payload, "w", compression=ZIP_DEFLATED) as archive:
         archive.writestr(
             "stops.txt",
-            "stop_id,stop_name,stop_lat,stop_lon\n"
-            "de:11000:1,Example Stop,52.5,13.4\n",
+            "stop_id,stop_name,stop_lat,stop_lon\nde:11000:1,Example Stop,52.5,13.4\n",
         )
         archive.writestr("routes.txt", "route_id,route_short_name\nr1,R1\n")
         trips = "route_id,service_id,trip_id\nr1,s1,t1\n"
