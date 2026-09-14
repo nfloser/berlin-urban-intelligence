@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from pydantic import HttpUrl
+from shapely import make_valid
+from shapely.geometry import mapping, shape
 
 from berlin_urban_intelligence.adapters.dwd import DwdTemperatureRecord
 from berlin_urban_intelligence.agents.base import BaseAgent
@@ -102,6 +104,21 @@ class HeatAgent(BaseAgent):
         self._observations = tuple(observations)
         return observations
 
+    @staticmethod
+    def _normalise_official_geometry(
+        geometry: dict[str, Any],
+    ) -> tuple[dict[str, Any], bool]:
+        """Return a valid geometry while recording whether upstream repair was necessary."""
+        parsed = shape(geometry)
+        if parsed.is_empty:
+            raise ValueError("official climate feature has an empty geometry")
+        if parsed.is_valid:
+            return geometry, False
+        repaired = make_valid(parsed)
+        if repaired.is_empty or not repaired.is_valid:
+            raise ValueError("official climate feature geometry could not be repaired")
+        return dict(mapping(repaired)), True
+
     def ingest_official_climate_features(
         self,
         payload: dict[str, Any],
@@ -112,7 +129,8 @@ class HeatAgent(BaseAgent):
         """Normalize an official Berlin climate WFS layer without promoting it to observation.
 
         Properties are preserved as published rather than guessed into project-specific metrics.
-        This allows later schema-specific mappings only after the upstream fields are verified.
+        Invalid but repairable upstream geometries are normalized with ``shapely.make_valid`` and
+        explicitly marked suspect so the transformation is visible in quality and provenance.
         """
         if payload.get("type") != "FeatureCollection" or not isinstance(
             payload.get("features"), list
@@ -130,6 +148,7 @@ class HeatAgent(BaseAgent):
                 if isinstance(raw_properties, dict)
                 else {}
             )
+            geometry, repaired = self._normalise_official_geometry(raw["geometry"])
             provenance = Provenance(
                 provider="Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin",
                 dataset="Klimaanalysekarten 2022 (Umweltatlas)",
@@ -138,12 +157,20 @@ class HeatAgent(BaseAgent):
                 retrieved_at=retrieved,
                 processed_at=self.now(),
                 processing_method=(
-                    "official Berlin WFS GeoJSON normalization with source properties preserved"
+                    "official Berlin WFS GeoJSON normalization; invalid upstream geometry "
+                    "repaired with shapely.make_valid; source properties preserved"
+                    if repaired
+                    else "official Berlin WFS GeoJSON normalization with source properties preserved"
                 ),
                 agent=self.descriptor.id,
                 agent_version=self.descriptor.version,
                 source_licence="Datenlizenz Deutschland - Zero - Version 2.0",
-                quality_note="Official model output; not a measured meteorological observation.",
+                quality_note=(
+                    "Official model output; upstream geometry was invalid and repaired during "
+                    "normalization. This feature is marked suspect."
+                    if repaired
+                    else "Official model output; not a measured meteorological observation."
+                ),
             )
             output.append(
                 OfficialModelFeature(
@@ -152,9 +179,9 @@ class HeatAgent(BaseAgent):
                     model_name="Klimaanalysekarten 2022",
                     feature_type=feature_type,
                     properties=properties,
-                    quality=QualityFlag.VALID,
+                    quality=QualityFlag.SUSPECT if repaired else QualityFlag.VALID,
                     provenance=provenance,
-                    spatial=SpatialReference(crs="EPSG:4326", geometry=raw["geometry"]),
+                    spatial=SpatialReference(crs="EPSG:4326", geometry=geometry),
                 )
             )
         return output
