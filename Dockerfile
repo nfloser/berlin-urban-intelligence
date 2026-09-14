@@ -14,7 +14,7 @@ COPY knowledge ./knowledge
 COPY scripts ./scripts
 COPY data/README.md ./data/README.md
 
-RUN pip install --upgrade pip && pip install ".[live]" \
+RUN pip install --upgrade pip && pip install ".[live,osm]" \
     && useradd --create-home --uid 10001 appuser \
     && mkdir -p /app/data/runtime /app/data/generated \
     && chown -R appuser:appuser /app
