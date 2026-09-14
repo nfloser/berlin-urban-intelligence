@@ -20,6 +20,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install --upgrade pip
       - run: pip install -e '.[dev,live]'
+      - run: pip install 'types-PyYAML>=6.0'
       - name: Apply reviewed typing corrections
         run: |
           python - <<'PY'
