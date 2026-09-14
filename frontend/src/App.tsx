@@ -279,7 +279,7 @@ function App() {
               stops: stops.length,
               climate: climate.length,
             }).map(([label, count]) => {
-              const key = label === "Critical facilities"
+              const key: keyof typeof visibleLayers = label === "Critical facilities"
                 ? "facilities"
                 : label === "VBB stops"
                   ? "stops"
