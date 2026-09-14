@@ -1,0 +1,265 @@
+name: Strict typing fixes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/mypy-fix-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,live]'
+      - name: Apply reviewed typing corrections
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path_string: str, old: str, new: str) -> None:
+              path = Path(path_string)
+              text = path.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'missing reviewed pattern in {path}: {old!r}')
+              path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace('pyproject.toml', '  "pandas-stubs>=2.2",\n', '  "pandas-stubs>=2.2",\n  "types-PyYAML>=6.0",\n')
+
+          replace(
+              'src/berlin_urban_intelligence/shared/observability.py',
+              '    handler._bui_structured = True\n',
+              '    setattr(handler, "_bui_structured", True)\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/shared/contracts.py',
+              '        if self.lower_bound is not None and not (\n            self.lower_bound <= self.value <= self.upper_bound\n        ):\n',
+              '        if (\n            self.lower_bound is not None\n            and self.upper_bound is not None\n            and not self.lower_bound <= self.value <= self.upper_bound\n        ):\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/adapters/vbb_static.py',
+              '    def _reader(archive: ZipFile, name: str) -> csv.DictReader:\n',
+              '    def _reader(archive: ZipFile, name: str) -> csv.DictReader[str]:\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/adapters/vbb.py',
+              '        from google.transit import gtfs_realtime_pb2  # type: ignore[import-not-found]\n',
+              '        from google.transit import gtfs_realtime_pb2\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/adapters/berlin_wfs.py',
+              '        params: dict[str, object] = {\n',
+              '        params: dict[str, str | int] = {\n',
+          )
+
+          replace(
+              'src/berlin_urban_intelligence/agents/heat.py',
+              'from typing import Any\n\nfrom berlin_urban_intelligence.adapters.dwd',
+              'from typing import Any\n\nfrom pydantic import HttpUrl\n\nfrom berlin_urban_intelligence.adapters.dwd',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/heat.py',
+              '            source_url=(\n',
+              '            source_url=HttpUrl(\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/heat.py',
+              '            properties = raw.get("properties") if isinstance(raw.get("properties"), dict) else {}\n',
+              '            raw_properties = raw.get("properties")\n            properties = (\n                {str(key): value for key, value in raw_properties.items()}\n                if isinstance(raw_properties, dict)\n                else {}\n            )\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/heat.py',
+              '                source_url="https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022",\n',
+              '                source_url=HttpUrl(\n                    "https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022"\n                ),\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/heat.py',
+              '                    properties={str(key): value for key, value in properties.items()},\n',
+              '                    properties=properties,\n',
+          )
+
+          replace(
+              'src/berlin_urban_intelligence/agents/exposure.py',
+              'from datetime import datetime, timedelta\n\nfrom berlin_urban_intelligence.adapters.berlin_air_quality',
+              'from datetime import datetime, timedelta\n\nfrom pydantic import HttpUrl\n\nfrom berlin_urban_intelligence.adapters.berlin_air_quality',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/exposure.py',
+              '                source_url="https://luftdaten.berlin.de/api/lqis/data",\n',
+              '                source_url=HttpUrl("https://luftdaten.berlin.de/api/lqis/data"),\n',
+          )
+
+          replace(
+              'src/berlin_urban_intelligence/shared/dependencies.py',
+              '        self._graph = nx.DiGraph()\n',
+              '        self._graph: nx.DiGraph[str] = nx.DiGraph()\n',
+          )
+
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              'from pydantic import BaseModel, ConfigDict, Field\n',
+              'from pydantic import BaseModel, ConfigDict, Field, HttpUrl\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              'from shapely.geometry import shape\n',
+              'from shapely.geometry import Point, shape\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              '    candidates = [\n        (node, *transformer.transform(float(node.longitude), float(node.latitude)))\n        for node in nodes\n    ]\n',
+              '    candidates = []\n    for candidate_node in nodes:\n        if candidate_node.longitude is None or candidate_node.latitude is None:\n            raise ValueError("all network nodes require coordinates for nearest-node lookup")\n        candidate_x, candidate_y = transformer.transform(\n            candidate_node.longitude, candidate_node.latitude\n        )\n        candidates.append((candidate_node, candidate_x, candidate_y))\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              '    return NearestNetworkNode(\n        node_id=node.id,\n        longitude=float(node.longitude),\n        latitude=float(node.latitude),\n',
+              '    if node.longitude is None or node.latitude is None:\n        raise ValueError("nearest network node unexpectedly lacks coordinates")\n    return NearestNetworkNode(\n        node_id=node.id,\n        longitude=node.longitude,\n        latitude=node.latitude,\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              '    projected_nodes = [\n        (node, *node_transformer.transform(float(node.longitude), float(node.latitude)))\n        for node in nodes\n    ]\n',
+              '    projected_nodes = []\n    for network_node in nodes:\n        if network_node.longitude is None or network_node.latitude is None:\n            raise ValueError("all network nodes require coordinates for facility snapping")\n        node_x, node_y = node_transformer.transform(\n            network_node.longitude, network_node.latitude\n        )\n        projected_nodes.append((network_node, node_x, node_y))\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              '        point = projected if projected.geom_type == "Point" else projected.representative_point()\n',
+              '        point = projected if isinstance(projected, Point) else projected.representative_point()\n        if not isinstance(point, Point):\n            raise ValueError("facility geometry could not be reduced to a point")\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              '            properties = raw.get("properties") if isinstance(raw.get("properties"), dict) else {}\n',
+              '            raw_properties = raw.get("properties")\n            properties = (\n                {str(key): value for key, value in raw_properties.items()}\n                if isinstance(raw_properties, dict)\n                else {}\n            )\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              '                source_url=source_url,\n',
+              '                source_url=HttpUrl(source_url),\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              '    def _build_graph(edges: tuple[NetworkEdge, ...] | list[NetworkEdge]) -> nx.MultiDiGraph:\n        graph = nx.MultiDiGraph()\n',
+              '    def _build_graph(\n        edges: tuple[NetworkEdge, ...] | list[NetworkEdge],\n    ) -> nx.MultiDiGraph[str]:\n        graph: nx.MultiDiGraph[str] = nx.MultiDiGraph()\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/agents/resilience.py',
+              '    def _scenario_graph(self, scenario: Scenario | None) -> nx.MultiDiGraph:\n',
+              '    def _scenario_graph(self, scenario: Scenario | None) -> nx.MultiDiGraph[str]:\n',
+          )
+
+          replace(
+              'src/berlin_urban_intelligence/adapters/osm_network.py',
+              'from pydantic import BaseModel, ConfigDict\n',
+              'from pydantic import BaseModel, ConfigDict, HttpUrl\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/adapters/osm_network.py',
+              '    graph: nx.MultiDiGraph,\n',
+              '    graph: nx.MultiDiGraph[str],\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/adapters/osm_network.py',
+              '        source_url="https://www.openstreetmap.org/",\n',
+              '        source_url=HttpUrl("https://www.openstreetmap.org/"),\n',
+          )
+
+          replace(
+              'src/berlin_urban_intelligence/energy/workflow.py',
+              'from datetime import UTC, datetime\n\nfrom berlin_urban_intelligence.adapters.stromnetz_berlin',
+              'from datetime import UTC, datetime\n\nfrom pydantic import HttpUrl\n\nfrom berlin_urban_intelligence.adapters.stromnetz_berlin',
+          )
+          replace(
+              'src/berlin_urban_intelligence/energy/workflow.py',
+              '            source_url=series.source_url,\n',
+              '            source_url=HttpUrl(series.source_url),\n',
+          )
+
+          replace(
+              'src/berlin_urban_intelligence/runtime/reference_refresh.py',
+              'from typing import Any, Protocol\n',
+              'from typing import Any, Protocol, cast\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/runtime/reference_refresh.py',
+              'from berlin_urban_intelligence.runtime.reference import ReferenceState\n',
+              'from berlin_urban_intelligence.runtime.reference import ReferenceState\nfrom berlin_urban_intelligence.shared.contracts import CriticalFacility, OfficialModelFeature\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/runtime/reference_refresh.py',
+              '            return fetch_all(feature_type)\n',
+              '            return cast(dict[str, Any], fetch_all(feature_type))\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/runtime/reference_refresh.py',
+              '        facilities: list = []\n        climate_features: list = []\n',
+              '        facilities: list[CriticalFacility] = []\n        climate_features: list[OfficialModelFeature] = []\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/runtime/reference_refresh.py',
+              '            candidate_features: list = []\n',
+              '            candidate_features: list[OfficialModelFeature] = []\n',
+          )
+
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              'import logging\nimport os\nfrom contextlib import asynccontextmanager\n',
+              'import logging\nimport os\nfrom collections.abc import AsyncIterator, Awaitable, Callable, Sequence\nfrom contextlib import asynccontextmanager\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              'from uuid import uuid4\n\nfrom fastapi',
+              'from typing import TypeVar\nfrom uuid import uuid4\n\nfrom fastapi',
+          )
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              'from berlin_urban_intelligence.agents.energy import EnergyAgent\n',
+              'from berlin_urban_intelligence.agents.base import BaseAgent\nfrom berlin_urban_intelligence.agents.energy import EnergyAgent\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              'MAX_PAGE_SIZE = 1000\n',
+              'MAX_PAGE_SIZE = 1000\nT = TypeVar("T")\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              ') -> dict[str, object]:\n',
+              ') -> dict[str, BaseAgent]:\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              'def _slice(items: tuple | list, offset: int, limit: int) -> list:\n    return list(items[offset : offset + limit])\n',
+              'def _slice(items: Sequence[T], offset: int, limit: int) -> list[T]:\n    return list(items[offset : offset + limit])\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              '    async def lifespan(app: FastAPI):\n',
+              '    async def lifespan(app: FastAPI) -> AsyncIterator[None]:\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              '    async def operation_context(request: Request, call_next):\n        operation_id = str(uuid4())\n        started = perf_counter()\n',
+              '    async def operation_context(\n        request: Request, call_next: Callable[[Request], Awaitable[Response]]\n    ) -> Response:\n        operation_id = str(uuid4())\n        started = perf_counter()\n        response: Response | None = None\n',
+          )
+          replace(
+              'src/berlin_urban_intelligence/api/app.py',
+              '            if "response" in locals():\n                response.headers["X-Operation-Id"] = operation_id\n',
+              '            if response is not None:\n                response.headers["X-Operation-Id"] = operation_id\n',
+          )
+          PY
+          ruff format src tests scripts
+          ruff check src tests scripts
+          mypy src/berlin_urban_intelligence
+      - name: Commit strict typing fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pyproject.toml src
+          git commit -m 'fix: satisfy strict backend typing'
+          git push origin HEAD:main
