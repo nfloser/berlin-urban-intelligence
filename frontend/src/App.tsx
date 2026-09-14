@@ -11,6 +11,7 @@ import {
   type Observation,
   type OfficialModelFeature,
   type OrchestrationResponse,
+  type RouteComparisonResponse,
   type SystemResponse,
   type UrbanEntity,
   type WorkflowKind,
@@ -18,6 +19,7 @@ import {
   fetchJson,
   heatAssessmentRequest,
   mapLayerCounts,
+  networkDisruptionRequest,
   postJson,
   toFeatureCollection,
 } from "./api";
@@ -66,6 +68,12 @@ function App() {
   const [assessmentState, setAssessmentState] = useState<ActionState>("idle");
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
+  const [routeOrigin, setRouteOrigin] = useState("");
+  const [routeDestination, setRouteDestination] = useState("");
+  const [closedEdge, setClosedEdge] = useState("");
+  const [routeState, setRouteState] = useState<ActionState>("idle");
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeComparison, setRouteComparison] = useState<RouteComparisonResponse | null>(null);
 
   const selectedObservation =
     observations.find((item) => item.id === selectedObservationId) ?? null;
@@ -138,6 +146,14 @@ function App() {
     const facilityData = toFeatureCollection(facilities);
     const stopData = toFeatureCollection(stops);
     const climateData = toFeatureCollection(climate);
+    const routeData = (geometry: RouteComparisonResponse["baseline_geometry"]): FeatureCollection => ({
+      type: "FeatureCollection",
+      features: geometry
+        ? [{ type: "Feature", properties: {}, geometry }]
+        : [],
+    });
+    const baselineRouteData = routeData(routeComparison?.baseline_geometry ?? null);
+    const scenarioRouteData = routeData(routeComparison?.scenario_geometry ?? null);
     const setVisibility = (layerId: string, visible: boolean) => {
       if (map.getLayer(layerId)) {
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
@@ -153,7 +169,25 @@ function App() {
       upsert("facilities", facilityData);
       upsert("stops", stopData);
       upsert("climate", climateData);
+      upsert("route-baseline", baselineRouteData);
+      upsert("route-scenario", scenarioRouteData);
 
+      if (!map.getLayer("route-baseline-line")) {
+        map.addLayer({
+          id: "route-baseline-line",
+          type: "line",
+          source: "route-baseline",
+          paint: { "line-color": "#dfe8f0", "line-width": 4, "line-opacity": 0.72 },
+        });
+      }
+      if (!map.getLayer("route-scenario-line")) {
+        map.addLayer({
+          id: "route-scenario-line",
+          type: "line",
+          source: "route-scenario",
+          paint: { "line-color": "#d85f70", "line-width": 5, "line-opacity": 0.9 },
+        });
+      }
       if (!map.getLayer("climate-fill")) {
         map.addLayer({
           id: "climate-fill",
@@ -190,7 +224,7 @@ function App() {
 
     if (map.isStyleLoaded()) installLayers();
     else map.once("load", installLayers);
-  }, [loadState, facilities, stops, climate, visibleLayers]);
+  }, [loadState, facilities, stops, climate, visibleLayers, routeComparison]);
 
   const runWorkflow = async () => {
     setWorkflowState("running");
@@ -202,6 +236,24 @@ function App() {
     } catch (reason) {
       setWorkflowError(reason instanceof Error ? reason.message : "Unknown orchestration error");
       setWorkflowState("error");
+    }
+  };
+
+  const runRouteComparison = async () => {
+    setRouteError(null);
+    setRouteComparison(null);
+    setRouteState("running");
+    try {
+      const request = networkDisruptionRequest(routeOrigin, routeDestination, closedEdge);
+      const result = await postJson<RouteComparisonResponse>(
+        "/api/v1/resilience/routes/compare",
+        request,
+      );
+      setRouteComparison(result);
+      setRouteState("idle");
+    } catch (reason) {
+      setRouteError(reason instanceof Error ? reason.message : "Route comparison failed.");
+      setRouteState("error");
     }
   };
 
@@ -434,6 +486,39 @@ function App() {
               <span>
                 Missing: {workflowResult.execution.missing_agents.length > 0 ? workflowResult.execution.missing_agents.join(", ") : "none"}
               </span>
+            </div>
+          )}
+        </article>
+
+        <article className="research-card scenario-card">
+          <p className="eyebrow">Spatial hypothetical scenario</p>
+          <h2>Network disruption route</h2>
+          <p className="method-note">
+            Enter existing network node and edge IDs from the persisted reference snapshot. The white
+            line is the baseline route; the red line is the route after the explicitly closed edge.
+          </p>
+          <label className="field">
+            <span>Origin node ID</span>
+            <input value={routeOrigin} onChange={(event) => setRouteOrigin(event.target.value)} placeholder="e.g. osm:node:…" />
+          </label>
+          <label className="field">
+            <span>Destination node ID</span>
+            <input value={routeDestination} onChange={(event) => setRouteDestination(event.target.value)} placeholder="e.g. osm:node:…" />
+          </label>
+          <label className="field">
+            <span>Close network edge ID</span>
+            <input value={closedEdge} onChange={(event) => setClosedEdge(event.target.value)} placeholder="e.g. osm:edge:…" />
+          </label>
+          <button className="primary-action" onClick={runRouteComparison} disabled={routeState === "running"} type="button">
+            {routeState === "running" ? "Comparing…" : "Compare baseline vs. disruption"}
+          </button>
+          {routeError && <p className="inline-error">{routeError}</p>}
+          {routeComparison && (
+            <div className="result-box">
+              <strong>{routeComparison.scenario_name}</strong>
+              <span>Baseline: {Math.round(routeComparison.baseline_travel_time_s)} s</span>
+              <span>Scenario: {Math.round(routeComparison.scenario_travel_time_s)} s</span>
+              <span>Change: {Math.round(routeComparison.absolute_delta_s)} s ({routeComparison.relative_delta_pct.toFixed(1)}%)</span>
             </div>
           )}
         </article>
