@@ -42,7 +42,7 @@ def test_numeric_observation_requires_unit() -> None:
 
 
 def test_observation_cannot_claim_scenario_state() -> None:
-    with pytest.raises(ValidationError, match="observation state"):
+    with pytest.raises(ValidationError, match="cannot use forecast, scenario or unavailable"):
         Observation(
             id="fixture:obs",
             entity_id="fixture:entity",
