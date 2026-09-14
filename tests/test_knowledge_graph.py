@@ -46,3 +46,30 @@ def test_observation_projection_preserves_state_and_provenance() -> None:
     )
     assert "observed" in graph.serialize()
     assert "fixture-provider" in graph.serialize()
+
+
+def test_provenance_source_with_human_readable_names_serializes_as_valid_uri() -> None:
+    provenance = Provenance(
+        provider="Senatsverwaltung für Stadtentwicklung",
+        dataset="Klimaanalysekarten 2022 (Umweltatlas)",
+        source_url="https://example.invalid/climate",
+        retrieved_at=NOW,
+        processed_at=NOW,
+        processing_method="fixture mapping",
+        agent="fixture-agent",
+        agent_version="0.0-test",
+    )
+    observation = Observation(
+        id="fixture:observation:source-name",
+        entity_id="fixture:entity",
+        phenomenon="fixture_temperature",
+        value=20.0,
+        unit="Cel",
+        observed_at=NOW,
+        state=DataState.OBSERVED,
+        quality=QualityFlag.VALID,
+        provenance=provenance,
+    )
+    serialized = KnowledgeGraph()
+    serialized.add_observation(observation)
+    assert "Senatsverwaltung%20f%C3%BCr%20Stadtentwicklung" in serialized.serialize()
