@@ -21,6 +21,7 @@ from berlin_urban_intelligence.shared.contracts import (
     CriticalFacility,
     FreshnessStatus,
     NetworkEdge,
+    NetworkNode,
     Provenance,
     QualityFlag,
     SpatialReference,
@@ -223,7 +224,9 @@ class CriticalInfrastructureRegistry:
                 agent="resilience",
                 agent_version="1.0.0",
                 source_licence=licence,
-                quality_note="Dataset identity/location only; no claim of live operational availability.",
+                quality_note=(
+                    "Dataset identity/location only; no claim of live operational availability."
+                ),
             )
             facilities.append(
                 CriticalFacility(
@@ -244,7 +247,9 @@ class ResilienceAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="resilience",
         version="1.0.0",
-        description="Network accessibility and disruption analysis over explicit network/facility inputs.",
+        description=(
+            "Network accessibility and disruption analysis over explicit network/facility inputs."
+        ),
         capabilities=(
             "shortest_path",
             "accessibility",
@@ -311,7 +316,7 @@ class ResilienceAgent(BaseAgent):
         path = nx.shortest_path(graph, origin, destination, weight="travel_time_s")
         edge_ids: list[str] = []
         travel_time = 0.0
-        for u, v in zip(path, path[1:]):
+        for u, v in zip(path, path[1:], strict=False):
             edge_options = graph.get_edge_data(u, v)
             if not edge_options:
                 raise RuntimeError("route path references a missing graph edge")

@@ -111,7 +111,8 @@ class IntegratedAssessmentService:
             if not self.facilities or not self.network_nodes:
                 unavailable.append("resilience")
                 errors["resilience"] = (
-                    "INSUFFICIENT_DATA: persisted network nodes and critical facilities are required"
+                    "INSUFFICIENT_DATA: persisted network nodes and critical "
+                    "facilities are required"
                 )
             else:
                 try:

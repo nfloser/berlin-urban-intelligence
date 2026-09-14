@@ -27,7 +27,10 @@ class HeatAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="heat",
         version="0.1.0",
-        description="Measured meteorology and official urban-climate information with explicit state semantics.",
+        description=(
+            "Measured meteorology and official urban-climate information with "
+            "explicit state semantics."
+        ),
         capabilities=("ingest_dwd_temperature", "ingest_official_climate_features", "heat_state"),
         input_contracts=("DwdTemperatureRecord",),
         output_contracts=("Observation",),
@@ -64,7 +67,8 @@ class HeatAgent(BaseAgent):
             agent_version=self.descriptor.version,
             source_licence="CC BY 4.0",
             quality_note=(
-                "DWD now data have not completed final quality control; QN is retained in the source record."
+                "DWD now data have not completed final quality control; "
+                "QN is retained in the source record."
             ),
         )
         specs = [
@@ -126,7 +130,9 @@ class HeatAgent(BaseAgent):
                 original_identifier=feature_id,
                 retrieved_at=retrieved,
                 processed_at=self.now(),
-                processing_method="official Berlin WFS GeoJSON normalization with source properties preserved",
+                processing_method=(
+                    "official Berlin WFS GeoJSON normalization with source properties preserved"
+                ),
                 agent=self.descriptor.id,
                 agent_version=self.descriptor.version,
                 source_licence="Datenlizenz Deutschland - Zero - Version 2.0",

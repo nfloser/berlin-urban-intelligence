@@ -40,7 +40,10 @@ class MobilityAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="mobility",
         version="0.1.0",
-        description="Berlin mobility state from verified VBB sources with explicit realtime coverage semantics.",
+        description=(
+            "Berlin mobility state from verified VBB sources with explicit "
+            "realtime coverage semantics."
+        ),
         capabilities=("gtfs_realtime_summary", "mobility_state"),
         input_contracts=("TransitUpdate",),
         output_contracts=("MobilitySnapshot",),
@@ -88,7 +91,10 @@ class MobilityAgent(BaseAgent):
             note = "Summary reflects trip updates present in the VBB GTFS-Realtime feed only."
         else:
             quality = QualityFlag.UNKNOWN
-            note = "No trip updates were present; absence of realtime updates is not evidence of normal operation."
+            note = (
+                "No trip updates were present; absence of realtime updates is not "
+                "evidence of normal operation."
+            )
         snapshot = MobilitySnapshot(
             observed_at=observed,
             retrieved_at=retrieved,

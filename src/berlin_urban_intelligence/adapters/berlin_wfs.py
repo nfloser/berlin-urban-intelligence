@@ -87,7 +87,8 @@ class BerlinWfsClient:
         ]
         if len(matches) != 1:
             raise ValueError(
-                f"feature type discovery expected exactly one match for {cleaned!r}, found {matches!r}"
+                "feature type discovery expected exactly one match for "
+                f"{cleaned!r}, found {matches!r}"
             )
         return matches[0]
 

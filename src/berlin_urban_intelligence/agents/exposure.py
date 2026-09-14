@@ -58,7 +58,10 @@ class ExposureAgent(BaseAgent):
                 agent=self.descriptor.id,
                 agent_version=self.descriptor.version,
                 source_licence="Datenlizenz Deutschland - Namensnennung - Version 2.0",
-                quality_note="Current LQI uses automatic measurements that remain subject to quality control.",
+                quality_note=(
+                    "Current LQI uses automatic measurements that remain subject "
+                    "to quality control."
+                ),
             )
             output.append(
                 Observation(

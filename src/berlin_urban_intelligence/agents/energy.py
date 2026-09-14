@@ -152,7 +152,8 @@ class EnergyAgent(BaseAgent):
         now = self.now()
         if self._berlin_model_metric is None:
             return self.unavailable_health(
-                "No validated Berlin grid-load dataset/model is configured; the UCI prototype is research-reference-only."
+                "No validated Berlin grid-load dataset/model is configured; "
+                "the UCI prototype is research-reference-only."
             )
         if not self._forecasts:
             return AgentHealth(
@@ -162,7 +163,8 @@ class EnergyAgent(BaseAgent):
                 freshness=FreshnessStatus.UNAVAILABLE,
                 quality=QualityFlag.VALID,
                 detail=(
-                    f"Evaluation {self._berlin_model_metric.model_id} is registered, but no matching "
+                    f"Evaluation {self._berlin_model_metric.model_id} is registered, "
+                    "but no matching "
                     "Berlin forecast artefact is available."
                 ),
             )

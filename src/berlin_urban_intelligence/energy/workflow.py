@@ -54,6 +54,7 @@ class EnergyForecastWorkflow:
             notes=(
                 "Candidate selected by lowest chronological holdout MAE, then RMSE; simpler "
                 "baselines win exact ties. Forecast is one source interval ahead.",
-                "No prediction interval is emitted because no calibrated uncertainty method is implemented.",
+                "No prediction interval is emitted because no calibrated "
+                "uncertainty method is implemented.",
             ),
         )

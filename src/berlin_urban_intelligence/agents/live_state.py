@@ -61,7 +61,10 @@ class LiveStateAgent(BaseAgent):
             generated_at=self.now(),
             agents=health,
             overall_status=overall,
-            note="Overall status summarises availability only; unavailable domains are never replaced with synthetic values.",
+            note=(
+                "Overall status summarises availability only; unavailable domains "
+                "are never replaced with synthetic values."
+            ),
         )
         self._last = snapshot
         return snapshot
