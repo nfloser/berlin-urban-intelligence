@@ -374,11 +374,13 @@ def create_app() -> FastAPI:
     ) -> dict[str, object]:
         reference: ReferenceState | None = request.app.state.reference
         if reference is None or not reference.network_nodes:
-            raise HTTPException(status_code=409, detail="INSUFFICIENT_DATA: routing network required")
+            raise HTTPException(
+                status_code=409, detail="INSUFFICIENT_DATA: routing network required"
+            )
         try:
-            return nearest_network_node(
-                longitude, latitude, reference.network_nodes
-            ).model_dump(mode="json")
+            return nearest_network_node(longitude, latitude, reference.network_nodes).model_dump(
+                mode="json"
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=f"DERIVATION_FAILED: {exc}") from None
 
