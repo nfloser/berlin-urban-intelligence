@@ -1,0 +1,38 @@
+name: Reference source smoke once
+
+on:
+  push:
+    paths:
+      - .github/workflows/reference-smoke-once.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[live]"
+      - name: Verify current official reference sources
+        shell: python
+        run: |
+          from berlin_urban_intelligence.runtime.reference_acquisition import ReferenceAcquisitionCoordinator
+
+          state = ReferenceAcquisitionCoordinator().refresh(include_gtfs=True)
+          print("errors=", state.errors)
+          print("critical_facilities=", len(state.critical_facilities))
+          print("official_model_features=", len(state.official_model_features))
+          print("transport_stops=", len(state.transport_stops))
+          repaired = sum(
+              1 for item in state.official_model_features if item.quality.value == "suspect"
+          )
+          print("suspect_climate_features=", repaired)
+          assert not state.errors, state.errors
+          assert state.critical_facilities
+          assert state.official_model_features
+          assert state.transport_stops
