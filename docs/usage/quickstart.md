@@ -104,7 +104,7 @@ The map shows only persisted, WGS84 reference features returned by the API. Its 
 
 A map can therefore remain visually unchanged after a workflow or heat assessment: workflows expose agent availability, and a heat assessment returns an explicitly hypothetical cross-domain result. Neither action mutates the observed/reference baseline or fabricates a spatial impact layer.
 
-The dashboard also supports a spatial network-disruption comparison when a reference snapshot contains routing topology. Enter valid persisted origin/destination node IDs and one network-edge ID to close. The API computes both routes; the map renders the returned baseline geometry in white and the hypothetical disrupted route in red. It does not infer closures, nodes or a spatial heat impact from incomplete data.
+The dashboard also supports a spatial network-disruption comparison when a reference snapshot contains routing topology. Select origin and destination directly on the map; the API snaps each click to the nearest persisted network node and returns the baseline route. Select a displayed baseline route segment to close, then run the hypothetical disruption. The map renders the returned baseline geometry in white and the hypothetical disrupted route in red. It does not infer closures, nodes or a spatial heat impact from incomplete data.
 
 ## Energy workflow
 
