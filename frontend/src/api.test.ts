@@ -4,6 +4,7 @@ import {
   heatAssessmentRequest,
   mapLayerCounts,
   networkDisruptionRequest,
+  routeRequest,
   toFeatureCollection,
 } from "./api";
 
@@ -40,6 +41,14 @@ describe("dashboard data semantics", () => {
       ["Official climate features", 1],
     ]);
     expect(mapLayerCounts({ facilities: 0, stops: 0, climate: 0 })).toEqual([]);
+  });
+
+  it("builds a baseline route request only from selected map nodes", () => {
+    expect(routeRequest("node:a", "node:c")).toEqual({
+      origin: "node:a",
+      destination: "node:c",
+    });
+    expect(() => routeRequest("node:a", "node:a")).toThrow(/different/);
   });
 
   it("builds a route-comparison request with an explicit closed edge", () => {
