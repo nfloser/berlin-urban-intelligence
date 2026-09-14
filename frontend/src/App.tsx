@@ -10,8 +10,10 @@ import {
   type MobilityResponse,
   type Observation,
   type OfficialModelFeature,
+  type NetworkNodePick,
   type OrchestrationResponse,
   type RouteComparisonResponse,
+  type RouteResponse,
   type SystemResponse,
   type UrbanEntity,
   type WorkflowKind,
@@ -21,6 +23,7 @@ import {
   mapLayerCounts,
   networkDisruptionRequest,
   postJson,
+  routeRequest,
   toFeatureCollection,
 } from "./api";
 
@@ -68,8 +71,10 @@ function App() {
   const [assessmentState, setAssessmentState] = useState<ActionState>("idle");
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
-  const [routeOrigin, setRouteOrigin] = useState("");
-  const [routeDestination, setRouteDestination] = useState("");
+  const [routeOrigin, setRouteOrigin] = useState<NetworkNodePick | null>(null);
+  const [routeDestination, setRouteDestination] = useState<NetworkNodePick | null>(null);
+  const [routeSelectionMode, setRouteSelectionMode] = useState<"origin" | "destination" | null>(null);
+  const [routeBaseline, setRouteBaseline] = useState<RouteResponse | null>(null);
   const [closedEdge, setClosedEdge] = useState("");
   const [routeState, setRouteState] = useState<ActionState>("idle");
   const [routeError, setRouteError] = useState<string | null>(null);
@@ -152,7 +157,19 @@ function App() {
         ? [{ type: "Feature", properties: {}, geometry }]
         : [],
     });
-    const baselineRouteData = routeData(routeComparison?.baseline_geometry ?? null);
+    const baselineRouteData = routeData(
+      routeComparison?.baseline_geometry ?? routeBaseline?.geometry ?? null,
+    );
+    const selectionData: FeatureCollection = {
+      type: "FeatureCollection",
+      features: [routeOrigin, routeDestination]
+        .filter((node): node is NetworkNodePick => node !== null)
+        .map((node) => ({
+          type: "Feature",
+          properties: { node_id: node.node_id },
+          geometry: { type: "Point", coordinates: [node.longitude, node.latitude] },
+        })),
+    };
     const scenarioRouteData = routeData(routeComparison?.scenario_geometry ?? null);
     const setVisibility = (layerId: string, visible: boolean) => {
       if (map.getLayer(layerId)) {
@@ -171,6 +188,7 @@ function App() {
       upsert("climate", climateData);
       upsert("route-baseline", baselineRouteData);
       upsert("route-scenario", scenarioRouteData);
+      upsert("route-selection", selectionData);
 
       if (!map.getLayer("climate-fill")) {
         map.addLayer({
@@ -201,6 +219,19 @@ function App() {
           },
         });
       }
+      if (!map.getLayer("route-selection-circle")) {
+        map.addLayer({
+          id: "route-selection-circle",
+          type: "circle",
+          source: "route-selection",
+          paint: {
+            "circle-radius": 8,
+            "circle-color": "#f0c75e",
+            "circle-stroke-color": "#111821",
+            "circle-stroke-width": 2,
+          },
+        });
+      }
       if (!map.getLayer("route-baseline-line")) {
         map.addLayer({
           id: "route-baseline-line",
@@ -224,7 +255,44 @@ function App() {
 
     if (map.isStyleLoaded()) installLayers();
     else map.once("load", installLayers);
-  }, [loadState, facilities, stops, climate, visibleLayers, routeComparison]);
+  }, [
+    loadState,
+    facilities,
+    stops,
+    climate,
+    visibleLayers,
+    routeComparison,
+    routeBaseline,
+    routeOrigin,
+    routeDestination,
+  ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || routeSelectionMode === null) return;
+    const selectNearestNode = async (event: maplibregl.MapMouseEvent) => {
+      setRouteError(null);
+      try {
+        const point = event.lngLat;
+        const node = await fetchJson<NetworkNodePick>(
+          `/api/v1/network/nearest?longitude=${point.lng}&latitude=${point.lat}`,
+        );
+        if (routeSelectionMode === "origin") setRouteOrigin(node);
+        else setRouteDestination(node);
+        setRouteBaseline(null);
+        setRouteComparison(null);
+        setClosedEdge("");
+        setRouteSelectionMode(null);
+      } catch (reason) {
+        setRouteError(reason instanceof Error ? reason.message : "Could not select a network node.");
+        setRouteSelectionMode(null);
+      }
+    };
+    map.on("click", selectNearestNode);
+    return () => {
+      map.off("click", selectNearestNode);
+    };
+  }, [routeSelectionMode]);
 
   const runWorkflow = async () => {
     setWorkflowState("running");
@@ -239,12 +307,41 @@ function App() {
     }
   };
 
+  const runRouteBaseline = async () => {
+    setRouteError(null);
+    setRouteComparison(null);
+    if (!routeOrigin || !routeDestination) {
+      setRouteError("Select an origin and a destination on the map first.");
+      return;
+    }
+    setRouteState("running");
+    try {
+      const result = await postJson<RouteResponse>(
+        "/api/v1/resilience/routes",
+        routeRequest(routeOrigin.node_id, routeDestination.node_id),
+      );
+      setRouteBaseline(result);
+      setClosedEdge(result.edge_ids[0] ?? "");
+      setRouteState("idle");
+    } catch (reason) {
+      setRouteError(reason instanceof Error ? reason.message : "Baseline route failed.");
+      setRouteState("error");
+    }
+  };
+
   const runRouteComparison = async () => {
     setRouteError(null);
     setRouteComparison(null);
     setRouteState("running");
     try {
-      const request = networkDisruptionRequest(routeOrigin, routeDestination, closedEdge);
+      if (!routeOrigin || !routeDestination) {
+        throw new Error("Select an origin and a destination on the map first.");
+      }
+      const request = networkDisruptionRequest(
+        routeOrigin.node_id,
+        routeDestination.node_id,
+        closedEdge,
+      );
       const result = await postJson<RouteComparisonResponse>(
         "/api/v1/resilience/routes/compare",
         request,
@@ -497,20 +594,43 @@ function App() {
             Enter existing network node and edge IDs from the persisted reference snapshot. The white
             line is the baseline route; the red line is the route after the explicitly closed edge.
           </p>
-          <label className="field">
-            <span>Origin node ID</span>
-            <input value={routeOrigin} onChange={(event) => setRouteOrigin(event.target.value)} placeholder="e.g. osm:node:…" />
-          </label>
-          <label className="field">
-            <span>Destination node ID</span>
-            <input value={routeDestination} onChange={(event) => setRouteDestination(event.target.value)} placeholder="e.g. osm:node:…" />
-          </label>
-          <label className="field">
-            <span>Close network edge ID</span>
-            <input value={closedEdge} onChange={(event) => setClosedEdge(event.target.value)} placeholder="e.g. osm:edge:…" />
-          </label>
-          <button className="primary-action" onClick={runRouteComparison} disabled={routeState === "running"} type="button">
-            {routeState === "running" ? "Comparing…" : "Compare baseline vs. disruption"}
+          <div className="route-selection-actions">
+            <button
+              className={`secondary-action${routeSelectionMode === "origin" ? " active" : ""}`}
+              onClick={() => setRouteSelectionMode("origin")}
+              type="button"
+            >
+              {routeOrigin ? "Origin selected" : "Select origin on map"}
+            </button>
+            <button
+              className={`secondary-action${routeSelectionMode === "destination" ? " active" : ""}`}
+              onClick={() => setRouteSelectionMode("destination")}
+              type="button"
+            >
+              {routeDestination ? "Destination selected" : "Select destination on map"}
+            </button>
+          </div>
+          {routeSelectionMode && <p className="method-note">Now click the map to set the {routeSelectionMode}.</p>}
+          <button className="primary-action" onClick={runRouteBaseline} disabled={routeState === "running"} type="button">
+            {routeState === "running" ? "Loading route…" : "Show baseline route"}
+          </button>
+          {routeBaseline && (
+            <label className="field">
+              <span>Disrupted route segment</span>
+              <select value={closedEdge} onChange={(event) => setClosedEdge(event.target.value)}>
+                {routeBaseline.edge_ids.map((edgeId, index) => (
+                  <option key={edgeId} value={edgeId}>Route segment {index + 1}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button
+            className="primary-action"
+            onClick={runRouteComparison}
+            disabled={routeState === "running" || !routeBaseline || !closedEdge}
+            type="button"
+          >
+            {routeState === "running" ? "Comparing…" : "Simulate selected disruption"}
           </button>
           {routeError && <p className="inline-error">{routeError}</p>}
           {routeComparison && (
