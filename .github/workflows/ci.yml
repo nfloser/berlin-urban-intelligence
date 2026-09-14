@@ -53,3 +53,22 @@ jobs:
       - run: docker compose config
       - run: docker build -t berlin-urban-intelligence:ci .
       - run: docker build -t berlin-urban-intelligence-dashboard:ci frontend
+      - name: Start composed stack and verify HTTP health
+        run: |
+          set -euo pipefail
+          trap 'docker compose down -v' EXIT
+          docker compose up -d --build backend frontend
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              docker compose ps
+              docker compose logs backend frontend
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:8080/ >/dev/null
+          curl --fail --silent http://127.0.0.1:8080/health >/dev/null
+          docker compose ps
