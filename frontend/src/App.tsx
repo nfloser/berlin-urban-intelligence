@@ -591,8 +591,8 @@ function App() {
           <p className="eyebrow">Spatial hypothetical scenario</p>
           <h2>Network disruption route</h2>
           <p className="method-note">
-            Enter existing network node and edge IDs from the persisted reference snapshot. The white
-            line is the baseline route; the red line is the route after the explicitly closed edge.
+            Select origin and destination directly on the map. The white line is the baseline route;
+            choose one displayed route segment to close, then compare it with the red disruption route.
           </p>
           <div className="route-selection-actions">
             <button
