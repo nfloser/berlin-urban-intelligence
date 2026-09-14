@@ -5,7 +5,10 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from rdflib import Literal
 from rdflib.namespace import PROV
 
-from berlin_urban_intelligence.adapters.berlin_air_quality import parse_lqi_record
+from berlin_urban_intelligence.adapters.berlin_air_quality import (
+    extract_lqi_records,
+    parse_lqi_record,
+)
 from berlin_urban_intelligence.adapters.dwd import DwdTenMinuteAirTemperatureClient
 from berlin_urban_intelligence.agents.exposure import ExposureAgent
 from berlin_urban_intelligence.knowledge.graph import BUI, KnowledgeGraph
@@ -18,6 +21,73 @@ from berlin_urban_intelligence.shared.contracts import (
 from berlin_urban_intelligence.shared.source_status import SourceStatusStore
 
 NOW = datetime(2026, 9, 14, 15, 30, tzinfo=UTC)
+
+
+def test_current_berlin_lqi_station_envelope_is_normalised() -> None:
+    payload = [
+        {
+            "station": "mc010",
+            "data": [
+                {
+                    "component": "lqi",
+                    "datetime": "2026-09-14T17:00:00+02:00",
+                    "grade": 3.0,
+                    "period": "1h",
+                    "station": "mc010",
+                    "value": 3.0,
+                },
+                {
+                    "component": "pm10",
+                    "datetime": "2026-09-14T17:00:00+02:00",
+                    "grade": 2.0,
+                    "period": "24h",
+                    "station": "mc010",
+                    "value": 2.0,
+                },
+                {
+                    "component": "pm25",
+                    "datetime": "2026-09-14T17:00:00+02:00",
+                    "grade": 2.0,
+                    "period": "24h",
+                    "station": "mc010",
+                    "value": 2.0,
+                },
+                {
+                    "component": "no2",
+                    "datetime": "2026-09-14T17:00:00+02:00",
+                    "grade": 1.0,
+                    "period": "1h",
+                    "station": "mc010",
+                    "value": 1.0,
+                },
+                {
+                    "component": "o3",
+                    "datetime": "2026-09-14T17:00:00+02:00",
+                    "grade": 3.0,
+                    "period": "1h",
+                    "station": "mc010",
+                    "value": 3.0,
+                },
+                {
+                    "component": "co",
+                    "datetime": "2026-09-14T17:00:00+02:00",
+                    "grade": None,
+                    "period": "8h",
+                    "station": "mc010",
+                    "value": None,
+                },
+            ],
+        }
+    ]
+
+    extracted = extract_lqi_records(payload)
+    assert len(extracted) == 1
+
+    record = parse_lqi_record(extracted[0])
+    assert record.station_code == "MC010"
+    assert record.observed_at == datetime(2026, 9, 14, 15, 0, tzinfo=UTC)
+    assert record.grade == 3
+    assert record.component_grades == {"PM10": 2, "PM2.5": 2, "NO2": 1, "O3": 3}
 
 
 def test_official_air_payload_flows_through_agent_into_rdf_provenance() -> None:
