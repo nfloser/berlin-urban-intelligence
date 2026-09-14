@@ -1,0 +1,44 @@
+name: Inspect Berlin air schema once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/air-schema-once.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install 'httpx>=0.27,<1'
+      - name: Inspect response shape
+        run: |
+          python - <<'PY'
+          import json
+          import httpx
+
+          response = httpx.get('https://luftdaten.berlin.de/api/lqis/data', timeout=20, follow_redirects=True)
+          print('status', response.status_code, 'content-type', response.headers.get('content-type'))
+          response.raise_for_status()
+          payload = response.json()
+          print('root-type', type(payload).__name__)
+          if isinstance(payload, dict):
+              print('root-keys', sorted(payload.keys()))
+              for key, value in payload.items():
+                  print('key', key, 'type', type(value).__name__)
+                  if isinstance(value, list) and value:
+                      print('first-list-item', json.dumps(value[0], ensure_ascii=False, sort_keys=True)[:3000])
+                  elif isinstance(value, dict):
+                      print('dict-keys', sorted(value.keys())[:100])
+          elif isinstance(payload, list) and payload:
+              print('first-list-item', json.dumps(payload[0], ensure_ascii=False, sort_keys=True)[:3000])
+          print('sample', json.dumps(payload, ensure_ascii=False, sort_keys=True)[:5000])
+          PY
