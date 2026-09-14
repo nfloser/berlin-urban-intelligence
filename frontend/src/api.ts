@@ -190,3 +190,16 @@ export function toFeatureCollection(
   }
   return { type: "FeatureCollection", features };
 }
+
+
+export function mapLayerCounts(counts: {
+  facilities: number;
+  stops: number;
+  climate: number;
+}): Array<[string, number]> {
+  return [
+    ["Critical facilities", counts.facilities],
+    ["VBB stops", counts.stops],
+    ["Official climate features", counts.climate],
+  ].filter(([, count]) => count > 0);
+}
