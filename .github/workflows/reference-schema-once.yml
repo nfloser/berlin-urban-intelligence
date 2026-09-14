@@ -1,4 +1,4 @@
-name: Reference schema diagnostic
+name: Reference source smoke
 
 on:
   workflow_dispatch:
@@ -10,54 +10,32 @@ permissions:
   contents: read
 
 jobs:
-  diagnose:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install httpx
-      - name: Inspect current upstream sizes
+      - run: pip install -e ".[live]"
+      - name: Run full reference refresh
+        run: python scripts/refresh_reference.py --state /tmp/reference.json --rdf /tmp/reference.ttl
+      - name: Verify persisted reference state
         shell: python
         run: |
-          import io
           import json
-          import zipfile
-          from xml.etree import ElementTree as ET
-          import httpx
+          from pathlib import Path
 
-          client = httpx.Client(timeout=90.0, follow_redirects=True, headers={"User-Agent": "berlin-urban-intelligence-schema-diagnostic/1"})
-          climate = "https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022"
-
-          def local(tag):
-              return tag.rsplit("}", 1)[-1]
-
-          r = client.get(climate, params={"service":"WFS","request":"GetCapabilities","version":"2.0.0"})
-          r.raise_for_status()
-          root = ET.fromstring(r.content)
-          names = []
-          for ft in root.iter():
-              if local(ft.tag) != "FeatureType":
-                  continue
-              for child in ft:
-                  if local(child.tag) == "Name" and child.text:
-                      names.append(child.text.strip())
-                      break
-          selected = [name for name in names if ":t" in name and "_kak_" in name]
-          print("selected_climate_layers", json.dumps(selected, ensure_ascii=False))
-          for name in selected:
-              g = client.get(climate, params={"service":"WFS","version":"2.0.0","request":"GetFeature","typeNames":name,"outputFormat":"application/json","srsName":"EPSG:4326","count":1})
-              g.raise_for_status()
-              payload = g.json()
-              print(name, "numberMatched", payload.get("numberMatched"), "totalFeatures", payload.get("totalFeatures"))
-
-          print("=== VBB static size ===")
-          r = client.get("https://unternehmen.vbb.de/gtfs")
-          r.raise_for_status()
-          z = zipfile.ZipFile(io.BytesIO(r.content))
-          total_size = sum(info.file_size for info in z.infolist())
-          print("compressed_bytes", len(r.content))
-          print("uncompressed_bytes", total_size)
-          for info in sorted(z.infolist(), key=lambda item: item.file_size, reverse=True)[:10]:
-              print(info.filename, info.file_size)
+          state = json.loads(Path('/tmp/reference.json').read_text(encoding='utf-8'))
+          errors = state.get('errors', {})
+          facilities = state.get('critical_facilities', [])
+          climate = state.get('official_model_features', [])
+          stops = state.get('transport_stops', [])
+          print('errors=', errors)
+          print('critical_facilities=', len(facilities))
+          print('official_model_features=', len(climate))
+          print('transport_stops=', len(stops))
+          assert not errors, errors
+          assert facilities, 'no critical facilities persisted'
+          assert climate, 'no climate features persisted'
+          assert stops, 'no VBB transport stops persisted'
