@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { displayValue, heatAssessmentRequest, toFeatureCollection } from "./api";
+import {
+  displayValue,
+  heatAssessmentRequest,
+  mapLayerCounts,
+  toFeatureCollection,
+} from "./api";
 
 describe("dashboard data semantics", () => {
   it("does not turn missing values into plausible numbers", () => {
@@ -25,6 +30,15 @@ describe("dashboard data semantics", () => {
     ]);
     expect(collection.features).toHaveLength(1);
     expect(collection.features[0].id).toBe("fixture:wgs84");
+  });
+
+  it("reports map layer counts only for mappable features", () => {
+    expect(mapLayerCounts({ facilities: 2, stops: 5, climate: 1 })).toEqual([
+      ["Critical facilities", 2],
+      ["VBB stops", 5],
+      ["Official climate features", 1],
+    ]);
+    expect(mapLayerCounts({ facilities: 0, stops: 0, climate: 0 })).toEqual([]);
   });
 
   it("builds an explicitly hypothetical heat scenario without observed-state fields", () => {
