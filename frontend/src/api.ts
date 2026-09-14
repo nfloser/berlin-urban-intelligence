@@ -120,6 +120,22 @@ export type OrchestrationResponse = {
   };
 };
 
+export type NetworkNodePick = {
+  node_id: string;
+  longitude: number;
+  latitude: number;
+  distance_m: number;
+  metric_crs: string;
+};
+
+export type RouteResponse = {
+  node_path: string[];
+  edge_ids: string[];
+  travel_time_s: number;
+  scenario_name: string | null;
+  geometry: Geometry | null;
+};
+
 export type RouteComparisonResponse = {
   origin: string;
   destination: string;
@@ -167,6 +183,18 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
     throw new Error(`${response.status} ${response.statusText}${detail ? ` · ${detail}` : ""}`);
   }
   return (await response.json()) as T;
+}
+
+export function routeRequest(origin: string, destination: string): Record<string, string> {
+  const start = origin.trim();
+  const end = destination.trim();
+  if (!start || !end) {
+    throw new Error("Origin and destination are required.");
+  }
+  if (start === end) {
+    throw new Error("Origin and destination must be different.");
+  }
+  return { origin: start, destination: end };
 }
 
 export function networkDisruptionRequest(
