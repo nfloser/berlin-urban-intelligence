@@ -2,12 +2,17 @@
 
 Scenarios are explicit hypothetical overlays. They never alter persisted observed/reference state.
 
-Supported parameter families include extreme-heat deltas, network disruptions/edge penalties, energy-demand deltas and infrastructure degradation/unavailability. A scenario is validated before use and always identifies itself as hypothetical.
+Supported parameter families include extreme-heat deltas, network edge closures/penalties, energy-demand deltas and infrastructure degradation/unavailability. Scenario requests are validated before use and identify themselves as hypothetical.
 
 Examples:
 
-- applying `+3 Cel` to a measured temperature produces a scenario result linked to the baseline observation;
-- closing a road edge builds a copied network view and compares the resulting route/accessibility with baseline;
-- an unavailable facility in a scenario affects accessibility but does not change the facility's recorded source identity.
+- applying `+3 Cel` to a measured temperature creates a `scenario` result linked to the baseline observation;
+- applying an energy-demand delta transforms a validated forecast into a scenario value while preserving the forecast baseline identity;
+- closing or penalizing a road edge builds a copied network view and compares the resulting route/accessibility with the baseline;
+- an unavailable facility in a scenario affects accessibility analysis but does not rewrite the facility's recorded source identity.
 
-No scenario output is written back as `observed`. Scenario results must preserve baseline identifiers so that the counterfactual can be audited.
+Resilience route comparisons preserve baseline/scenario node paths and edge IDs; where stored network coordinates are available, the API also returns LineString geometries for map display.
+
+Integrated assessments can combine multiple requested scenario dimensions, but the dimensions remain separate and no artificial city-wide score is calculated.
+
+No scenario output is persisted back as `observed`. Scenario results retain baseline identifiers so the counterfactual can be audited.
