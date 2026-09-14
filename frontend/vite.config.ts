@@ -3,6 +3,12 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    // MapLibre ships its own worker bundle. Vite's dependency optimizer can
+    // otherwise cache a transient maplibre-gl-worker file that no longer
+    // exists after re-optimization in dev mode, leaving the map blank.
+    exclude: ["maplibre-gl"],
+  },
   server: {
     proxy: {
       "/api": "http://127.0.0.1:8000",
