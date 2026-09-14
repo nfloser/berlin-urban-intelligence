@@ -1,5 +1,7 @@
+import type { FeatureCollection } from "geojson";
+import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import {
   CriticalFacility,
   EnergyResponse,
@@ -46,17 +48,27 @@ function App() {
       fetchJson<UrbanEntity[]>("/api/v1/transport-stops?limit=1000"),
       fetchJson<OfficialModelFeature[]>("/api/v1/climate-features?limit=1000"),
     ])
-      .then(([systemValue, healthValue, mobilityValue, energyValue, facilityValue, stopValue, climateValue]) => {
-        if (cancelled) return;
-        setSystem(systemValue);
-        setHealth(healthValue);
-        setMobility(mobilityValue);
-        setEnergy(energyValue);
-        setFacilities(facilityValue);
-        setStops(stopValue);
-        setClimate(climateValue);
-        setLoadState("ready");
-      })
+      .then(
+        ([
+          systemValue,
+          healthValue,
+          mobilityValue,
+          energyValue,
+          facilityValue,
+          stopValue,
+          climateValue,
+        ]) => {
+          if (cancelled) return;
+          setSystem(systemValue);
+          setHealth(healthValue);
+          setMobility(mobilityValue);
+          setEnergy(energyValue);
+          setFacilities(facilityValue);
+          setStops(stopValue);
+          setClimate(climateValue);
+          setLoadState("ready");
+        },
+      )
       .catch((reason: unknown) => {
         if (cancelled) return;
         setError(reason instanceof Error ? reason.message : "Unknown API error");
@@ -92,7 +104,7 @@ function App() {
     const climateData = toFeatureCollection(climate);
 
     const installLayers = () => {
-      const upsert = (id: string, data: GeoJSON.FeatureCollection) => {
+      const upsert = (id: string, data: FeatureCollection) => {
         const source = map.getSource(id) as GeoJSONSource | undefined;
         if (source) source.setData(data);
         else map.addSource(id, { type: "geojson", data });
@@ -159,7 +171,9 @@ function App() {
               <StatusBadge health={item} />
             </div>
             <p>{item.detail ?? "No detail supplied."}</p>
-            <small>Freshness: {item.freshness} · Quality: {item.quality}</small>
+            <small>
+              Freshness: {item.freshness} · Quality: {item.quality}
+            </small>
           </article>
         ))}
         {Object.keys(health).length === 0 && (
