@@ -1,3 +1,5 @@
+import type { Feature, FeatureCollection, Geometry } from "geojson";
+
 export type Health = {
   agent_id: string;
   status: "available" | "degraded" | "unavailable" | "unknown";
@@ -9,7 +11,7 @@ export type Health = {
 
 export type Spatial = {
   crs: string;
-  geometry?: GeoJSON.Geometry | null;
+  geometry?: Geometry | null;
 };
 
 export type UrbanEntity = {
@@ -80,8 +82,8 @@ export function displayValue(value: unknown, unit?: string | null): string {
 
 export function toFeatureCollection(
   entities: Array<{ id: string; spatial?: Spatial | null }>,
-): GeoJSON.FeatureCollection {
-  const features: GeoJSON.Feature[] = [];
+): FeatureCollection {
+  const features: Feature[] = [];
   for (const entity of entities) {
     const geometry = entity.spatial?.geometry;
     if (!geometry || entity.spatial?.crs !== "EPSG:4326") continue;
