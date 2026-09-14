@@ -160,7 +160,10 @@ class HeatAgent(BaseAgent):
                     "official Berlin WFS GeoJSON normalization; invalid upstream geometry "
                     "repaired with shapely.make_valid; source properties preserved"
                     if repaired
-                    else "official Berlin WFS GeoJSON normalization with source properties preserved"
+                    else (
+                        "official Berlin WFS GeoJSON normalization with source properties "
+                        "preserved"
+                    )
                 ),
                 agent=self.descriptor.id,
                 agent_version=self.descriptor.version,
