@@ -1,4 +1,4 @@
-name: Reference climate diagnostic
+name: Reference source smoke
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  diagnose:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,31 +18,26 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e ".[live]"
-      - name: Diagnose selected climate layers
+      - name: Run full reference refresh
+        run: python scripts/refresh_reference.py --state /tmp/reference.json --rdf /tmp/reference.ttl
+      - name: Verify persisted reference state
         shell: python
         run: |
-          import traceback
-          from datetime import UTC, datetime
-          from berlin_urban_intelligence.adapters.berlin_wfs import BerlinWfsClient
-          from berlin_urban_intelligence.agents.heat import HeatAgent
-          from berlin_urban_intelligence.runtime.reference_refresh import ReferenceRefreshCoordinator
+          import json
+          from pathlib import Path
 
-          client = BerlinWfsClient(ReferenceRefreshCoordinator.CLIMATE_URL)
-          heat = HeatAgent()
-          advertised = client.feature_types()
-          by_local = {name.split(':', 1)[-1]: name for name in advertised}
-          for local_name in ReferenceRefreshCoordinator.CLIMATE_LAYER_LOCAL_NAMES:
-              name = by_local[local_name]
-              print(f'=== {name} ===')
-              try:
-                  payload = client.fetch_all_geojson(name)
-                  print('features=', len(payload.get('features', [])))
-                  features = heat.ingest_official_climate_features(
-                      payload,
-                      feature_type=name,
-                      retrieved_at=datetime.now(UTC),
-                  )
-                  print('normalized=', len(features))
-              except Exception as exc:
-                  print(type(exc).__name__, str(exc))
-                  traceback.print_exc()
+          state = json.loads(Path('/tmp/reference.json').read_text(encoding='utf-8'))
+          errors = state.get('errors', {})
+          facilities = state.get('critical_facilities', [])
+          climate = state.get('official_model_features', [])
+          stops = state.get('transport_stops', [])
+          suspect_climate = [item for item in climate if item.get('quality') == 'suspect']
+          print('errors=', errors)
+          print('critical_facilities=', len(facilities))
+          print('official_model_features=', len(climate))
+          print('suspect_climate_features=', len(suspect_climate))
+          print('transport_stops=', len(stops))
+          assert not errors, errors
+          assert facilities, 'no critical facilities persisted'
+          assert climate, 'no climate features persisted'
+          assert stops, 'no VBB transport stops persisted'
