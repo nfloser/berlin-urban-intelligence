@@ -1,33 +1,54 @@
 @prefix bui: <https://w3id.org/berlin-urban-intelligence/ontology#> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix qudt: <http://qudt.org/schema/qudt/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-bui:UrbanEntity a rdfs:Class .
-bui:Observation a rdfs:Class ; rdfs:subClassOf sosa:Observation .
-bui:DerivedValue a rdfs:Class ; rdfs:subClassOf prov:Entity .
-bui:Forecast a rdfs:Class ; rdfs:subClassOf prov:Entity .
-bui:ScenarioValue a rdfs:Class ; rdfs:subClassOf prov:Entity .
-bui:DataSource a rdfs:Class ; rdfs:subClassOf prov:Entity .
-bui:CriticalFacility a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
-bui:District a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
-bui:Building a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
-bui:TransportStop a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
-bui:NetworkNode a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
-bui:NetworkEdge a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
-bui:Disruption a rdfs:Class ; rdfs:subClassOf prov:Entity .
-bui:DataStateConcept a rdfs:Class .
-bui:dataState a rdf:Property ; rdfs:range xsd:string .
-bui:qualityFlag a rdf:Property ; rdfs:range xsd:string .
-bui:unit a rdf:Property ; rdfs:range xsd:string .
-bui:agentVersion a rdf:Property ; rdfs:range xsd:string .
-bui:contractVersion a rdf:Property ; rdfs:range xsd:string .
+bui:UrbanEntity a rdfs:Class ; rdfs:label "Urban entity" .
+bui:Observation a rdfs:Class ; rdfs:subClassOf sosa:Observation ; rdfs:label "Observation" .
+bui:DerivedValue a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Derived value" .
+bui:Forecast a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Forecast" .
+bui:ScenarioValue a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Scenario value" .
+bui:OfficialModelFeature a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Official model feature" .
+bui:DataSource a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Data source" .
+bui:CriticalFacility a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity ; rdfs:label "Critical facility" .
+bui:District a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity ; rdfs:label "District" .
+bui:Building a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity ; rdfs:label "Building" .
+bui:TransportStop a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity ; rdfs:label "Transport stop" .
+bui:NetworkNode a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity ; rdfs:label "Network node" .
+bui:NetworkEdge a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity ; rdfs:label "Network edge" .
+bui:Disruption a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Disruption" .
+
+bui:dataState a rdf:Property ; rdfs:label "data state" ; rdfs:range xsd:string .
+bui:qualityFlag a rdf:Property ; rdfs:label "quality flag" ; rdfs:range xsd:string .
+bui:unit a rdf:Property ; rdfs:label "unit symbol/code" ; rdfs:range xsd:string .
+bui:agentVersion a rdf:Property ; rdfs:label "agent version" ; rdfs:range xsd:string .
+bui:contractVersion a rdf:Property ; rdfs:label "contract version" ; rdfs:range xsd:string .
 bui:locatedIn a rdf:Property ; rdfs:domain bui:UrbanEntity ; rdfs:range bui:District .
 bui:serves a rdf:Property ; rdfs:domain bui:TransportStop ; rdfs:range bui:District .
 bui:affects a rdf:Property ; rdfs:domain bui:Disruption .
 bui:baseline a rdf:Property ; rdfs:domain bui:ScenarioValue ; rdfs:range prov:Entity .
+
+bui:entity a rdf:Property .
+bui:phenomenon a rdf:Property .
+bui:value a rdf:Property .
+bui:modelName a rdf:Property ; rdfs:range xsd:string .
+bui:featureType a rdf:Property ; rdfs:range xsd:string .
+bui:propertiesJSON a rdf:Property ; rdfs:range xsd:string .
+bui:crs a rdf:Property ; rdfs:range xsd:string .
+bui:geometryGeoJSON a rdf:Property ; rdfs:range xsd:string .
+bui:longitude a rdf:Property ; rdfs:range xsd:double .
+bui:latitude a rdf:Property ; rdfs:range xsd:double .
+bui:sourceNode a rdf:Property ; rdfs:domain bui:NetworkEdge ; rdfs:range bui:NetworkNode .
+bui:targetNode a rdf:Property ; rdfs:domain bui:NetworkEdge ; rdfs:range bui:NetworkNode .
+bui:travelTimeSeconds a rdf:Property ; rdfs:domain bui:NetworkEdge ; rdfs:range xsd:double .
+bui:lengthMetres a rdf:Property ; rdfs:domain bui:NetworkEdge ; rdfs:range xsd:double .
+bui:bidirectional a rdf:Property ; rdfs:domain bui:NetworkEdge ; rdfs:range xsd:boolean .
+
+# Data states are intentionally strings in the operational graph so versioned contracts remain
+# the authoritative validation layer. These resources document the controlled vocabulary.
 bui:ObservedState a bui:DataStateConcept ; rdfs:label "observed" .
 bui:OfficialModelledState a bui:DataStateConcept ; rdfs:label "official_modelled" .
 bui:ProjectModelledState a bui:DataStateConcept ; rdfs:label "project_modelled" .
@@ -38,3 +59,4 @@ bui:ScenarioState a bui:DataStateConcept ; rdfs:label "scenario" .
 bui:UnknownState a bui:DataStateConcept ; rdfs:label "unknown" .
 bui:UnavailableState a bui:DataStateConcept ; rdfs:label "unavailable" .
 bui:StaleState a bui:DataStateConcept ; rdfs:label "stale" .
+bui:DataStateConcept a rdfs:Class .

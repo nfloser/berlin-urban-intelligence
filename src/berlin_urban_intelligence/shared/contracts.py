@@ -11,6 +11,8 @@ from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pyproj import CRS
+from shapely.geometry import shape
 
 CONTRACT_VERSION = "1.0.0"
 
@@ -100,6 +102,26 @@ class Provenance(CanonicalModel):
 class SpatialReference(CanonicalModel):
     crs: str = Field(default="EPSG:4326", min_length=1)
     geometry: dict[str, Any] | None = None
+
+    @model_validator(mode="after")
+    def validate_spatial_reference(self) -> "SpatialReference":
+        try:
+            crs = CRS.from_user_input(self.crs)
+        except Exception as exc:
+            raise ValueError(f"unknown CRS: {self.crs}") from exc
+        if self.geometry is None:
+            return self
+        try:
+            geometry = shape(self.geometry)
+        except Exception as exc:
+            raise ValueError("geometry must be valid GeoJSON geometry") from exc
+        if geometry.is_empty or not geometry.is_valid:
+            raise ValueError("geometry must be non-empty and geometrically valid")
+        if crs.to_epsg() == 4326:
+            min_x, min_y, max_x, max_y = geometry.bounds
+            if min_x < -180 or max_x > 180 or min_y < -90 or max_y > 90:
+                raise ValueError("EPSG:4326 geometry coordinates are outside longitude/latitude bounds")
+        return self
 
 
 class TimeInterval(CanonicalModel):
@@ -194,33 +216,55 @@ class Forecast(CanonicalModel):
 
 
 class ScenarioValue(CanonicalModel):
-    id: str
-    phenomenon: str
+    id: str = Field(min_length=1)
+    phenomenon: str = Field(min_length=1)
     value: float | int | str | bool
     unit: str | None = None
     state: Literal[DataState.SCENARIO] = DataState.SCENARIO
-    scenario_id: str
+    scenario_id: str = Field(min_length=1)
+
+
+class OfficialModelFeature(CanonicalModel):
+    id: str = Field(min_length=1)
+    entity_id: str = Field(min_length=1)
+    model_name: str = Field(min_length=1)
+    feature_type: str = Field(min_length=1)
+    properties: dict[str, Any] = Field(default_factory=dict)
+    state: Literal[DataState.OFFICIAL_MODELLED] = DataState.OFFICIAL_MODELLED
+    quality: QualityFlag
+    provenance: Provenance
+    spatial: SpatialReference
 
 
 class NetworkNode(CanonicalModel):
-    id: str
-    longitude: float | None = None
-    latitude: float | None = None
+    id: str = Field(min_length=1)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    provenance: Provenance | None = None
+
+    @model_validator(mode="after")
+    def validate_coordinates(self) -> "NetworkNode":
+        if (self.longitude is None) != (self.latitude is None):
+            raise ValueError("longitude and latitude must be supplied together")
+        return self
 
 
 class NetworkEdge(CanonicalModel):
-    id: str
-    source: str
-    target: str
+    id: str = Field(min_length=1)
+    source: str = Field(min_length=1)
+    target: str = Field(min_length=1)
     travel_time_s: float = Field(gt=0)
     length_m: float = Field(gt=0)
     bidirectional: bool = True
+    provenance: Provenance | None = None
 
 
 class CriticalFacility(UrbanEntity):
     entity_type: str = "critical_facility"
     category: str
     confidence: str | None = None
+    quality: QualityFlag = QualityFlag.UNKNOWN
+    provenance: Provenance | None = None
 
 
 class AgentDescriptor(CanonicalModel):

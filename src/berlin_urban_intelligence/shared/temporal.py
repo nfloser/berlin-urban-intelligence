@@ -6,11 +6,6 @@ from berlin_urban_intelligence.shared.contracts import FreshnessStatus
 
 
 def ensure_utc(value: datetime) -> datetime:
-    """Return a timezone-aware datetime normalized to UTC.
-
-    Naive datetimes are rejected because guessing the source timezone can silently corrupt
-    cross-domain joins, especially around daylight-saving transitions.
-    """
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("datetime must be timezone-aware")
     return value.astimezone(UTC)

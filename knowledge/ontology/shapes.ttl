@@ -5,13 +5,13 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
 bui:ObservationShape a sh:NodeShape ;
-  sh:targetClass bui:Observation ;
-  sh:property [ sh:path bui:dataState ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
-  sh:property [ sh:path bui:qualityFlag ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
-  sh:property [ sh:path sosa:resultTime ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
-  sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ] .
+    sh:targetClass bui:Observation ;
+    sh:property [ sh:path bui:dataState ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path bui:qualityFlag ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path sosa:resultTime ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ] .
 
 bui:ScenarioValueShape a sh:NodeShape ;
-  sh:targetClass bui:ScenarioValue ;
-  sh:property [ sh:path bui:dataState ; sh:hasValue "scenario" ] ;
-  sh:property [ sh:path bui:baseline ; sh:minCount 1 ] .
+    sh:targetClass bui:ScenarioValue ;
+    sh:property [ sh:path bui:dataState ; sh:hasValue "scenario" ] ;
+    sh:property [ sh:path bui:baseline ; sh:minCount 1 ] .

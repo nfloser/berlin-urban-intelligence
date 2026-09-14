@@ -14,6 +14,7 @@ sources:
     limitations:
       - Current automatically measured values can be provisional and subject to quality control.
       - Missing component values must not be interpreted as zero concentration or normal conditions.
+
   - id: vbb_gtfs_rt
     provider: Verkehrsverbund Berlin-Brandenburg (VBB)
     dataset: GTFS-Realtime
@@ -28,11 +29,13 @@ sources:
     limitations:
       - Realtime coverage depends on operator/feed availability.
       - Absence of an update is not proof of normal operation.
+
   - id: vbb_gtfs_static
     provider: Verkehrsverbund Berlin-Brandenburg (VBB)
     dataset: GTFS schedule data
     domain: mobility
     reference_url: https://unternehmen.vbb.de/digitale-services/datensaetze/
+    api_url: https://unternehmen.vbb.de/gtfs
     authoritative: true
     licence: CC BY 4.0
     attribution: "Verkehrsverbund Berlin-Brandenburg (VBB)"
@@ -40,6 +43,7 @@ sources:
     spatial_coverage: Berlin and Brandenburg public transport covered by VBB
     limitations:
       - Schedule data is not realtime operational state.
+
   - id: berlin_climate_analysis_2022
     provider: Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin
     dataset: Klimaanalysekarten 2022 (Umweltatlas) - WFS
@@ -53,6 +57,7 @@ sources:
     limitations:
       - Official modelled urban-climate information is not a live observation.
       - Original model data can have finer resolution than defensible interpretation at street level.
+
   - id: dwd_open_data
     provider: Deutscher Wetterdienst (DWD)
     dataset: CDC observations / Open Data
@@ -64,6 +69,34 @@ sources:
     limitations:
       - Individual products use different station sets, variables and publication delays.
       - Source-specific timestamps and missing-value conventions require explicit parsing.
+
+
+  - id: berlin_hospitals
+    provider: Senatsverwaltung für Wissenschaft, Gesundheit und Pflege Berlin
+    dataset: Krankenhäuser in Berlin - WFS
+    domain: resilience
+    reference_url: https://daten.berlin.de/
+    api_url: https://gdi.berlin.de/services/wfs/krankenhaeuser
+    authoritative: true
+    licence: Datenlizenz Deutschland - Zero - Version 2.0
+    expected_update_frequency: provider-specific
+    spatial_coverage: Berlin
+    limitations:
+      - Published facility identity and location do not imply current operational availability.
+
+  - id: berlin_fire_stations
+    provider: Berliner Feuerwehr
+    dataset: Standorte der Berliner Feuerwehr - WFS
+    domain: resilience
+    reference_url: https://daten.berlin.de/
+    api_url: https://gdi.berlin.de/services/wfs/feuerwehr
+    authoritative: true
+    licence: Datenlizenz Deutschland - Zero - Version 2.0
+    expected_update_frequency: provider-specific
+    spatial_coverage: Berlin
+    limitations:
+      - Published station identity and location do not imply current operational availability.
+
   - id: osm_berlin
     provider: OpenStreetMap contributors
     dataset: OpenStreetMap
@@ -77,6 +110,22 @@ sources:
     limitations:
       - Completeness and correctness vary by feature and area.
       - OSM objects must not be treated as authoritative critical-infrastructure truth without qualification.
+
+  - id: stromnetz_berlin_grid_load
+    provider: Stromnetz Berlin GmbH
+    dataset: Jahreshöchstlast und Lastverlauf des Berliner Verteilungsnetzes
+    domain: energy
+    reference_url: https://www.stromnetz.berlin/uber-uns/veroffentlichungspflichten/energiewirtschaftsgesetz-enwg/
+    api_url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2025/jahreshoechstlast-2025-hochspannung.csv
+    authoritative: true
+    expected_update_frequency: annual publication with quarter-hourly values
+    temporal_coverage: annual load curves published by year
+    spatial_coverage: Berlin distribution grid, separated by voltage/network level
+    limitations:
+      - The published high-voltage load curve represents one network level and must not be labelled total Berlin electricity demand.
+      - File schemas must be inspected explicitly before parsing; the production parser never guesses column names or units.
+      - Historical publication cadence does not make the resulting forecast a live grid-control forecast.
+
   - id: energy_reference_uci
     provider: UCI Machine Learning Repository
     dataset: Individual Household Electric Power Consumption

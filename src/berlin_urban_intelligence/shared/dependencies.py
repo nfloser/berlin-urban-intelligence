@@ -13,8 +13,10 @@ class DependencyGraph:
         self._statuses: dict[str, DerivationStatus] = {}
 
     def add_derivation(self, product_id: str, upstream_ids: list[str] | tuple[str, ...]) -> None:
-        if not product_id or not upstream_ids:
-            raise ValueError("a derivation requires a product id and at least one upstream dependency")
+        if not product_id:
+            raise ValueError("product_id must not be empty")
+        if not upstream_ids:
+            raise ValueError("a derivation requires at least one upstream dependency")
         self._graph.add_node(product_id)
         for upstream_id in upstream_ids:
             if not upstream_id:

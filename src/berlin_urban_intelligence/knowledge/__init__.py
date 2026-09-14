@@ -1,1 +1,1 @@
-"""Semantic knowledge projection."""
+"""Semantic knowledge-layer utilities."""
