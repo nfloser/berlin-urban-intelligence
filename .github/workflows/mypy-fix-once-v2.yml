@@ -1,0 +1,64 @@
+name: Strict typing fixes v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/mypy-fix-once-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e '.[dev,live]'
+      - name: Apply reviewed typing corrections
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from textwrap import dedent
+
+          source = Path('.github/workflows/mypy-fix-once.yml').read_text(encoding='utf-8')
+          marker = "python - <<'PY'\n"
+          script = source.split(marker, 1)[1].split("\n          PY", 1)[0]
+          exec(compile(dedent(script), '<reviewed-typing-fixes>', 'exec'))
+
+          obs = Path('src/berlin_urban_intelligence/shared/observability.py')
+          text = obs.read_text(encoding='utf-8')
+          text = text.replace(
+              '    if any(getattr(handler, "_bui_structured", False) for handler in logger.handlers):\n',
+              '    if any(isinstance(handler.formatter, JsonFormatter) for handler in logger.handlers):\n',
+              1,
+          )
+          text = text.replace('    setattr(handler, "_bui_structured", True)\n', '', 1)
+          obs.write_text(text, encoding='utf-8')
+
+          api = Path('src/berlin_urban_intelligence/api/app.py')
+          text = api.read_text(encoding='utf-8')
+          text = text.replace('from typing import TypeVar\n', '', 1)
+          text = text.replace('T = TypeVar("T")\n', '', 1)
+          text = text.replace(
+              'def _slice(items: Sequence[T], offset: int, limit: int) -> list[T]:\n',
+              'def _slice[T](items: Sequence[T], offset: int, limit: int) -> list[T]:\n',
+              1,
+          )
+          api.write_text(text, encoding='utf-8')
+          PY
+          ruff format src tests scripts
+          ruff check src tests scripts
+          mypy src/berlin_urban_intelligence
+      - name: Commit strict typing fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add pyproject.toml src
+          git commit -m 'fix: satisfy strict backend typing'
+          git push origin HEAD:main
