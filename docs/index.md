@@ -23,7 +23,7 @@ The [domain model](concepts/domain-model.md), [terminology](concepts/terminology
 
 ### Architecture
 
-Architecture documentation is split into [overview](architecture/overview.md), [components](architecture/components.md), [data flow](architecture/data-flow.md), [interfaces](architecture/interfaces.md), [deployment](architecture/deployment.md) and [design decisions](architecture/design-decisions.md). Accepted ADRs remain under [`docs/adr/`](adr/).
+Architecture documentation is split into [overview](architecture/overview.md), [components](architecture/components.md), [data flow](architecture/data-flow.md), [interfaces](architecture/interfaces.md), [deployment](architecture/deployment.md), [operational characteristics](architecture/operational-characteristics.md) and [design decisions](architecture/design-decisions.md). Accepted ADRs remain under [`docs/adr/`](adr/).
 
 ### Data
 
