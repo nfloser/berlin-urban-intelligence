@@ -1,0 +1,34 @@
+name: Generate frontend lockfile once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/lockfile-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate and verify lockfile
+        working-directory: frontend
+        run: |
+          npm install --package-lock-only --no-audit --no-fund
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build
+      - name: Commit lockfile
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/package-lock.json
+          git commit -m 'build: lock frontend dependency graph'
+          git push origin HEAD:main
