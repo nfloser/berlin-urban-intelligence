@@ -5,7 +5,9 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pytest
 
 from berlin_urban_intelligence.adapters.vbb_static import VbbGtfsStaticAdapter
+from berlin_urban_intelligence.agents.heat import HeatAgent
 from berlin_urban_intelligence.runtime.reference_refresh import ReferenceRefreshCoordinator
+from berlin_urban_intelligence.shared.contracts import QualityFlag
 
 NOW = datetime(2026, 9, 14, 16, 0, tzinfo=UTC)
 
@@ -73,6 +75,42 @@ def test_reference_refresh_selects_current_official_wfs_layers() -> None:
     assert fire.requested == ["feuerwehr:a_feuerwehr_standorte"]
     assert climate.requested == climate_names
     assert len(state.official_model_features) == len(climate_names)
+
+
+def test_invalid_official_climate_geometry_is_repaired_and_marked_suspect() -> None:
+    payload = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "id": "climate.1",
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [
+                            [13.0, 52.0],
+                            [13.1, 52.1],
+                            [13.1, 52.0],
+                            [13.0, 52.1],
+                            [13.0, 52.0],
+                        ]
+                    ],
+                },
+                "properties": {"class": "fixture"},
+            }
+        ],
+    }
+
+    features = HeatAgent(now_factory=lambda: NOW).ingest_official_climate_features(
+        payload,
+        feature_type="ua_klimaanalyse_2022:ti_kak_kaltluftabfluss_2022",
+        retrieved_at=NOW,
+    )
+
+    assert len(features) == 1
+    assert features[0].quality == QualityFlag.SUSPECT
+    assert "shapely.make_valid" in (features[0].provenance.processing_method or "")
+    assert "repaired" in (features[0].provenance.quality_note or "")
 
 
 def _gtfs_archive(*, unused_size: int = 0, extra_trip_rows: int = 0) -> bytes:
