@@ -25,7 +25,7 @@ from berlin_urban_intelligence.agents.exposure import ExposureAgent
 from berlin_urban_intelligence.agents.heat import HeatAgent
 from berlin_urban_intelligence.agents.live_state import LiveStateAgent
 from berlin_urban_intelligence.agents.mobility import MobilityAgent
-from berlin_urban_intelligence.agents.resilience import ResilienceAgent
+from berlin_urban_intelligence.agents.resilience import ResilienceAgent, nearest_network_node
 from berlin_urban_intelligence.energy.state import EnergyStateStore
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
 from berlin_urban_intelligence.orchestrator.assessment import (
@@ -365,6 +365,46 @@ def create_app() -> FastAPI:
             "plan": orchestrator.plan(payload).model_dump(mode="json"),
             "execution": orchestrator.execute(payload).model_dump(mode="json"),
         }
+
+    @app.get("/api/v1/network/nearest")
+    def nearest_network(
+        request: Request,
+        longitude: float = Query(ge=-180, le=180),
+        latitude: float = Query(ge=-90, le=90),
+    ) -> dict[str, object]:
+        reference: ReferenceState | None = request.app.state.reference
+        if reference is None or not reference.network_nodes:
+            raise HTTPException(status_code=409, detail="INSUFFICIENT_DATA: routing network required")
+        try:
+            return nearest_network_node(
+                longitude, latitude, reference.network_nodes
+            ).model_dump(mode="json")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"DERIVATION_FAILED: {exc}") from None
+
+    @app.post("/api/v1/resilience/routes")
+    def route(request: Request, payload: RouteRequest) -> dict[str, object]:
+        if payload.scenario is not None:
+            raise HTTPException(status_code=422, detail="baseline route does not accept a scenario")
+        agent: ResilienceAgent = request.app.state.agents["resilience"]
+        try:
+            result = agent.shortest_path(payload.origin, payload.destination)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"DERIVATION_FAILED: {exc}") from None
+        reference: ReferenceState | None = request.app.state.reference
+        nodes = {node.id: node for node in (reference.network_nodes if reference else ())}
+        coordinates = [
+            [nodes[node_id].longitude, nodes[node_id].latitude]
+            for node_id in result.node_path
+            if node_id in nodes
+            and nodes[node_id].longitude is not None
+            and nodes[node_id].latitude is not None
+        ]
+        body = result.model_dump(mode="json")
+        body["geometry"] = (
+            {"type": "LineString", "coordinates": coordinates} if len(coordinates) >= 2 else None
+        )
+        return body
 
     @app.post("/api/v1/resilience/routes/compare")
     def route_compare(request: Request, payload: RouteRequest) -> dict[str, object]:
