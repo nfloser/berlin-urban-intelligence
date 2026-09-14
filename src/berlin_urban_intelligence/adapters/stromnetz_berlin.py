@@ -47,7 +47,9 @@ class StromnetzBerlinCsvAdapter:
         raw = pd.read_csv(StringIO(text), sep=delimiter, dtype=str, keep_default_na=False)
         missing = {timestamp_column, value_column}.difference(raw.columns)
         if missing:
-            raise ValueError(f"CSV schema changed or configured columns are missing: {sorted(missing)}")
+            raise ValueError(
+                f"CSV schema changed or configured columns are missing: {sorted(missing)}"
+            )
         timestamps = pd.to_datetime(raw[timestamp_column], dayfirst=True, errors="raise")
         if timestamps.dt.tz is None:
             try:

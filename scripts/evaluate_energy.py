@@ -20,7 +20,9 @@ from berlin_urban_intelligence.energy.workflow import EnergyForecastWorkflow
 def _load_text(value: str) -> tuple[str, str | None]:
     if value.startswith("https://"):
         if not value.startswith("https://www.stromnetz.berlin/"):
-            raise ValueError("remote energy input must use the verified www.stromnetz.berlin domain")
+            raise ValueError(
+                "remote energy input must use the verified www.stromnetz.berlin domain"
+            )
         response = httpx.get(value, timeout=60.0, follow_redirects=True)
         response.raise_for_status()
         return response.text, value
@@ -32,7 +34,9 @@ def _load_text(value: str) -> tuple[str, str | None]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True, help="Local CSV path or verified Stromnetz Berlin HTTPS URL")
+    parser.add_argument(
+        "--input", required=True, help="Local CSV path or verified Stromnetz Berlin HTTPS URL"
+    )
     parser.add_argument("--source-url", help="Required provenance URL when --input is a local file")
     parser.add_argument("--dataset", required=True, help="Inspected upstream dataset title")
     parser.add_argument("--timestamp-column", required=True)

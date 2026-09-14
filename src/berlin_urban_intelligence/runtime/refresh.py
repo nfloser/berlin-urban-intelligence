@@ -12,7 +12,11 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from berlin_urban_intelligence.adapters.berlin_air_quality import BerlinAirQualityClient, extract_lqi_records, parse_lqi_record
+from berlin_urban_intelligence.adapters.berlin_air_quality import (
+    BerlinAirQualityClient,
+    extract_lqi_records,
+    parse_lqi_record,
+)
 from berlin_urban_intelligence.adapters.dwd import DwdTenMinuteAirTemperatureClient
 from berlin_urban_intelligence.adapters.vbb import VbbGtfsRealtimeClient, decode_gtfs_realtime
 from berlin_urban_intelligence.agents.exposure import ExposureAgent
@@ -24,7 +28,17 @@ from berlin_urban_intelligence.shared.source_status import SourceRuntimeStatus, 
 
 
 class RefreshCoordinator:
-    def __init__(self, *, air_client: Any | None = None, dwd_client: Any | None = None, vbb_client: Any | None = None, vbb_decoder: Callable[[bytes], tuple[datetime | None, list[dict[str, object]]]] = decode_gtfs_realtime, now_factory: Callable[[], datetime] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        air_client: Any | None = None,
+        dwd_client: Any | None = None,
+        vbb_client: Any | None = None,
+        vbb_decoder: Callable[
+            [bytes], tuple[datetime | None, list[dict[str, object]]]
+        ] = decode_gtfs_realtime,
+        now_factory: Callable[[], datetime] | None = None,
+    ) -> None:
         self.air_client = air_client or BerlinAirQualityClient()
         self.dwd_client = dwd_client or DwdTenMinuteAirTemperatureClient()
         self.vbb_client = vbb_client or VbbGtfsRealtimeClient()
@@ -40,7 +54,9 @@ class RefreshCoordinator:
         return "SOURCE_UNAVAILABLE"
 
     @staticmethod
-    def _replace_agent_observations(existing: list[Observation], agent_id: str, replacement: list[Observation]) -> list[Observation]:
+    def _replace_agent_observations(
+        existing: list[Observation], agent_id: str, replacement: list[Observation]
+    ) -> list[Observation]:
         retained = [item for item in existing if item.provenance.agent != agent_id]
         return [*retained, *replacement]
 
@@ -50,10 +66,12 @@ class RefreshCoordinator:
             raise ValueError("now_factory must produce timezone-aware datetimes")
         now = now.astimezone(UTC)
         status_store = SourceStatusStore(previous_state.source_statuses if previous_state else None)
-        exposure = ExposureAgent()
-        heat = HeatAgent()
+        exposure = ExposureAgent(now_factory=self.now_factory)
+        heat = HeatAgent(now_factory=self.now_factory)
         observations = list(previous_state.observations if previous_state else ())
-        mobility_snapshot: MobilitySnapshot | None = previous_state.mobility if previous_state else None
+        mobility_snapshot: MobilitySnapshot | None = (
+            previous_state.mobility if previous_state else None
+        )
         errors: dict[str, str] = {}
 
         try:
@@ -63,7 +81,11 @@ class RefreshCoordinator:
                 raise ValueError("Berlin LQI response contains no usable records")
             current = exposure.ingest_lqi_records(records, retrieved_at=now)
             observations = self._replace_agent_observations(observations, "exposure", current)
-            status_store.record_success("berlin_air_quality", retrieved_at=now, observation_time=max(record.observed_at for record in records))
+            status_store.record_success(
+                "berlin_air_quality",
+                retrieved_at=now,
+                observation_time=max(record.observed_at for record in records),
+            )
         except Exception as exc:
             code = self._error_code(exc)
             status_store.record_failure("berlin_air_quality", checked_at=now, error_code=code)
@@ -73,7 +95,9 @@ class RefreshCoordinator:
             record = self.dwd_client.fetch()
             current = heat.ingest_dwd_record(record, retrieved_at=now)
             observations = self._replace_agent_observations(observations, "heat", current)
-            status_store.record_success("dwd_open_data", retrieved_at=now, observation_time=record.observed_at)
+            status_store.record_success(
+                "dwd_open_data", retrieved_at=now, observation_time=record.observed_at
+            )
         except Exception as exc:
             code = self._error_code(exc)
             status_store.record_failure("dwd_open_data", checked_at=now, error_code=code)
@@ -84,10 +108,14 @@ class RefreshCoordinator:
             feed_timestamp, decoded = self.vbb_decoder(raw)
             if feed_timestamp is None:
                 raise ValueError("VBB feed has no source timestamp")
-            mobility = MobilityAgent()
+            mobility = MobilityAgent(now_factory=self.now_factory)
             updates = mobility.from_decoded_records(decoded)
-            mobility_snapshot = mobility.summarise_updates(updates, feed_timestamp=feed_timestamp, retrieved_at=now)
-            status_store.record_success("vbb_gtfs_rt", retrieved_at=now, observation_time=feed_timestamp)
+            mobility_snapshot = mobility.summarise_updates(
+                updates, feed_timestamp=feed_timestamp, retrieved_at=now
+            )
+            status_store.record_success(
+                "vbb_gtfs_rt", retrieved_at=now, observation_time=feed_timestamp
+            )
         except Exception as exc:
             code = self._error_code(exc)
             status_store.record_failure("vbb_gtfs_rt", checked_at=now, error_code=code)

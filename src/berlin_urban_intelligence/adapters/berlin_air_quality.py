@@ -42,21 +42,51 @@ def _first(payload: dict[str, Any], *keys: str) -> Any:
 
 
 def _grade(value: Any) -> int:
-    grade = int(value)
+    if isinstance(value, bool) or not float(value).is_integer():
+        raise ValueError("LQI grade must be an integer")
+    grade = int(float(value))
     if not 1 <= grade <= 6:
         raise ValueError("LQI grade must be between 1 and 6")
     return grade
 
 
 def extract_lqi_records(payload: Any) -> list[dict[str, Any]]:
-    if isinstance(payload, list):
-        return [item for item in payload if isinstance(item, dict)]
     if isinstance(payload, dict):
         for key in ("data", "items", "results", "lqis"):
-            value = payload.get(key)
-            if isinstance(value, list):
-                return [item for item in value if isinstance(item, dict)]
-    raise ValueError("Unsupported Berlin LQI response envelope")
+            if isinstance(payload.get(key), list):
+                return extract_lqi_records(payload[key])
+        raise ValueError("Unsupported Berlin LQI response envelope")
+    if not isinstance(payload, list):
+        raise ValueError("Unsupported Berlin LQI response envelope")
+    output: list[dict[str, Any]] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        rows = item.get("data")
+        if not isinstance(rows, list):
+            output.append(item)
+            continue
+        grouped: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in rows:
+            if not isinstance(row, dict) or row.get("grade") is None:
+                continue
+            if row.get("grade") == -1:
+                # Negative grades are outside the published index range, never observations.
+                continue
+            station = str(row.get("station") or item.get("station") or "")
+            timestamp = str(row.get("datetime") or "")
+            group_key = (station, timestamp)
+            record = grouped.setdefault(
+                group_key, {"station": station, "datetime": timestamp, "components": {}}
+            )
+            component = str(row.get("component") or "").lower()
+            if component == "lqi":
+                record["grade"] = row["grade"]
+            elif component in _COMPONENT_ALIASES:
+                record["components"][component] = row["grade"]
+        # Only combine component grades with an overall index at the exact same source time.
+        output.extend(record for record in grouped.values() if "grade" in record)
+    return output
 
 
 def parse_lqi_record(payload: dict[str, Any]) -> LqiRecord:
@@ -123,7 +153,7 @@ class BerlinAirQualityClient:
         if self._owned_client:
             self._client.close()
 
-    def __enter__(self) -> "BerlinAirQualityClient":
+    def __enter__(self) -> BerlinAirQualityClient:
         return self
 
     def __exit__(self, *_args: object) -> None:

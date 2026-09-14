@@ -2,6 +2,8 @@
 
 **Version 0.1.0 — integrated research foundation**
 
+Implementation and remaining v1.0 acceptance gates are recorded in [docs/integration.md](docs/integration.md). This release provides a working API/dashboard integration; it is not a claim that every masterprompt requirement or live source has passed acceptance.
+
 Berlin Urban Intelligence is an agent-extensible urban intelligence and digital-twin research platform for Berlin. It connects independently testable domain agents through shared contracts, explicit provenance, semantic relationships, deterministic orchestration and scenario semantics so that cross-domain urban analysis can be built without hiding uncertainty or fabricating missing data.
 
 The project is inspired by architectural principles demonstrated by **The World Avatar**—specialised agents, semantic interoperability, provenance and composable derivations—but is an independent, deliberately smaller implementation for one city. It is not affiliated with The World Avatar or the University of Cambridge.
@@ -67,8 +69,8 @@ The initial live path uses authoritative providers where available:
 - **Berliner Luftgütemessnetz** — official LQI/air-quality REST data. Current automatic values remain explicitly provisional. Licence: DL-DE-BY-2.0.
 - **VBB** — official GTFS static data and GTFS-Realtime feed. VBB publishes its open datasets under CC BY 4.0. Absence of realtime updates is not interpreted as normal service.
 - **DWD Open Data / CDC** — 10-minute meteorological observations; v0.1 defaults to Berlin-Tempelhof station `00433`. UTC timestamps and `-999` missing values are handled explicitly.
-- **Berlin Climate Analysis 2022** — official Berlin WFS is registered as `official_modelled` source material, not as live observation. Schema-normalised ingestion remains a planned capability.
-- **OpenStreetMap** — registered as a qualified, non-authoritative future resilience/network source under ODbL.
+- **Berlin Climate Analysis 2022** — official Berlin WFS is registered as `official_modelled` source material, not as live observation. GeoJSON normalization and explicit reference acquisition are implemented; provider completeness must be checked on acquisition.
+- **OpenStreetMap** — available through an optional, explicit OSMnx acquisition path under ODbL.
 
 The UCI household energy dataset used in the standalone Energy Twin is in Sceaux, France. This platform records it only as a methodological research reference and never presents it as Berlin energy state.
 
@@ -146,6 +148,10 @@ GET  /api/v1/resilience
 GET  /api/v1/graph
 POST /api/v1/scenarios/validate
 POST /api/v1/orchestrate
+POST /api/v1/assessments
+POST /api/v1/routes
+GET  /api/v1/reference
+GET  /api/v1/map
 ```
 
 OpenAPI is available at `http://localhost:8000/docs`.
@@ -207,12 +213,7 @@ tests/                deterministic unit/integration tests
 
 ## Prototype migration
 
-Migration assessments are under [`docs/prototype-migrations/`](docs/prototype-migrations/). In summary:
-
-- Live Twin contributes strong patterns for semantic state, provenance, freshness and VBB/Berlin source adapters.
-- Resilience Twin contributes topology/scenario separation and accessibility analysis patterns.
-- Energy Twin contributes leakage-safe evaluation and baseline methodology, but not Berlin operational data.
-- Mobility, Environmental Exposure and Urban Heat standalone repositories are currently bootstrap/empty and therefore do not supply substantive code to migrate.
+The standalone repositories remain reference prototypes. Current integration reuses canonical adapter and agent patterns without importing those repositories at runtime. Their current completion status has not been re-audited in this revision; older chat summaries must not be treated as current repository evidence. See [docs/integration.md](docs/integration.md).
 
 ## Scientific boundaries
 

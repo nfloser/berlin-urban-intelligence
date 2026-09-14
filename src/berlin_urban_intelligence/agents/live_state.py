@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -51,7 +51,9 @@ class LiveStateAgent(BaseAgent):
             overall = AvailabilityStatus.UNKNOWN
         elif all(item == AvailabilityStatus.AVAILABLE for item in statuses):
             overall = AvailabilityStatus.AVAILABLE
-        elif any(item in {AvailabilityStatus.AVAILABLE, AvailabilityStatus.DEGRADED} for item in statuses):
+        elif any(
+            item in {AvailabilityStatus.AVAILABLE, AvailabilityStatus.DEGRADED} for item in statuses
+        ):
             overall = AvailabilityStatus.DEGRADED
         else:
             overall = AvailabilityStatus.UNAVAILABLE
@@ -59,7 +61,10 @@ class LiveStateAgent(BaseAgent):
             generated_at=self.now(),
             agents=health,
             overall_status=overall,
-            note="Overall status summarises availability only; unavailable domains are never replaced with synthetic values.",
+            note=(
+                "Overall status summarises availability only; unavailable domains"
+                " are never replaced with synthetic values."
+            ),
         )
         self._last = snapshot
         return snapshot

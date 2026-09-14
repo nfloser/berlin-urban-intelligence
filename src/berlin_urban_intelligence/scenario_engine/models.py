@@ -26,17 +26,33 @@ class Scenario(BaseModel):
 
     @model_validator(mode="after")
     def validate_scenario(self) -> "Scenario":
+        if ScenarioKind.EXTREME_HEAT in self.kinds and self.temperature_delta_c is None:
+            raise ValueError("extreme_heat requires temperature_delta_c")
+        if ScenarioKind.ENERGY_DEMAND in self.kinds and self.energy_demand_delta_pct is None:
+            raise ValueError("energy_demand requires energy_demand_delta_pct")
         if self.temperature_delta_c is not None and ScenarioKind.EXTREME_HEAT not in self.kinds:
             raise ValueError("temperature_delta_c requires extreme_heat scenario kind")
-        if self.energy_demand_delta_pct is not None and ScenarioKind.ENERGY_DEMAND not in self.kinds:
+        if (
+            self.energy_demand_delta_pct is not None
+            and ScenarioKind.ENERGY_DEMAND not in self.kinds
+        ):
             raise ValueError("energy_demand_delta_pct requires energy_demand scenario kind")
-        if (self.closed_network_edges or self.edge_penalties) and ScenarioKind.NETWORK_DISRUPTION not in self.kinds:
+        if (
+            self.closed_network_edges or self.edge_penalties
+        ) and ScenarioKind.NETWORK_DISRUPTION not in self.kinds:
             raise ValueError("network edge changes require network_disruption scenario kind")
-        if self.unavailable_facilities and ScenarioKind.INFRASTRUCTURE_DEGRADATION not in self.kinds:
+        if (
+            self.unavailable_facilities
+            and ScenarioKind.INFRASTRUCTURE_DEGRADATION not in self.kinds
+        ):
             raise ValueError("facility changes require infrastructure_degradation scenario kind")
         if any(penalty < 1.0 or penalty > 100.0 for penalty in self.edge_penalties.values()):
             raise ValueError("edge penalties must be between 1.0 and 100.0")
-        identifiers = [*self.closed_network_edges, *self.unavailable_facilities, *self.edge_penalties.keys()]
+        identifiers = [
+            *self.closed_network_edges,
+            *self.unavailable_facilities,
+            *self.edge_penalties.keys(),
+        ]
         if any(not identifier.strip() for identifier in identifiers):
             raise ValueError("scenario identifiers must not be blank")
         if not self.is_hypothetical:

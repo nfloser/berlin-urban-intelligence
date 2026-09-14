@@ -87,7 +87,8 @@ class BerlinWfsClient:
         ]
         if len(matches) != 1:
             raise ValueError(
-                f"feature type discovery expected exactly one match for {cleaned!r}, found {matches!r}"
+                f"feature type discovery expected exactly one match for {cleaned!r}, "
+                f"found {matches!r}"
             )
         return matches[0]
 
@@ -104,7 +105,7 @@ class BerlinWfsClient:
             raise ValueError("count must be between 1 and 100000")
         if start_index is not None and start_index < 0:
             raise ValueError("start_index must not be negative")
-        params: dict[str, object] = {
+        params: dict[str, str | int] = {
             "service": "WFS",
             "version": "2.0.0",
             "request": "GetFeature",
@@ -148,15 +149,17 @@ class BerlinWfsClient:
         previous_signature: str | None = None
         start_index = 0
         while True:
-            page = self.fetch_geojson(
-                feature_type, count=page_size, start_index=start_index
-            )
+            page = self.fetch_geojson(feature_type, count=page_size, start_index=start_index)
             page_features = page["features"]
             if not page_features:
                 break
-            signature = json.dumps(page_features, sort_keys=True, separators=(",", ":"), default=str)
+            signature = json.dumps(
+                page_features, sort_keys=True, separators=(",", ":"), default=str
+            )
             if previous_signature == signature:
-                raise ValueError("WFS pagination did not advance; refusing duplicated/truncated data")
+                raise ValueError(
+                    "WFS pagination did not advance; refusing duplicated/truncated data"
+                )
             previous_signature = signature
             features.extend(page_features)
             if len(features) > max_features:
@@ -173,7 +176,7 @@ class BerlinWfsClient:
         if self._owned_client:
             self._client.close()
 
-    def __enter__(self) -> "BerlinWfsClient":
+    def __enter__(self) -> BerlinWfsClient:
         return self
 
     def __exit__(self, *_args: object) -> None:

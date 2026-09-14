@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import networkx as nx
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pyproj import Transformer
-from pydantic import BaseModel, ConfigDict, Field
 from shapely.geometry import shape
 from shapely.ops import transform as transform_geometry
 
@@ -21,12 +21,11 @@ from berlin_urban_intelligence.shared.contracts import (
     CriticalFacility,
     FreshnessStatus,
     NetworkEdge,
+    NetworkNode,
     Provenance,
     QualityFlag,
     SpatialReference,
 )
-
-
 
 
 class NearestNetworkNode(BaseModel):
@@ -54,7 +53,7 @@ def nearest_network_node(
     transformer = Transformer.from_crs("EPSG:4326", metric_crs, always_xy=True)
     x, y = transformer.transform(longitude, latitude)
     candidates = [
-        (node, *transformer.transform(float(node.longitude), float(node.latitude)))
+        (node, *transformer.transform(cast(float, node.longitude), cast(float, node.latitude)))
         for node in nodes
     ]
     node, node_x, node_y = min(
@@ -63,8 +62,8 @@ def nearest_network_node(
     distance = float(((x - node_x) ** 2 + (y - node_y) ** 2) ** 0.5)
     return NearestNetworkNode(
         node_id=node.id,
-        longitude=float(node.longitude),
-        latitude=float(node.latitude),
+        longitude=cast(float, node.longitude),
+        latitude=cast(float, node.latitude),
         distance_m=distance,
         metric_crs=metric_crs,
     )
@@ -102,7 +101,7 @@ def snap_facilities_to_network(
 
     node_transformer = Transformer.from_crs("EPSG:4326", metric_crs, always_xy=True)
     projected_nodes = [
-        (node, *node_transformer.transform(float(node.longitude), float(node.latitude)))
+        (node, *node_transformer.transform(cast(float, node.longitude), cast(float, node.latitude)))
         for node in nodes
     ]
 
@@ -114,7 +113,7 @@ def snap_facilities_to_network(
         geometry = shape(spatial.geometry)
         transformer = Transformer.from_crs(spatial.crs, metric_crs, always_xy=True)
         projected = transform_geometry(transformer.transform, geometry)
-        point = projected if projected.geom_type == "Point" else projected.representative_point()
+        point = projected.representative_point()
         node, x, y = min(
             projected_nodes,
             key=lambda candidate: (point.x - candidate[1]) ** 2 + (point.y - candidate[2]) ** 2,
@@ -198,7 +197,9 @@ class CriticalInfrastructureRegistry:
         licence: str,
         retrieved_at: datetime | None = None,
     ) -> list[CriticalFacility]:
-        if payload.get("type") != "FeatureCollection" or not isinstance(payload.get("features"), list):
+        if payload.get("type") != "FeatureCollection" or not isinstance(
+            payload.get("features"), list
+        ):
             raise ValueError("critical infrastructure source must be a GeoJSON FeatureCollection")
         retrieved = retrieved_at or datetime.now(UTC)
         if retrieved.tzinfo is None or retrieved.utcoffset() is None:
@@ -211,11 +212,12 @@ class CriticalInfrastructureRegistry:
             if not isinstance(geometry, dict):
                 continue
             feature_id = str(raw.get("id") or f"feature-{index}")
-            properties = raw.get("properties") if isinstance(raw.get("properties"), dict) else {}
+            raw_properties = raw.get("properties")
+            properties = raw_properties if isinstance(raw_properties, dict) else {}
             provenance = Provenance(
                 provider=provider,
                 dataset=dataset,
-                source_url=source_url,
+                source_url=HttpUrl(source_url),
                 original_identifier=feature_id,
                 retrieved_at=retrieved,
                 processed_at=retrieved,
@@ -223,7 +225,9 @@ class CriticalInfrastructureRegistry:
                 agent="resilience",
                 agent_version="1.0.0",
                 source_licence=licence,
-                quality_note="Dataset identity/location only; no claim of live operational availability.",
+                quality_note=(
+                    "Dataset identity/location only; no claim of live operational availability."
+                ),
             )
             facilities.append(
                 CriticalFacility(
@@ -244,8 +248,15 @@ class ResilienceAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="resilience",
         version="1.0.0",
-        description="Network accessibility and disruption analysis over explicit network/facility inputs.",
-        capabilities=("shortest_path", "accessibility", "scenario_comparison", "critical_infrastructure"),
+        description=(
+            "Network accessibility and disruption analysis over explicit network/facility inputs."
+        ),
+        capabilities=(
+            "shortest_path",
+            "accessibility",
+            "scenario_comparison",
+            "critical_infrastructure",
+        ),
         input_contracts=("NetworkEdge", "CriticalFacility", "Scenario"),
         output_contracts=("RouteResult", "AccessibilityResult", "RouteComparison"),
         source_dependencies=("osm_berlin", "berlin_hospitals", "berlin_fire_stations"),
@@ -262,8 +273,8 @@ class ResilienceAgent(BaseAgent):
         self._base_graph = self._build_graph(self._edges)
 
     @staticmethod
-    def _build_graph(edges: tuple[NetworkEdge, ...] | list[NetworkEdge]) -> nx.MultiDiGraph:
-        graph = nx.MultiDiGraph()
+    def _build_graph(edges: tuple[NetworkEdge, ...] | list[NetworkEdge]) -> nx.MultiDiGraph[str]:
+        graph: nx.MultiDiGraph[str] = nx.MultiDiGraph()
         for edge in edges:
             graph.add_edge(
                 edge.source,
@@ -284,7 +295,7 @@ class ResilienceAgent(BaseAgent):
                 )
         return graph
 
-    def _scenario_graph(self, scenario: Scenario | None) -> nx.MultiDiGraph:
+    def _scenario_graph(self, scenario: Scenario | None) -> nx.MultiDiGraph[str]:
         graph = self._base_graph.copy()
         if scenario is None:
             return graph
@@ -299,12 +310,14 @@ class ResilienceAgent(BaseAgent):
                 data["travel_time_s"] = float(data["travel_time_s"]) * penalty
         return graph
 
-    def shortest_path(self, origin: str, destination: str, scenario: Scenario | None = None) -> RouteResult:
+    def shortest_path(
+        self, origin: str, destination: str, scenario: Scenario | None = None
+    ) -> RouteResult:
         graph = self._scenario_graph(scenario)
         path = nx.shortest_path(graph, origin, destination, weight="travel_time_s")
         edge_ids: list[str] = []
         travel_time = 0.0
-        for u, v in zip(path, path[1:]):
+        for u, v in zip(path, path[1:], strict=False):
             edge_options = graph.get_edge_data(u, v)
             if not edge_options:
                 raise RuntimeError("route path references a missing graph edge")
@@ -368,7 +381,6 @@ class ResilienceAgent(BaseAgent):
             unreachable_facility_ids=sorted(unreachable),
         )
 
-
     def accessibility_links(
         self,
         origin: str,
@@ -379,9 +391,7 @@ class ResilienceAgent(BaseAgent):
         scenario: Scenario | None = None,
         max_snap_distance_m: float = 1000.0,
     ) -> SnappedAccessibilityResult:
-        links = snap_facilities_to_network(
-            facilities, nodes, max_distance_m=max_snap_distance_m
-        )
+        links = snap_facilities_to_network(facilities, nodes, max_distance_m=max_snap_distance_m)
         by_id = {facility.id: facility for facility in facilities}
         graph = self._scenario_graph(scenario)
         lengths = nx.single_source_dijkstra_path_length(
