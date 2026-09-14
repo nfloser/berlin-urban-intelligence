@@ -15,7 +15,6 @@ from berlin_urban_intelligence.shared.contracts import CriticalFacility, Officia
 
 class WfsReader(Protocol):
     def feature_types(self) -> list[str]: ...
-    def discover_feature_type(self, *keywords: str) -> str: ...
     def fetch_geojson(self, feature_type: str, *, count: int | None = None) -> dict[str, Any]: ...
 
 
@@ -23,6 +22,17 @@ class ReferenceRefreshCoordinator:
     HOSPITAL_URL = "https://gdi.berlin.de/services/wfs/krankenhaeuser"
     FIRE_URL = "https://gdi.berlin.de/services/wfs/feuerwehr"
     CLIMATE_URL = "https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022"
+
+    # The upstream climate service currently advertises dozens of layers, including source
+    # geometries with hundreds of thousands of features. The reference state intentionally loads
+    # a verified, semantically relevant map subset instead of silently downloading the entire WFS.
+    CLIMATE_LAYER_LOCAL_NAMES = (
+        "ta_kak_luftaustausch_2022",
+        "te_kak_klimarelevante_bebauung_2022",
+        "tf_kak_windfeldveraenderung_2022",
+        "ti_kak_kaltluftabfluss_2022",
+        "tk_kak_leitbahnkorridor_2022",
+    )
 
     def __init__(
         self,
@@ -52,6 +62,40 @@ class ReferenceRefreshCoordinator:
             return cast(dict[str, Any], fetch_all(feature_type))
         return client.fetch_geojson(feature_type)
 
+    @staticmethod
+    def _matching_feature_types(
+        client: WfsReader,
+        *,
+        include: tuple[str, ...],
+        exclude: tuple[str, ...] = (),
+    ) -> list[str]:
+        include_lower = tuple(value.lower() for value in include)
+        exclude_lower = tuple(value.lower() for value in exclude)
+        matches = [
+            name
+            for name in client.feature_types()
+            if all(value in name.lower() for value in include_lower)
+            and not any(value in name.lower() for value in exclude_lower)
+        ]
+        if not matches:
+            raise ValueError(
+                f"WFS advertises no feature type matching include={include!r}, exclude={exclude!r}"
+            )
+        return sorted(matches)
+
+    @classmethod
+    def _selected_climate_feature_types(cls, client: WfsReader) -> list[str]:
+        advertised = client.feature_types()
+        by_local_name = {name.split(":", 1)[-1]: name for name in advertised}
+        missing = [
+            local_name
+            for local_name in cls.CLIMATE_LAYER_LOCAL_NAMES
+            if local_name not in by_local_name
+        ]
+        if missing:
+            raise ValueError(f"climate WFS is missing verified reference layers: {missing!r}")
+        return [by_local_name[name] for name in cls.CLIMATE_LAYER_LOCAL_NAMES]
+
     def refresh(self, *, previous: ReferenceState | None = None) -> ReferenceState:
         now = self.now_factory()
         if now.tzinfo is None or now.utcoffset() is None:
@@ -67,7 +111,8 @@ class ReferenceRefreshCoordinator:
             (
                 "berlin_hospitals",
                 self.hospital_client,
-                ("kranken",),
+                ("krankenhaeuser",),
+                (),
                 "hospital",
                 "Senatsverwaltung für Wissenschaft, Gesundheit und Pflege Berlin",
                 "Krankenhäuser in Berlin",
@@ -76,28 +121,34 @@ class ReferenceRefreshCoordinator:
             (
                 "berlin_fire_stations",
                 self.fire_client,
-                ("feuer",),
+                ("feuerwehr", "standorte"),
+                ("einsatzbereiche",),
                 "fire_station",
                 "Berliner Feuerwehr",
                 "Standorte der Berliner Feuerwehr",
                 self.FIRE_URL,
             ),
         )
-        for source_id, client, keywords, category, provider, dataset, url in facility_specs:
+        for source_id, client, include, exclude, category, provider, dataset, url in facility_specs:
             try:
-                feature_type = client.discover_feature_type(*keywords)
-                payload = self._fetch_complete_layer(client, feature_type)
-                facilities.extend(
-                    registry.ingest_official_geojson(
-                        payload,
-                        category=category,
-                        provider=provider,
-                        dataset=dataset,
-                        source_url=url,
-                        licence="Datenlizenz Deutschland - Zero - Version 2.0",
-                        retrieved_at=now,
-                    )
+                feature_types = self._matching_feature_types(
+                    client, include=include, exclude=exclude
                 )
+                source_facilities: list[CriticalFacility] = []
+                for feature_type in feature_types:
+                    payload = self._fetch_complete_layer(client, feature_type)
+                    source_facilities.extend(
+                        registry.ingest_official_geojson(
+                            payload,
+                            category=category,
+                            provider=provider,
+                            dataset=dataset,
+                            source_url=url,
+                            licence="Datenlizenz Deutschland - Zero - Version 2.0",
+                            retrieved_at=now,
+                        )
+                    )
+                facilities.extend(source_facilities)
             except Exception as exc:
                 errors[source_id] = self._source_failure(exc)
                 if previous is not None:
@@ -106,14 +157,7 @@ class ReferenceRefreshCoordinator:
                     )
 
         try:
-            feature_types_method = getattr(self.climate_client, "feature_types", None)
-            feature_types = (
-                feature_types_method()
-                if callable(feature_types_method)
-                else [self.climate_client.discover_feature_type("klima")]
-            )
-            if not feature_types:
-                raise ValueError("climate WFS advertises no feature types")
+            feature_types = self._selected_climate_feature_types(self.climate_client)
             candidate_features: list[OfficialModelFeature] = []
             for feature_type in feature_types:
                 payload = self._fetch_complete_layer(self.climate_client, feature_type)
