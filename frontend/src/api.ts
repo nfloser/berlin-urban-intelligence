@@ -197,9 +197,10 @@ export function mapLayerCounts(counts: {
   stops: number;
   climate: number;
 }): Array<[string, number]> {
-  return [
+  const layers: Array<[string, number]> = [
     ["Critical facilities", counts.facilities],
     ["VBB stops", counts.stops],
     ["Official climate features", counts.climate],
-  ].filter(([, count]) => count > 0);
+  ];
+  return layers.filter(([, count]) => count > 0);
 }
