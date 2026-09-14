@@ -142,3 +142,7 @@ dd { margin: 0; text-align: right; }
 .layer-swatch.facilities { background: #e36d6d; }
 .layer-swatch.stops { background: #65b3d1; }
 .layer-swatch.climate { border-radius: 2px; background: #e0a458; }
+
+.route-selection-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+.secondary-action { padding: 9px 10px; border: 1px solid #536d86; border-radius: 7px; background: #101b25; cursor: pointer; font-size: 12px; }
+.secondary-action:hover, .secondary-action.active { background: #24394c; border-color: #83aeca; }
