@@ -28,6 +28,10 @@ from berlin_urban_intelligence.agents.mobility import MobilityAgent
 from berlin_urban_intelligence.agents.resilience import ResilienceAgent
 from berlin_urban_intelligence.energy.state import EnergyStateStore
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
+from berlin_urban_intelligence.orchestrator.assessment import (
+    AssessmentRequest,
+    IntegratedAssessmentService,
+)
 from berlin_urban_intelligence.orchestrator.engine import (
     OrchestrationRequest,
     Orchestrator,
@@ -413,6 +417,21 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=422, detail=f"DERIVATION_FAILED: {exc}") from None
         return result.model_dump(mode="json")
+
+    @app.post("/api/v1/assess")
+    def assess(request: Request, payload: AssessmentRequest) -> dict[str, object]:
+        reference: ReferenceState | None = request.app.state.reference
+        heat_agent: HeatAgent = request.app.state.agents["heat"]
+        energy_agent: EnergyAgent = request.app.state.agents["energy"]
+        resilience_agent: ResilienceAgent = request.app.state.agents["resilience"]
+        service = IntegratedAssessmentService(
+            heat=heat_agent,
+            energy=energy_agent,
+            resilience=resilience_agent,
+            facilities=reference.critical_facilities if reference else (),
+            network_nodes=reference.network_nodes if reference else (),
+        )
+        return service.assess(payload).model_dump(mode="json")
 
     @app.get("/api/v1/graph", response_class=PlainTextResponse)
     def graph(request: Request) -> str:
