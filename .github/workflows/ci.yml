@@ -69,6 +69,15 @@ jobs:
             fi
             sleep 2
           done
-          curl --fail --silent http://127.0.0.1:8080/ >/dev/null
-          curl --fail --silent http://127.0.0.1:8080/health >/dev/null
+          for attempt in $(seq 1 15); do
+            if curl --fail --silent http://127.0.0.1:8080/ >/dev/null               && curl --fail --silent http://127.0.0.1:8080/health >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 15 ]; then
+              docker compose ps
+              docker compose logs backend frontend
+              exit 1
+            fi
+            sleep 1
+          done
           docker compose ps
