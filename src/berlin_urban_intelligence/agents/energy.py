@@ -9,7 +9,7 @@ matching model and dataset fingerprints are explicitly registered.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
@@ -38,7 +38,7 @@ class ModelMetric(BaseModel):
     baseline_mae: float = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_window(self) -> "ModelMetric":
+    def validate_window(self) -> ModelMetric:
         object.__setattr__(self, "evaluation_start", ensure_utc(self.evaluation_start))
         object.__setattr__(self, "evaluation_end", ensure_utc(self.evaluation_end))
         if self.evaluation_end <= self.evaluation_start:
@@ -64,7 +64,7 @@ class ForecastArtifact(BaseModel):
     upper_bound: float | None = None
 
     @model_validator(mode="after")
-    def validate_times(self) -> "ForecastArtifact":
+    def validate_times(self) -> ForecastArtifact:
         object.__setattr__(self, "issued_at", ensure_utc(self.issued_at))
         object.__setattr__(self, "valid_at", ensure_utc(self.valid_at))
         if self.valid_at <= self.issued_at:
@@ -102,7 +102,9 @@ class EnergyAgent(BaseAgent):
         if artifact.model_id != metric.model_id:
             raise ValueError("forecast model_id does not match the registered evaluation")
         if artifact.dataset_fingerprint != metric.dataset_fingerprint:
-            raise ValueError("forecast dataset fingerprint does not match the registered evaluation")
+            raise ValueError(
+                "forecast dataset fingerprint does not match the registered evaluation"
+            )
         provenance = Provenance(
             provider="configured Berlin energy source",
             dataset=artifact.source_dataset,

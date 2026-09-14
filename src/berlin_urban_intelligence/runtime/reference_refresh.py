@@ -23,7 +23,14 @@ class ReferenceRefreshCoordinator:
     FIRE_URL = "https://gdi.berlin.de/services/wfs/feuerwehr"
     CLIMATE_URL = "https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022"
 
-    def __init__(self, *, hospital_client: WfsReader | None = None, fire_client: WfsReader | None = None, climate_client: WfsReader | None = None, now_factory: Callable[[], datetime] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        hospital_client: WfsReader | None = None,
+        fire_client: WfsReader | None = None,
+        climate_client: WfsReader | None = None,
+        now_factory: Callable[[], datetime] | None = None,
+    ) -> None:
         self.hospital_client = hospital_client or BerlinWfsClient(self.HOSPITAL_URL)
         self.fire_client = fire_client or BerlinWfsClient(self.FIRE_URL)
         self.climate_client = climate_client or BerlinWfsClient(self.CLIMATE_URL)
@@ -31,7 +38,11 @@ class ReferenceRefreshCoordinator:
 
     @staticmethod
     def _source_failure(exc: Exception) -> str:
-        return "SCHEMA_CHANGED" if isinstance(exc, (ValueError, KeyError, TypeError)) else "SOURCE_UNAVAILABLE"
+        return (
+            "SCHEMA_CHANGED"
+            if isinstance(exc, (ValueError, KeyError, TypeError))
+            else "SOURCE_UNAVAILABLE"
+        )
 
     @staticmethod
     def _fetch_complete_layer(client: WfsReader, feature_type: str) -> dict[str, Any]:
@@ -52,28 +63,64 @@ class ReferenceRefreshCoordinator:
         heat = HeatAgent(now_factory=self.now_factory)
 
         facility_specs = (
-            ("berlin_hospitals", self.hospital_client, ("kranken",), "hospital", "Senatsverwaltung für Wissenschaft, Gesundheit und Pflege Berlin", "Krankenhäuser in Berlin", self.HOSPITAL_URL),
-            ("berlin_fire_stations", self.fire_client, ("feuer",), "fire_station", "Berliner Feuerwehr", "Standorte der Berliner Feuerwehr", self.FIRE_URL),
+            (
+                "berlin_hospitals",
+                self.hospital_client,
+                ("kranken",),
+                "hospital",
+                "Senatsverwaltung für Wissenschaft, Gesundheit und Pflege Berlin",
+                "Krankenhäuser in Berlin",
+                self.HOSPITAL_URL,
+            ),
+            (
+                "berlin_fire_stations",
+                self.fire_client,
+                ("feuer",),
+                "fire_station",
+                "Berliner Feuerwehr",
+                "Standorte der Berliner Feuerwehr",
+                self.FIRE_URL,
+            ),
         )
         for source_id, client, keywords, category, provider, dataset, url in facility_specs:
             try:
                 feature_type = client.discover_feature_type(*keywords)
                 payload = self._fetch_complete_layer(client, feature_type)
-                facilities.extend(registry.ingest_official_geojson(payload, category=category, provider=provider, dataset=dataset, source_url=url, licence="Datenlizenz Deutschland - Zero - Version 2.0", retrieved_at=now))
+                facilities.extend(
+                    registry.ingest_official_geojson(
+                        payload,
+                        category=category,
+                        provider=provider,
+                        dataset=dataset,
+                        source_url=url,
+                        licence="Datenlizenz Deutschland - Zero - Version 2.0",
+                        retrieved_at=now,
+                    )
+                )
             except Exception as exc:
                 errors[source_id] = self._source_failure(exc)
                 if previous is not None:
-                    facilities.extend(item for item in previous.critical_facilities if item.category == category)
+                    facilities.extend(
+                        item for item in previous.critical_facilities if item.category == category
+                    )
 
         try:
             feature_types_method = getattr(self.climate_client, "feature_types", None)
-            feature_types = feature_types_method() if callable(feature_types_method) else [self.climate_client.discover_feature_type("klima")]
+            feature_types = (
+                feature_types_method()
+                if callable(feature_types_method)
+                else [self.climate_client.discover_feature_type("klima")]
+            )
             if not feature_types:
                 raise ValueError("climate WFS advertises no feature types")
             candidate_features: list = []
             for feature_type in feature_types:
                 payload = self._fetch_complete_layer(self.climate_client, feature_type)
-                candidate_features.extend(heat.ingest_official_climate_features(payload, feature_type=feature_type, retrieved_at=now))
+                candidate_features.extend(
+                    heat.ingest_official_climate_features(
+                        payload, feature_type=feature_type, retrieved_at=now
+                    )
+                )
             climate_features = candidate_features
         except Exception as exc:
             errors["berlin_climate_analysis_2022"] = self._source_failure(exc)

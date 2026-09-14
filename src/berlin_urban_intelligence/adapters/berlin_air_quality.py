@@ -123,7 +123,7 @@ class BerlinAirQualityClient:
         if self._owned_client:
             self._client.close()
 
-    def __enter__(self) -> "BerlinAirQualityClient":
+    def __enter__(self) -> BerlinAirQualityClient:
         return self
 
     def __exit__(self, *_args: object) -> None:

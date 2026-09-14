@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from berlin_urban_intelligence.adapters.berlin_air_quality import LqiRecord
 from berlin_urban_intelligence.agents.base import BaseAgent
@@ -99,7 +99,11 @@ class ExposureAgent(BaseAgent):
             return self.unavailable_health("No Berlin air-quality snapshot has been ingested.")
         newest = max(item.observed_at for item in self._observations)
         freshness = classify_freshness(newest, now, timedelta(hours=2))
-        status = AvailabilityStatus.AVAILABLE if freshness == FreshnessStatus.VALID else AvailabilityStatus.DEGRADED
+        status = (
+            AvailabilityStatus.AVAILABLE
+            if freshness == FreshnessStatus.VALID
+            else AvailabilityStatus.DEGRADED
+        )
         return AgentHealth(
             agent_id=self.descriptor.id,
             status=status,

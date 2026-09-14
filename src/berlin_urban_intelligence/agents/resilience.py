@@ -7,8 +7,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 import networkx as nx
-from pyproj import Transformer
 from pydantic import BaseModel, ConfigDict, Field
+from pyproj import Transformer
 from shapely.geometry import shape
 from shapely.ops import transform as transform_geometry
 
@@ -25,8 +25,6 @@ from berlin_urban_intelligence.shared.contracts import (
     QualityFlag,
     SpatialReference,
 )
-
-
 
 
 class NearestNetworkNode(BaseModel):
@@ -198,7 +196,9 @@ class CriticalInfrastructureRegistry:
         licence: str,
         retrieved_at: datetime | None = None,
     ) -> list[CriticalFacility]:
-        if payload.get("type") != "FeatureCollection" or not isinstance(payload.get("features"), list):
+        if payload.get("type") != "FeatureCollection" or not isinstance(
+            payload.get("features"), list
+        ):
             raise ValueError("critical infrastructure source must be a GeoJSON FeatureCollection")
         retrieved = retrieved_at or datetime.now(UTC)
         if retrieved.tzinfo is None or retrieved.utcoffset() is None:
@@ -245,7 +245,12 @@ class ResilienceAgent(BaseAgent):
         id="resilience",
         version="1.0.0",
         description="Network accessibility and disruption analysis over explicit network/facility inputs.",
-        capabilities=("shortest_path", "accessibility", "scenario_comparison", "critical_infrastructure"),
+        capabilities=(
+            "shortest_path",
+            "accessibility",
+            "scenario_comparison",
+            "critical_infrastructure",
+        ),
         input_contracts=("NetworkEdge", "CriticalFacility", "Scenario"),
         output_contracts=("RouteResult", "AccessibilityResult", "RouteComparison"),
         source_dependencies=("osm_berlin", "berlin_hospitals", "berlin_fire_stations"),
@@ -299,7 +304,9 @@ class ResilienceAgent(BaseAgent):
                 data["travel_time_s"] = float(data["travel_time_s"]) * penalty
         return graph
 
-    def shortest_path(self, origin: str, destination: str, scenario: Scenario | None = None) -> RouteResult:
+    def shortest_path(
+        self, origin: str, destination: str, scenario: Scenario | None = None
+    ) -> RouteResult:
         graph = self._scenario_graph(scenario)
         path = nx.shortest_path(graph, origin, destination, weight="travel_time_s")
         edge_ids: list[str] = []
@@ -368,7 +375,6 @@ class ResilienceAgent(BaseAgent):
             unreachable_facility_ids=sorted(unreachable),
         )
 
-
     def accessibility_links(
         self,
         origin: str,
@@ -379,9 +385,7 @@ class ResilienceAgent(BaseAgent):
         scenario: Scenario | None = None,
         max_snap_distance_m: float = 1000.0,
     ) -> SnappedAccessibilityResult:
-        links = snap_facilities_to_network(
-            facilities, nodes, max_distance_m=max_snap_distance_m
-        )
+        links = snap_facilities_to_network(facilities, nodes, max_distance_m=max_snap_distance_m)
         by_id = {facility.id: facility for facility in facilities}
         graph = self._scenario_graph(scenario)
         lengths = nx.single_source_dijkstra_path_length(

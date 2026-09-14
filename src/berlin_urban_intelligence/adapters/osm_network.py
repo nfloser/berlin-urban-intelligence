@@ -98,6 +98,7 @@ def normalize_osmnx_graph(
         edges=tuple(sorted(edges, key=lambda item: item.id)),
     )
 
+
 class OsmnxRoadNetworkClient:
     """Acquire an OSM road graph and convert it to canonical network contracts.
 
@@ -161,4 +162,3 @@ class OsmnxRoadNetworkClient:
             source_query=place,
             processing_note=note,
         )
-

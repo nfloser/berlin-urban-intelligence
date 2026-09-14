@@ -27,7 +27,9 @@ class GtfsStaticSnapshot(BaseModel):
 
 class VbbGtfsStaticClient:
     URL = "https://unternehmen.vbb.de/gtfs"
-    USER_AGENT = "berlin-urban-intelligence/0.1 (+https://github.com/nfloser/berlin-urban-intelligence)"
+    USER_AGENT = (
+        "berlin-urban-intelligence/0.1 (+https://github.com/nfloser/berlin-urban-intelligence)"
+    )
 
     def __init__(self, client: httpx.Client | None = None, timeout_s: float = 60.0) -> None:
         self._owned_client = client is None
@@ -54,7 +56,11 @@ class VbbGtfsStaticAdapter:
         return csv.DictReader(TextIOWrapper(archive.open(name), encoding="utf-8-sig", newline=""))
 
     def parse(self, payload: bytes, *, retrieved_at: datetime | str) -> GtfsStaticSnapshot:
-        retrieved = ensure_utc(datetime.fromisoformat(retrieved_at.replace("Z", "+00:00")) if isinstance(retrieved_at, str) else retrieved_at)
+        retrieved = ensure_utc(
+            datetime.fromisoformat(retrieved_at.replace("Z", "+00:00"))
+            if isinstance(retrieved_at, str)
+            else retrieved_at
+        )
         try:
             with ZipFile(BytesIO(payload)) as archive:
                 names = set(archive.namelist())
@@ -68,7 +74,9 @@ class VbbGtfsStaticAdapter:
                 stops: list[UrbanEntity] = []
                 stop_reader = self._reader(archive, "stops.txt")
                 required_stop_fields = {"stop_id", "stop_name", "stop_lat", "stop_lon"}
-                if not stop_reader.fieldnames or not required_stop_fields.issubset(stop_reader.fieldnames):
+                if not stop_reader.fieldnames or not required_stop_fields.issubset(
+                    stop_reader.fieldnames
+                ):
                     raise ValueError("GTFS stops.txt schema is missing required columns")
                 for row in stop_reader:
                     stop_id = (row.get("stop_id") or "").strip()

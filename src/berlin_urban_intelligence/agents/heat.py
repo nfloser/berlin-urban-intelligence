@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from typing import Any
 
 from berlin_urban_intelligence.adapters.dwd import DwdTemperatureRecord
 from berlin_urban_intelligence.agents.base import BaseAgent
-from typing import Any
-
 from berlin_urban_intelligence.shared.contracts import (
     AgentDescriptor,
     AgentHealth,
@@ -17,9 +16,9 @@ from berlin_urban_intelligence.shared.contracts import (
     FreshnessStatus,
     Observation,
     OfficialModelFeature,
-    SpatialReference,
     Provenance,
     QualityFlag,
+    SpatialReference,
 )
 from berlin_urban_intelligence.shared.temporal import classify_freshness, ensure_utc
 
@@ -88,13 +87,14 @@ class HeatAgent(BaseAgent):
                     unit=unit,
                     observed_at=record.observed_at,
                     state=DataState.OBSERVED,
-                    quality=QualityFlag.SUSPECT if record.quality_level in (None, 1) else QualityFlag.VALID,
+                    quality=QualityFlag.SUSPECT
+                    if record.quality_level in (None, 1)
+                    else QualityFlag.VALID,
                     provenance=provenance,
                 )
             )
         self._observations = tuple(observations)
         return observations
-
 
     def ingest_official_climate_features(
         self,
@@ -108,7 +108,9 @@ class HeatAgent(BaseAgent):
         Properties are preserved as published rather than guessed into project-specific metrics.
         This allows later schema-specific mappings only after the upstream fields are verified.
         """
-        if payload.get("type") != "FeatureCollection" or not isinstance(payload.get("features"), list):
+        if payload.get("type") != "FeatureCollection" or not isinstance(
+            payload.get("features"), list
+        ):
             raise ValueError("climate source must be a GeoJSON FeatureCollection")
         retrieved = ensure_utc(retrieved_at or self.now())
         output: list[OfficialModelFeature] = []
@@ -153,7 +155,11 @@ class HeatAgent(BaseAgent):
             return self.unavailable_health("No measured Berlin meteorology has been ingested.")
         newest = max(item.observed_at for item in self._observations)
         freshness = classify_freshness(newest, now, timedelta(hours=1))
-        status = AvailabilityStatus.AVAILABLE if freshness == FreshnessStatus.VALID else AvailabilityStatus.DEGRADED
+        status = (
+            AvailabilityStatus.AVAILABLE
+            if freshness == FreshnessStatus.VALID
+            else AvailabilityStatus.DEGRADED
+        )
         quality = (
             QualityFlag.SUSPECT
             if any(item.quality == QualityFlag.SUSPECT for item in self._observations)

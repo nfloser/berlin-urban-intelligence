@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from rdflib import Graph, Namespace, RDF, RDFS
+from rdflib import RDF, RDFS, Graph, Namespace
 
 BUI = Namespace("https://w3id.org/berlin-urban-intelligence/ontology#")
 ROOT = Path(__file__).resolve().parents[1]

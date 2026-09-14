@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from typing import Any, Mapping
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -22,8 +23,12 @@ class SourceRuntimeStatus(BaseModel):
     error_code: str | None = None
 
     @model_validator(mode="after")
-    def normalise_times(self) -> "SourceRuntimeStatus":
-        for field in ("last_retrieval_attempt", "last_successful_retrieval", "latest_observation_time"):
+    def normalise_times(self) -> SourceRuntimeStatus:
+        for field in (
+            "last_retrieval_attempt",
+            "last_successful_retrieval",
+            "latest_observation_time",
+        ):
             value = getattr(self, field)
             if value is None:
                 continue
@@ -51,7 +56,9 @@ class SourceStatusStore:
             raise ValueError("source status timestamps must be timezone-aware")
         return value.astimezone(UTC)
 
-    def record_success(self, source_id: str, *, retrieved_at: datetime, observation_time: datetime | None) -> None:
+    def record_success(
+        self, source_id: str, *, retrieved_at: datetime, observation_time: datetime | None
+    ) -> None:
         retrieved = self._utc(retrieved_at)
         observed = self._utc(observation_time) if observation_time is not None else None
         self._state[source_id] = {
@@ -64,15 +71,31 @@ class SourceStatusStore:
 
     def record_failure(self, source_id: str, *, checked_at: datetime, error_code: str) -> None:
         checked = self._utc(checked_at)
-        current = self._state.setdefault(source_id, {"last_successful_retrieval": None, "latest_observation_time": None})
-        current.update(availability=AvailabilityStatus.UNAVAILABLE, last_retrieval_attempt=checked, error_code=error_code)
+        current = self._state.setdefault(
+            source_id, {"last_successful_retrieval": None, "latest_observation_time": None}
+        )
+        current.update(
+            availability=AvailabilityStatus.UNAVAILABLE,
+            last_retrieval_attempt=checked,
+            error_code=error_code,
+        )
 
-    def get(self, source_id: str, *, now: datetime, freshness_threshold: timedelta) -> SourceRuntimeStatus:
+    def get(
+        self, source_id: str, *, now: datetime, freshness_threshold: timedelta
+    ) -> SourceRuntimeStatus:
         current = self._state.get(source_id)
         if current is None:
-            return SourceRuntimeStatus(source_id=source_id, availability=AvailabilityStatus.UNKNOWN, freshness=FreshnessStatus.UNKNOWN)
+            return SourceRuntimeStatus(
+                source_id=source_id,
+                availability=AvailabilityStatus.UNKNOWN,
+                freshness=FreshnessStatus.UNKNOWN,
+            )
         observed = current.get("latest_observation_time")
-        freshness = classify_freshness(observed, now=now, threshold=freshness_threshold) if isinstance(observed, datetime) else FreshnessStatus.UNKNOWN
+        freshness = (
+            classify_freshness(observed, now=now, threshold=freshness_threshold)
+            if isinstance(observed, datetime)
+            else FreshnessStatus.UNKNOWN
+        )
         return SourceRuntimeStatus(
             source_id=source_id,
             availability=current.get("availability", AvailabilityStatus.UNKNOWN),

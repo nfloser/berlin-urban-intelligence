@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from rdflib import Graph, Literal, Namespace, RDF, URIRef
+from rdflib import RDF, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import PROV, XSD
 
 from berlin_urban_intelligence.shared.contracts import (
@@ -60,7 +60,15 @@ class KnowledgeGraph:
             self.graph.add((subject, BUI.sourceIdentifier, Literal(entity.source_identifier)))
         if entity.spatial and entity.spatial.geometry:
             self.graph.add((subject, BUI.crs, Literal(entity.spatial.crs)))
-            self.graph.add((subject, BUI.geometryGeoJSON, Literal(json.dumps(entity.spatial.geometry, separators=(",", ":"), sort_keys=True))))
+            self.graph.add(
+                (
+                    subject,
+                    BUI.geometryGeoJSON,
+                    Literal(
+                        json.dumps(entity.spatial.geometry, separators=(",", ":"), sort_keys=True)
+                    ),
+                )
+            )
         return subject
 
     def _add_provenance(self, subject: URIRef, item_id: str, provenance: Provenance) -> None:
@@ -101,7 +109,13 @@ class KnowledgeGraph:
         self.graph.add((subject, BUI.value, Literal(observation.value)))
         if observation.unit:
             self.graph.add((subject, BUI.unit, Literal(observation.unit)))
-        self.graph.add((subject, SOSA.resultTime, Literal(observation.observed_at.isoformat(), datatype=XSD.dateTime)))
+        self.graph.add(
+            (
+                subject,
+                SOSA.resultTime,
+                Literal(observation.observed_at.isoformat(), datatype=XSD.dateTime),
+            )
+        )
         self._add_provenance(subject, observation.id, observation.provenance)
         return subject
 
@@ -113,7 +127,9 @@ class KnowledgeGraph:
         self.graph.add((subject, BUI.value, Literal(value.value)))
         self.graph.add((subject, BUI.dataState, Literal(value.state.value)))
         self.graph.add((subject, BUI.qualityFlag, Literal(value.quality.value)))
-        self.graph.add((subject, BUI.validAt, Literal(value.valid_at.isoformat(), datatype=XSD.dateTime)))
+        self.graph.add(
+            (subject, BUI.validAt, Literal(value.valid_at.isoformat(), datatype=XSD.dateTime))
+        )
         if value.unit:
             self.graph.add((subject, BUI.unit, Literal(value.unit)))
         for dependency in value.dependencies:
@@ -129,8 +145,12 @@ class KnowledgeGraph:
         self.graph.add((subject, BUI.value, Literal(forecast.value)))
         self.graph.add((subject, BUI.dataState, Literal(forecast.state.value)))
         self.graph.add((subject, BUI.qualityFlag, Literal(forecast.quality.value)))
-        self.graph.add((subject, BUI.issuedAt, Literal(forecast.issued_at.isoformat(), datatype=XSD.dateTime)))
-        self.graph.add((subject, BUI.validAt, Literal(forecast.valid_at.isoformat(), datatype=XSD.dateTime)))
+        self.graph.add(
+            (subject, BUI.issuedAt, Literal(forecast.issued_at.isoformat(), datatype=XSD.dateTime))
+        )
+        self.graph.add(
+            (subject, BUI.validAt, Literal(forecast.valid_at.isoformat(), datatype=XSD.dateTime))
+        )
         self.graph.add((subject, BUI.unit, Literal(forecast.unit)))
         if forecast.lower_bound is not None:
             self.graph.add((subject, BUI.lowerBound, Literal(forecast.lower_bound)))
@@ -161,8 +181,26 @@ class KnowledgeGraph:
         self.graph.add((subject, BUI.dataState, Literal(feature.state.value)))
         self.graph.add((subject, BUI.qualityFlag, Literal(feature.quality.value)))
         self.graph.add((subject, BUI.crs, Literal(feature.spatial.crs)))
-        self.graph.add((subject, BUI.geometryGeoJSON, Literal(json.dumps(feature.spatial.geometry, separators=(",", ":"), sort_keys=True))))
-        self.graph.add((subject, BUI.propertiesJSON, Literal(json.dumps(feature.properties, separators=(",", ":"), sort_keys=True, default=str))))
+        self.graph.add(
+            (
+                subject,
+                BUI.geometryGeoJSON,
+                Literal(
+                    json.dumps(feature.spatial.geometry, separators=(",", ":"), sort_keys=True)
+                ),
+            )
+        )
+        self.graph.add(
+            (
+                subject,
+                BUI.propertiesJSON,
+                Literal(
+                    json.dumps(
+                        feature.properties, separators=(",", ":"), sort_keys=True, default=str
+                    )
+                ),
+            )
+        )
         self._add_provenance(subject, feature.id, feature.provenance)
         return subject
 

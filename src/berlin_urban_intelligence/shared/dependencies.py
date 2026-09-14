@@ -30,7 +30,9 @@ class DependencyGraph:
     def mark_upstream_changed(self, upstream_id: str) -> set[str]:
         if upstream_id not in self._graph:
             return set()
-        affected = {node for node in nx.descendants(self._graph, upstream_id) if node in self._statuses}
+        affected = {
+            node for node in nx.descendants(self._graph, upstream_id) if node in self._statuses
+        }
         for product_id in affected:
             self._statuses[product_id] = DerivationStatus.STALE
         return affected

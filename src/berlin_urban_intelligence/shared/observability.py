@@ -43,7 +43,7 @@ def configure_structured_logging(level: int = logging.INFO) -> None:
         return
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter())
-    setattr(handler, "_bui_structured", True)
+    handler._bui_structured = True
     logger.addHandler(handler)
     logger.setLevel(level)
     logger.propagate = False

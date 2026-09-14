@@ -70,7 +70,9 @@ def _load_runtime() -> RuntimeState | None:
 
 
 def _load_reference() -> ReferenceState | None:
-    return ReferenceStateStore(_path_from_env("BUI_REFERENCE_STATE", DEFAULT_REFERENCE_STATE)).load()
+    return ReferenceStateStore(
+        _path_from_env("BUI_REFERENCE_STATE", DEFAULT_REFERENCE_STATE)
+    ).load()
 
 
 def _build_energy_agent() -> EnergyAgent:
@@ -84,7 +86,9 @@ def _build_energy_agent() -> EnergyAgent:
     return agent
 
 
-def _build_agents(runtime: RuntimeState | None, reference: ReferenceState | None) -> dict[str, object]:
+def _build_agents(
+    runtime: RuntimeState | None, reference: ReferenceState | None
+) -> dict[str, object]:
     observations = tuple(runtime.observations if runtime else ())
     exposure = ExposureAgent([item for item in observations if item.provenance.agent == "exposure"])
     heat = HeatAgent([item for item in observations if item.provenance.agent == "heat"])
@@ -102,7 +106,9 @@ def _build_agents(runtime: RuntimeState | None, reference: ReferenceState | None
     }
 
 
-def _graph(runtime: RuntimeState | None, reference: ReferenceState | None, energy: EnergyAgent) -> KnowledgeGraph:
+def _graph(
+    runtime: RuntimeState | None, reference: ReferenceState | None, energy: EnergyAgent
+) -> KnowledgeGraph:
     graph = KnowledgeGraph()
     if runtime:
         for observation in runtime.observations:
@@ -203,7 +209,9 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/agents")
     def agents(request: Request) -> list[dict[str, object]]:
-        return [agent.descriptor.model_dump(mode="json") for agent in request.app.state.agents.values()]
+        return [
+            agent.descriptor.model_dump(mode="json") for agent in request.app.state.agents.values()
+        ]
 
     @app.get("/api/v1/agents/health")
     def agent_health(request: Request) -> dict[str, object]:
@@ -222,7 +230,9 @@ def create_app() -> FastAPI:
         runtime: RuntimeState | None = request.app.state.runtime
         if runtime is None:
             return {}
-        return {key: value.model_dump(mode="json") for key, value in runtime.source_statuses.items()}
+        return {
+            key: value.model_dump(mode="json") for key, value in runtime.source_statuses.items()
+        }
 
     @app.get("/api/v1/state")
     def state(request: Request) -> dict[str, object]:
@@ -382,7 +392,9 @@ def create_app() -> FastAPI:
     def accessibility(request: Request, payload: AccessibilityRequest) -> dict[str, object]:
         reference: ReferenceState | None = request.app.state.reference
         if reference is None or not reference.network_nodes or not reference.critical_facilities:
-            raise HTTPException(status_code=409, detail="INSUFFICIENT_DATA: network and facilities required")
+            raise HTTPException(
+                status_code=409, detail="INSUFFICIENT_DATA: network and facilities required"
+            )
         agent: ResilienceAgent = request.app.state.agents["resilience"]
         try:
             result = agent.accessibility_links(

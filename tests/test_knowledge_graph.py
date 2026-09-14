@@ -40,6 +40,9 @@ def test_observation_projection_preserves_state_and_provenance() -> None:
     graph = KnowledgeGraph()
     subject = graph.add_observation(observation)
     assert (subject, RDF.type, BUI.Observation) in graph.graph
-    assert any(predicate == PROV.wasGeneratedBy for _, predicate, _ in graph.graph.triples((subject, None, None)))
+    assert any(
+        predicate == PROV.wasGeneratedBy
+        for _, predicate, _ in graph.graph.triples((subject, None, None))
+    )
     assert "observed" in graph.serialize()
     assert "fixture-provider" in graph.serialize()

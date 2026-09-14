@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -51,7 +51,9 @@ class LiveStateAgent(BaseAgent):
             overall = AvailabilityStatus.UNKNOWN
         elif all(item == AvailabilityStatus.AVAILABLE for item in statuses):
             overall = AvailabilityStatus.AVAILABLE
-        elif any(item in {AvailabilityStatus.AVAILABLE, AvailabilityStatus.DEGRADED} for item in statuses):
+        elif any(
+            item in {AvailabilityStatus.AVAILABLE, AvailabilityStatus.DEGRADED} for item in statuses
+        ):
             overall = AvailabilityStatus.DEGRADED
         else:
             overall = AvailabilityStatus.UNAVAILABLE

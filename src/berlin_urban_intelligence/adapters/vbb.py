@@ -13,7 +13,9 @@ import httpx
 
 class VbbGtfsRealtimeClient:
     URL = "https://production.gtfsrt.vbb.de/data"
-    USER_AGENT = "berlin-urban-intelligence/0.1 (+https://github.com/nfloser/berlin-urban-intelligence)"
+    USER_AGENT = (
+        "berlin-urban-intelligence/0.1 (+https://github.com/nfloser/berlin-urban-intelligence)"
+    )
 
     def __init__(self, client: httpx.Client | None = None, timeout_s: float = 20.0) -> None:
         self._owned_client = client is None
@@ -30,7 +32,7 @@ class VbbGtfsRealtimeClient:
         if self._owned_client:
             self._client.close()
 
-    def __enter__(self) -> "VbbGtfsRealtimeClient":
+    def __enter__(self) -> VbbGtfsRealtimeClient:
         return self
 
     def __exit__(self, *_args: object) -> None:

@@ -148,15 +148,17 @@ class BerlinWfsClient:
         previous_signature: str | None = None
         start_index = 0
         while True:
-            page = self.fetch_geojson(
-                feature_type, count=page_size, start_index=start_index
-            )
+            page = self.fetch_geojson(feature_type, count=page_size, start_index=start_index)
             page_features = page["features"]
             if not page_features:
                 break
-            signature = json.dumps(page_features, sort_keys=True, separators=(",", ":"), default=str)
+            signature = json.dumps(
+                page_features, sort_keys=True, separators=(",", ":"), default=str
+            )
             if previous_signature == signature:
-                raise ValueError("WFS pagination did not advance; refusing duplicated/truncated data")
+                raise ValueError(
+                    "WFS pagination did not advance; refusing duplicated/truncated data"
+                )
             previous_signature = signature
             features.extend(page_features)
             if len(features) > max_features:
@@ -173,7 +175,7 @@ class BerlinWfsClient:
         if self._owned_client:
             self._client.close()
 
-    def __enter__(self) -> "BerlinWfsClient":
+    def __enter__(self) -> BerlinWfsClient:
         return self
 
     def __exit__(self, *_args: object) -> None:
