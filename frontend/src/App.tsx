@@ -86,7 +86,6 @@ function App() {
       style: BASE_STYLE,
       center: [13.405, 52.52],
       zoom: 10,
-      attributionControl: true,
     });
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     mapRef.current = map;
