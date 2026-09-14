@@ -17,6 +17,7 @@ import {
   displayValue,
   fetchJson,
   heatAssessmentRequest,
+  mapLayerCounts,
   postJson,
   toFeatureCollection,
 } from "./api";
@@ -57,6 +58,11 @@ function App() {
   const [workflowResult, setWorkflowResult] = useState<OrchestrationResponse | null>(null);
   const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [temperatureDelta, setTemperatureDelta] = useState("");
+  const [visibleLayers, setVisibleLayers] = useState({
+    facilities: true,
+    stops: true,
+    climate: true,
+  });
   const [assessmentState, setAssessmentState] = useState<ActionState>("idle");
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
@@ -132,6 +138,11 @@ function App() {
     const facilityData = toFeatureCollection(facilities);
     const stopData = toFeatureCollection(stops);
     const climateData = toFeatureCollection(climate);
+    const setVisibility = (layerId: string, visible: boolean) => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
+      }
+    };
 
     const installLayers = () => {
       const upsert = (id: string, data: FeatureCollection) => {
@@ -148,7 +159,7 @@ function App() {
           id: "climate-fill",
           type: "fill",
           source: "climate",
-          paint: { "fill-opacity": 0.18 },
+          paint: { "fill-color": "#e0a458", "fill-outline-color": "#e0a458", "fill-opacity": 0.24 },
         });
       }
       if (!map.getLayer("stops-circle")) {
@@ -156,7 +167,7 @@ function App() {
           id: "stops-circle",
           type: "circle",
           source: "stops",
-          paint: { "circle-radius": 2.5, "circle-opacity": 0.55 },
+          paint: { "circle-radius": 3, "circle-color": "#65b3d1", "circle-opacity": 0.72 },
         });
       }
       if (!map.getLayer("facilities-circle")) {
@@ -164,14 +175,22 @@ function App() {
           id: "facilities-circle",
           type: "circle",
           source: "facilities",
-          paint: { "circle-radius": 5, "circle-stroke-width": 1.5 },
+          paint: {
+            "circle-radius": 6,
+            "circle-color": "#e36d6d",
+            "circle-stroke-color": "#ffffff",
+            "circle-stroke-width": 1.5,
+          },
         });
       }
+      setVisibility("facilities-circle", visibleLayers.facilities);
+      setVisibility("stops-circle", visibleLayers.stops);
+      setVisibility("climate-fill", visibleLayers.climate);
     };
 
     if (map.isStyleLoaded()) installLayers();
     else map.once("load", installLayers);
-  }, [loadState, facilities, stops, climate]);
+  }, [loadState, facilities, stops, climate, visibleLayers]);
 
   const runWorkflow = async () => {
     setWorkflowState("running");
@@ -253,10 +272,35 @@ function App() {
         <div className="map-panel">
           <div ref={mapContainer} className="map" aria-label="Berlin domain map" />
           <div className="legend">
-            <strong>Layers</strong>
-            <span>Critical facilities · {facilities.length}</span>
-            <span>VBB stops · {stops.length}</span>
-            <span>Official climate features · {climate.length}</span>
+            <strong>Reference layers</strong>
+            <p>These layers are persisted reference data, not simulated changes.</p>
+            {mapLayerCounts({
+              facilities: facilities.length,
+              stops: stops.length,
+              climate: climate.length,
+            }).map(([label, count]) => {
+              const key = label === "Critical facilities"
+                ? "facilities"
+                : label === "VBB stops"
+                  ? "stops"
+                  : "climate";
+              return (
+                <label className="layer-toggle" key={key}>
+                  <input
+                    checked={visibleLayers[key]}
+                    onChange={(event) =>
+                      setVisibleLayers((current) => ({ ...current, [key]: event.target.checked }))
+                    }
+                    type="checkbox"
+                  />
+                  <span className={`layer-swatch ${key}`} />
+                  <span>{label} · {count}</span>
+                </label>
+              );
+            })}
+            {mapLayerCounts({ facilities: facilities.length, stops: stops.length, climate: climate.length }).length === 0 && (
+              <span>No mappable reference data loaded.</span>
+            )}
           </div>
         </div>
 
