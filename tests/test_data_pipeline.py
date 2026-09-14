@@ -56,9 +56,7 @@ def test_dwd_missing_sentinel_stays_missing() -> None:
     with ZipFile(archive, "w", compression=ZIP_DEFLATED) as output:
         output.writestr("produkt_zehn_min_tu_20260914.txt", csv_payload)
 
-    record = DwdTenMinuteAirTemperatureClient.parse_latest(
-        archive.getvalue(), station_id="00433"
-    )
+    record = DwdTenMinuteAirTemperatureClient.parse_latest(archive.getvalue(), station_id="00433")
 
     assert record.temperature_c is None
     assert record.pressure_hpa is None
@@ -71,13 +69,9 @@ def test_source_availability_failure_does_not_erase_last_success_or_fake_freshne
     store = SourceStatusStore()
     observed_at = NOW - timedelta(hours=3)
     store.record_success("fixture-source", retrieved_at=observed_at, observation_time=observed_at)
-    store.record_failure(
-        "fixture-source", checked_at=NOW, error_code="SOURCE_UNAVAILABLE"
-    )
+    store.record_failure("fixture-source", checked_at=NOW, error_code="SOURCE_UNAVAILABLE")
 
-    status = store.get(
-        "fixture-source", now=NOW, freshness_threshold=timedelta(hours=2)
-    )
+    status = store.get("fixture-source", now=NOW, freshness_threshold=timedelta(hours=2))
 
     assert status.availability == AvailabilityStatus.UNAVAILABLE
     assert status.freshness == FreshnessStatus.STALE
