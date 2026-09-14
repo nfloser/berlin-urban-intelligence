@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from berlin_urban_intelligence.adapters.berlin_wfs import BerlinWfsClient
 from berlin_urban_intelligence.agents.heat import HeatAgent
 from berlin_urban_intelligence.agents.resilience import CriticalInfrastructureRegistry
 from berlin_urban_intelligence.runtime.reference import ReferenceState
+from berlin_urban_intelligence.shared.contracts import CriticalFacility, OfficialModelFeature
 
 
 class WfsReader(Protocol):
@@ -48,7 +49,7 @@ class ReferenceRefreshCoordinator:
     def _fetch_complete_layer(client: WfsReader, feature_type: str) -> dict[str, Any]:
         fetch_all = getattr(client, "fetch_all_geojson", None)
         if callable(fetch_all):
-            return fetch_all(feature_type)
+            return cast(dict[str, Any], fetch_all(feature_type))
         return client.fetch_geojson(feature_type)
 
     def refresh(self, *, previous: ReferenceState | None = None) -> ReferenceState:
@@ -56,8 +57,8 @@ class ReferenceRefreshCoordinator:
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("now_factory must produce timezone-aware datetimes")
         now = now.astimezone(UTC)
-        facilities: list = []
-        climate_features: list = []
+        facilities: list[CriticalFacility] = []
+        climate_features: list[OfficialModelFeature] = []
         errors: dict[str, str] = {}
         registry = CriticalInfrastructureRegistry()
         heat = HeatAgent(now_factory=self.now_factory)
@@ -113,7 +114,7 @@ class ReferenceRefreshCoordinator:
             )
             if not feature_types:
                 raise ValueError("climate WFS advertises no feature types")
-            candidate_features: list = []
+            candidate_features: list[OfficialModelFeature] = []
             for feature_type in feature_types:
                 payload = self._fetch_complete_layer(self.climate_client, feature_type)
                 candidate_features.extend(

@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timedelta
 
+from pydantic import HttpUrl
+
 from berlin_urban_intelligence.adapters.berlin_air_quality import LqiRecord
 from berlin_urban_intelligence.agents.base import BaseAgent
 from berlin_urban_intelligence.shared.contracts import (
@@ -49,7 +51,7 @@ class ExposureAgent(BaseAgent):
             provenance = Provenance(
                 provider="Berliner Luftgütemessnetz",
                 dataset="Luftqualitätsindex (LQI)",
-                source_url="https://luftdaten.berlin.de/api/lqis/data",
+                source_url=HttpUrl("https://luftdaten.berlin.de/api/lqis/data"),
                 original_identifier=record.station_code,
                 observation_time=record.observed_at,
                 retrieved_at=retrieved,

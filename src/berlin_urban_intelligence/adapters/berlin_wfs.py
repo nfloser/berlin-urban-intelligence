@@ -105,7 +105,7 @@ class BerlinWfsClient:
             raise ValueError("count must be between 1 and 100000")
         if start_index is not None and start_index < 0:
             raise ValueError("start_index must not be negative")
-        params: dict[str, object] = {
+        params: dict[str, str | int] = {
             "service": "WFS",
             "version": "2.0.0",
             "request": "GetFeature",

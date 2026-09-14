@@ -33,6 +33,7 @@ dev = [
   "types-networkx>=3.3",
   "types-shapely>=2.0",
   "pandas-stubs>=2.2",
+  "types-PyYAML>=6.0",
 ]
 
 [tool.setuptools.packages.find]

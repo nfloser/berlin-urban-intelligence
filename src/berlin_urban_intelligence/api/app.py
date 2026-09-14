@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
@@ -18,6 +19,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from berlin_urban_intelligence import __version__
+from berlin_urban_intelligence.agents.base import BaseAgent
 from berlin_urban_intelligence.agents.energy import EnergyAgent
 from berlin_urban_intelligence.agents.exposure import ExposureAgent
 from berlin_urban_intelligence.agents.heat import HeatAgent
@@ -88,7 +90,7 @@ def _build_energy_agent() -> EnergyAgent:
 
 def _build_agents(
     runtime: RuntimeState | None, reference: ReferenceState | None
-) -> dict[str, object]:
+) -> dict[str, BaseAgent]:
     observations = tuple(runtime.observations if runtime else ())
     exposure = ExposureAgent([item for item in observations if item.provenance.agent == "exposure"])
     heat = HeatAgent([item for item in observations if item.provenance.agent == "heat"])
@@ -129,13 +131,13 @@ def _graph(
     return graph
 
 
-def _slice(items: tuple | list, offset: int, limit: int) -> list:
+def _slice[T](items: Sequence[T], offset: int, limit: int) -> list[T]:
     return list(items[offset : offset + limit])
 
 
 def create_app() -> FastAPI:
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.runtime = _load_runtime()
         app.state.reference = _load_reference()
         app.state.agents = _build_agents(app.state.runtime, app.state.reference)
@@ -153,9 +155,12 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
-    async def operation_context(request: Request, call_next):
+    async def operation_context(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         operation_id = str(uuid4())
         started = perf_counter()
+        response: Response | None = None
         try:
             response = await call_next(request)
             error_state = None if response.status_code < 400 else f"HTTP_{response.status_code}"
@@ -174,7 +179,7 @@ def create_app() -> FastAPI:
                 error_state=error_state,
                 duration_ms=duration_ms,
             )
-            if "response" in locals():
+            if response is not None:
                 response.headers["X-Operation-Id"] = operation_id
 
     @app.get("/health")

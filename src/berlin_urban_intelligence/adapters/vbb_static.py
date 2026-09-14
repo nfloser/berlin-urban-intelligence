@@ -52,7 +52,7 @@ class VbbGtfsStaticAdapter:
     MAX_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
 
     @staticmethod
-    def _reader(archive: ZipFile, name: str) -> csv.DictReader:
+    def _reader(archive: ZipFile, name: str) -> csv.DictReader[str]:
         return csv.DictReader(TextIOWrapper(archive.open(name), encoding="utf-8-sig", newline=""))
 
     def parse(self, payload: bytes, *, retrieved_at: datetime | str) -> GtfsStaticSnapshot:

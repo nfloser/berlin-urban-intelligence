@@ -9,7 +9,7 @@ from berlin_urban_intelligence.shared.contracts import DerivationStatus
 
 class DependencyGraph:
     def __init__(self) -> None:
-        self._graph = nx.DiGraph()
+        self._graph: nx.DiGraph[str] = nx.DiGraph()
         self._statuses: dict[str, DerivationStatus] = {}
 
     def add_derivation(self, product_id: str, upstream_ids: list[str] | tuple[str, ...]) -> None:

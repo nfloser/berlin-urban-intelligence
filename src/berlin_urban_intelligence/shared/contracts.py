@@ -220,8 +220,10 @@ class Forecast(CanonicalModel):
             raise ValueError("valid_at cannot be earlier than issued_at")
         if (self.lower_bound is None) != (self.upper_bound is None):
             raise ValueError("forecast uncertainty bounds must be supplied together")
-        if self.lower_bound is not None and not (
-            self.lower_bound <= self.value <= self.upper_bound
+        if (
+            self.lower_bound is not None
+            and self.upper_bound is not None
+            and not self.lower_bound <= self.value <= self.upper_bound
         ):
             raise ValueError("forecast value must lie inside uncertainty bounds")
         return self

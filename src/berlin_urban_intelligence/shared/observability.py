@@ -38,12 +38,11 @@ class JsonFormatter(logging.Formatter):
 
 def configure_structured_logging(level: int = logging.INFO) -> None:
     logger = logging.getLogger("berlin_urban_intelligence")
-    if any(getattr(handler, "_bui_structured", False) for handler in logger.handlers):
+    if any(isinstance(handler.formatter, JsonFormatter) for handler in logger.handlers):
         logger.setLevel(level)
         return
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter())
-    handler._bui_structured = True
     logger.addHandler(handler)
     logger.setLevel(level)
     logger.propagate = False

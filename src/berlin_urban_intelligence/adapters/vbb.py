@@ -46,7 +46,7 @@ def decode_gtfs_realtime(payload: bytes) -> tuple[datetime | None, list[dict[str
     explicit rather than silently skipping realtime parsing.
     """
     try:
-        from google.transit import gtfs_realtime_pb2  # type: ignore[import-not-found]
+        from google.transit import gtfs_realtime_pb2
     except ImportError as exc:
         raise RuntimeError(
             "GTFS-Realtime decoding requires the optional 'gtfs-realtime-bindings' dependency"

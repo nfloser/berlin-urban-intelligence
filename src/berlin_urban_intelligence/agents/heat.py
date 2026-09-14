@@ -6,6 +6,8 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
 
+from pydantic import HttpUrl
+
 from berlin_urban_intelligence.adapters.dwd import DwdTemperatureRecord
 from berlin_urban_intelligence.agents.base import BaseAgent
 from berlin_urban_intelligence.shared.contracts import (
@@ -53,7 +55,7 @@ class HeatAgent(BaseAgent):
         provenance = Provenance(
             provider="Deutscher Wetterdienst (DWD)",
             dataset="CDC 10-minute station observations of air temperature - now",
-            source_url=(
+            source_url=HttpUrl(
                 "https://opendata.dwd.de/climate_environment/CDC/observations_germany/"
                 "climate/10_minutes/air_temperature/now/"
                 f"10minutenwerte_TU_{record.station_id}_now.zip"
@@ -122,11 +124,16 @@ class HeatAgent(BaseAgent):
             if not isinstance(raw, dict) or not isinstance(raw.get("geometry"), dict):
                 continue
             feature_id = str(raw.get("id") or f"feature-{index}")
-            properties = raw.get("properties") if isinstance(raw.get("properties"), dict) else {}
+            raw_properties = raw.get("properties")
+            properties = (
+                {str(key): value for key, value in raw_properties.items()}
+                if isinstance(raw_properties, dict)
+                else {}
+            )
             provenance = Provenance(
                 provider="Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin",
                 dataset="Klimaanalysekarten 2022 (Umweltatlas)",
-                source_url="https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022",
+                source_url=HttpUrl("https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022"),
                 original_identifier=feature_id,
                 retrieved_at=retrieved,
                 processed_at=self.now(),
@@ -144,7 +151,7 @@ class HeatAgent(BaseAgent):
                     entity_id=f"climate-zone:{feature_type}:{feature_id}",
                     model_name="Klimaanalysekarten 2022",
                     feature_type=feature_type,
-                    properties={str(key): value for key, value in properties.items()},
+                    properties=properties,
                     quality=QualityFlag.VALID,
                     provenance=provenance,
                     spatial=SpatialReference(crs="EPSG:4326", geometry=raw["geometry"]),

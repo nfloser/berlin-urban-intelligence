@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime
 
+from pydantic import HttpUrl
+
 from berlin_urban_intelligence.adapters.stromnetz_berlin import EnergySeries
 from berlin_urban_intelligence.agents.energy import ForecastArtifact
 from berlin_urban_intelligence.energy.pipeline import EnergyForecastPipeline
@@ -41,7 +43,7 @@ class EnergyForecastWorkflow:
             valid_at=point.valid_at,
             dataset_fingerprint=point.dataset_fingerprint,
             source_dataset=source_dataset,
-            source_url=series.source_url,
+            source_url=HttpUrl(series.source_url),
             source_licence=None,
         )
         generated = self.now_factory()

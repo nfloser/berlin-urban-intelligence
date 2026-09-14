@@ -7,9 +7,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 from pyproj import Transformer
-from shapely.geometry import shape
+from shapely.geometry import Point, shape
 from shapely.ops import transform as transform_geometry
 
 from berlin_urban_intelligence.agents.base import BaseAgent
@@ -52,18 +52,24 @@ def nearest_network_node(
         raise ValueError("all network nodes require coordinates for nearest-node lookup")
     transformer = Transformer.from_crs("EPSG:4326", metric_crs, always_xy=True)
     x, y = transformer.transform(longitude, latitude)
-    candidates = [
-        (node, *transformer.transform(float(node.longitude), float(node.latitude)))
-        for node in nodes
-    ]
+    candidates = []
+    for candidate_node in nodes:
+        if candidate_node.longitude is None or candidate_node.latitude is None:
+            raise ValueError("all network nodes require coordinates for nearest-node lookup")
+        candidate_x, candidate_y = transformer.transform(
+            candidate_node.longitude, candidate_node.latitude
+        )
+        candidates.append((candidate_node, candidate_x, candidate_y))
     node, node_x, node_y = min(
         candidates, key=lambda candidate: (x - candidate[1]) ** 2 + (y - candidate[2]) ** 2
     )
     distance = float(((x - node_x) ** 2 + (y - node_y) ** 2) ** 0.5)
+    if node.longitude is None or node.latitude is None:
+        raise ValueError("nearest network node unexpectedly lacks coordinates")
     return NearestNetworkNode(
         node_id=node.id,
-        longitude=float(node.longitude),
-        latitude=float(node.latitude),
+        longitude=node.longitude,
+        latitude=node.latitude,
         distance_m=distance,
         metric_crs=metric_crs,
     )
@@ -100,10 +106,12 @@ def snap_facilities_to_network(
         raise ValueError("all network nodes require coordinates for facility snapping")
 
     node_transformer = Transformer.from_crs("EPSG:4326", metric_crs, always_xy=True)
-    projected_nodes = [
-        (node, *node_transformer.transform(float(node.longitude), float(node.latitude)))
-        for node in nodes
-    ]
+    projected_nodes = []
+    for network_node in nodes:
+        if network_node.longitude is None or network_node.latitude is None:
+            raise ValueError("all network nodes require coordinates for facility snapping")
+        node_x, node_y = node_transformer.transform(network_node.longitude, network_node.latitude)
+        projected_nodes.append((network_node, node_x, node_y))
 
     links: list[FacilityNetworkLink] = []
     for facility in facilities:
@@ -113,7 +121,9 @@ def snap_facilities_to_network(
         geometry = shape(spatial.geometry)
         transformer = Transformer.from_crs(spatial.crs, metric_crs, always_xy=True)
         projected = transform_geometry(transformer.transform, geometry)
-        point = projected if projected.geom_type == "Point" else projected.representative_point()
+        point = projected if isinstance(projected, Point) else projected.representative_point()
+        if not isinstance(point, Point):
+            raise ValueError("facility geometry could not be reduced to a point")
         node, x, y = min(
             projected_nodes,
             key=lambda candidate: (point.x - candidate[1]) ** 2 + (point.y - candidate[2]) ** 2,
@@ -212,11 +222,16 @@ class CriticalInfrastructureRegistry:
             if not isinstance(geometry, dict):
                 continue
             feature_id = str(raw.get("id") or f"feature-{index}")
-            properties = raw.get("properties") if isinstance(raw.get("properties"), dict) else {}
+            raw_properties = raw.get("properties")
+            properties = (
+                {str(key): value for key, value in raw_properties.items()}
+                if isinstance(raw_properties, dict)
+                else {}
+            )
             provenance = Provenance(
                 provider=provider,
                 dataset=dataset,
-                source_url=source_url,
+                source_url=HttpUrl(source_url),
                 original_identifier=feature_id,
                 retrieved_at=retrieved,
                 processed_at=retrieved,
@@ -272,8 +287,10 @@ class ResilienceAgent(BaseAgent):
         self._base_graph = self._build_graph(self._edges)
 
     @staticmethod
-    def _build_graph(edges: tuple[NetworkEdge, ...] | list[NetworkEdge]) -> nx.MultiDiGraph:
-        graph = nx.MultiDiGraph()
+    def _build_graph(
+        edges: tuple[NetworkEdge, ...] | list[NetworkEdge],
+    ) -> nx.MultiDiGraph[str]:
+        graph: nx.MultiDiGraph[str] = nx.MultiDiGraph()
         for edge in edges:
             graph.add_edge(
                 edge.source,
@@ -294,7 +311,7 @@ class ResilienceAgent(BaseAgent):
                 )
         return graph
 
-    def _scenario_graph(self, scenario: Scenario | None) -> nx.MultiDiGraph:
+    def _scenario_graph(self, scenario: Scenario | None) -> nx.MultiDiGraph[str]:
         graph = self._base_graph.copy()
         if scenario is None:
             return graph
