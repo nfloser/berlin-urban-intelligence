@@ -3,21 +3,35 @@ import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import * as maplibregl from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import {
-  CriticalFacility,
-  EnergyResponse,
-  Health,
-  MobilityResponse,
-  OfficialModelFeature,
-  SystemResponse,
-  UrbanEntity,
+  type AssessmentResponse,
+  type CriticalFacility,
+  type EnergyResponse,
+  type Health,
+  type MobilityResponse,
+  type Observation,
+  type OfficialModelFeature,
+  type OrchestrationResponse,
+  type SystemResponse,
+  type UrbanEntity,
+  type WorkflowKind,
   displayValue,
   fetchJson,
+  heatAssessmentRequest,
+  postJson,
   toFeatureCollection,
 } from "./api";
 
 const BASE_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+const WORKFLOWS: Array<{ value: WorkflowKind; label: string }> = [
+  { value: "urban_snapshot", label: "Urban snapshot" },
+  { value: "heat_energy", label: "Heat + energy" },
+  { value: "mobility_exposure", label: "Mobility + exposure" },
+  { value: "mobility_resilience", label: "Mobility + resilience" },
+  { value: "heat_mobility_resilience", label: "Heat + mobility + resilience" },
+];
 
 type LoadState = "loading" | "ready" | "error";
+type ActionState = "idle" | "running" | "error";
 
 function StatusBadge({ health }: { health?: Health }) {
   const status = health?.status ?? "unknown";
@@ -36,6 +50,19 @@ function App() {
   const [facilities, setFacilities] = useState<CriticalFacility[]>([]);
   const [stops, setStops] = useState<UrbanEntity[]>([]);
   const [climate, setClimate] = useState<OfficialModelFeature[]>([]);
+  const [observations, setObservations] = useState<Observation[]>([]);
+  const [selectedObservationId, setSelectedObservationId] = useState<string | null>(null);
+  const [workflow, setWorkflow] = useState<WorkflowKind>("urban_snapshot");
+  const [workflowState, setWorkflowState] = useState<ActionState>("idle");
+  const [workflowResult, setWorkflowResult] = useState<OrchestrationResponse | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [temperatureDelta, setTemperatureDelta] = useState("");
+  const [assessmentState, setAssessmentState] = useState<ActionState>("idle");
+  const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
+  const [assessmentError, setAssessmentError] = useState<string | null>(null);
+
+  const selectedObservation =
+    observations.find((item) => item.id === selectedObservationId) ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +74,7 @@ function App() {
       fetchJson<CriticalFacility[]>("/api/v1/facilities?limit=1000"),
       fetchJson<UrbanEntity[]>("/api/v1/transport-stops?limit=1000"),
       fetchJson<OfficialModelFeature[]>("/api/v1/climate-features?limit=1000"),
+      fetchJson<Observation[]>("/api/v1/observations?limit=250"),
     ])
       .then(
         ([
@@ -57,6 +85,7 @@ function App() {
           facilityValue,
           stopValue,
           climateValue,
+          observationValue,
         ]) => {
           if (cancelled) return;
           setSystem(systemValue);
@@ -66,6 +95,8 @@ function App() {
           setFacilities(facilityValue);
           setStops(stopValue);
           setClimate(climateValue);
+          setObservations(observationValue);
+          setSelectedObservationId(observationValue[0]?.id ?? null);
           setLoadState("ready");
         },
       )
@@ -142,6 +173,40 @@ function App() {
     else map.once("load", installLayers);
   }, [loadState, facilities, stops, climate]);
 
+  const runWorkflow = async () => {
+    setWorkflowState("running");
+    setWorkflowError(null);
+    try {
+      const result = await postJson<OrchestrationResponse>("/api/v1/orchestrate", { workflow });
+      setWorkflowResult(result);
+      setWorkflowState("idle");
+    } catch (reason) {
+      setWorkflowError(reason instanceof Error ? reason.message : "Unknown orchestration error");
+      setWorkflowState("error");
+    }
+  };
+
+  const runHeatAssessment = async () => {
+    setAssessmentError(null);
+    setAssessment(null);
+    const parsed = Number(temperatureDelta);
+    if (temperatureDelta.trim() === "" || !Number.isFinite(parsed)) {
+      setAssessmentError("Enter an explicit temperature delta in Cel.");
+      setAssessmentState("error");
+      return;
+    }
+    setAssessmentState("running");
+    try {
+      const request = heatAssessmentRequest(parsed);
+      const result = await postJson<AssessmentResponse>("/api/v1/assess", request);
+      setAssessment(result);
+      setAssessmentState("idle");
+    } catch (reason) {
+      setAssessmentError(reason instanceof Error ? reason.message : "Unknown assessment error");
+      setAssessmentState("error");
+    }
+  };
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -153,6 +218,7 @@ function App() {
           <span>Platform {system?.version ?? "—"}</span>
           <span>Runtime {system?.runtime_generated_at ?? "unavailable"}</span>
           <span>Reference {system?.reference_generated_at ?? "unavailable"}</span>
+          <span>Synthetic production fallback: {system?.synthetic_production_fallback ? "yes" : "no"}</span>
         </div>
       </header>
 
@@ -233,6 +299,136 @@ function App() {
             </p>
           </section>
         </aside>
+      </section>
+
+      <section className="research-grid" aria-label="Research controls and provenance">
+        <article className="research-card observations-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Canonical state</p>
+              <h2>Latest observations</h2>
+            </div>
+            <span className="count-pill">{observations.length}</span>
+          </div>
+          {observations.length === 0 ? (
+            <p className="empty-state">No persisted observations are available. No demo values are substituted.</p>
+          ) : (
+            <div className="observation-list">
+              {observations.map((item) => (
+                <button
+                  className={`observation-row${item.id === selectedObservationId ? " selected" : ""}`}
+                  key={item.id}
+                  onClick={() => setSelectedObservationId(item.id)}
+                  type="button"
+                >
+                  <span>
+                    <strong>{item.phenomenon}</strong>
+                    <small>{item.entity_id}</small>
+                  </span>
+                  <span>{displayValue(item.value, item.unit)}</span>
+                  <span className="state-label">{item.state}</span>
+                  <span className="quality-label">{item.quality}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </article>
+
+        <article className="research-card provenance-card">
+          <p className="eyebrow">Audit trail</p>
+          <h2>Provenance inspector</h2>
+          {selectedObservation ? (
+            <dl className="provenance-list">
+              <dt>Observation</dt>
+              <dd>{selectedObservation.id}</dd>
+              <dt>Provider</dt>
+              <dd>{selectedObservation.provenance.provider}</dd>
+              <dt>Dataset</dt>
+              <dd>{selectedObservation.provenance.dataset}</dd>
+              <dt>Retrieved</dt>
+              <dd>{selectedObservation.provenance.retrieved_at}</dd>
+              <dt>Processed</dt>
+              <dd>{selectedObservation.provenance.processed_at}</dd>
+              <dt>Agent</dt>
+              <dd>
+                {selectedObservation.provenance.agent} · {selectedObservation.provenance.agent_version}
+              </dd>
+              <dt>Method</dt>
+              <dd>{selectedObservation.provenance.processing_method}</dd>
+              <dt>Licence</dt>
+              <dd>{displayValue(selectedObservation.provenance.source_licence)}</dd>
+              <dt>Quality note</dt>
+              <dd>{displayValue(selectedObservation.provenance.quality_note)}</dd>
+            </dl>
+          ) : (
+            <p className="empty-state">Select a real observation to inspect its provenance.</p>
+          )}
+        </article>
+
+        <article className="research-card">
+          <p className="eyebrow">Deterministic orchestration</p>
+          <h2>Workflow planner</h2>
+          <label className="field">
+            <span>Workflow</span>
+            <select value={workflow} onChange={(event) => setWorkflow(event.target.value as WorkflowKind)}>
+              {WORKFLOWS.map((item) => (
+                <option value={item.value} key={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="primary-action" onClick={runWorkflow} disabled={workflowState === "running"} type="button">
+            {workflowState === "running" ? "Running…" : "Run deterministic workflow"}
+          </button>
+          {workflowError && <p className="inline-error">{workflowError}</p>}
+          {workflowResult && (
+            <div className="result-box">
+              <strong>{workflowResult.execution.status}</strong>
+              <span>Agents: {workflowResult.plan.agents.join(", ")}</span>
+              <span>LLM required: {workflowResult.plan.requires_llm ? "yes" : "no"}</span>
+              <span>
+                Missing: {workflowResult.execution.missing_agents.length > 0 ? workflowResult.execution.missing_agents.join(", ") : "none"}
+              </span>
+            </div>
+          )}
+        </article>
+
+        <article className="research-card scenario-card">
+          <p className="eyebrow">Hypothetical scenario</p>
+          <h2>Heat assessment</h2>
+          <p className="method-note">
+            This control never changes the observed baseline. The result is a counterfactual derived from an explicit delta.
+          </p>
+          <label className="field">
+            <span>Temperature delta (Cel)</span>
+            <input
+              inputMode="decimal"
+              placeholder="Enter delta, e.g. 3"
+              value={temperatureDelta}
+              onChange={(event) => setTemperatureDelta(event.target.value)}
+            />
+          </label>
+          <button className="primary-action" onClick={runHeatAssessment} disabled={assessmentState === "running"} type="button">
+            {assessmentState === "running" ? "Assessing…" : "Assess hypothetical scenario"}
+          </button>
+          {assessmentError && <p className="inline-error">{assessmentError}</p>}
+          {assessment && (
+            <div className="result-box">
+              <strong>{assessment.scenario_name}</strong>
+              <span>Hypothetical: yes</span>
+              <span>Composite score: none by design</span>
+              <span>
+                Unavailable dimensions: {assessment.unavailable_dimensions.length > 0 ? assessment.unavailable_dimensions.join(", ") : "none"}
+              </span>
+              {Object.entries(assessment.dimension_errors).map(([dimension, detail]) => (
+                <span key={dimension}>
+                  {dimension}: {detail}
+                </span>
+              ))}
+            </div>
+          )}
+        </article>
       </section>
     </main>
   );
