@@ -6,6 +6,7 @@ speed or travel time when the source/OSMnx processing chain did not provide one.
 
 from __future__ import annotations
 
+import importlib
 from datetime import UTC, datetime
 from typing import Any
 
@@ -114,12 +115,11 @@ class OsmnxRoadNetworkClient:
         if self._osmnx is not None:
             return self._osmnx
         try:
-            import osmnx as ox
+            return importlib.import_module("osmnx")
         except ImportError as exc:
             raise RuntimeError(
                 "OSM acquisition requires the optional 'osm' dependency: pip install -e '.[osm]'"
             ) from exc
-        return ox
 
     @staticmethod
     def _routing_function(ox: Any, name: str) -> Any:
