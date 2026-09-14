@@ -62,7 +62,7 @@ class DerivationStatus(StrEnum):
 
 
 class CanonicalModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
     contract_version: str = CONTRACT_VERSION
 
 
@@ -89,7 +89,7 @@ class Provenance(CanonicalModel):
     upstream_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")
-    def validate_times(self) -> "Provenance":
+    def validate_times(self) -> Provenance:
         for name in ("observation_time", "retrieved_at", "processed_at"):
             value = getattr(self, name)
             if value is not None:
@@ -104,7 +104,7 @@ class SpatialReference(CanonicalModel):
     geometry: dict[str, Any] | None = None
 
     @model_validator(mode="after")
-    def validate_spatial_reference(self) -> "SpatialReference":
+    def validate_spatial_reference(self) -> SpatialReference:
         try:
             crs = CRS.from_user_input(self.crs)
         except Exception as exc:
@@ -120,7 +120,9 @@ class SpatialReference(CanonicalModel):
         if crs.to_epsg() == 4326:
             min_x, min_y, max_x, max_y = geometry.bounds
             if min_x < -180 or max_x > 180 or min_y < -90 or max_y > 90:
-                raise ValueError("EPSG:4326 geometry coordinates are outside longitude/latitude bounds")
+                raise ValueError(
+                    "EPSG:4326 geometry coordinates are outside longitude/latitude bounds"
+                )
         return self
 
 
@@ -129,7 +131,7 @@ class TimeInterval(CanonicalModel):
     end: datetime
 
     @model_validator(mode="after")
-    def validate_interval(self) -> "TimeInterval":
+    def validate_interval(self) -> TimeInterval:
         object.__setattr__(self, "start", _require_aware(self.start, "start"))
         object.__setattr__(self, "end", _require_aware(self.end, "end"))
         if self.end < self.start:
@@ -158,9 +160,13 @@ class Observation(CanonicalModel):
     spatial: SpatialReference | None = None
 
     @model_validator(mode="after")
-    def validate_observation(self) -> "Observation":
+    def validate_observation(self) -> Observation:
         object.__setattr__(self, "observed_at", _require_aware(self.observed_at, "observed_at"))
-        if isinstance(self.value, (int, float)) and not isinstance(self.value, bool) and not self.unit:
+        if (
+            isinstance(self.value, (int, float))
+            and not isinstance(self.value, bool)
+            and not self.unit
+        ):
             raise ValueError("numeric observations require an explicit unit")
         if self.state in {DataState.FORECAST, DataState.SCENARIO, DataState.UNAVAILABLE}:
             raise ValueError("Observation cannot use forecast, scenario or unavailable data state")
@@ -181,9 +187,13 @@ class DerivedValue(CanonicalModel):
     derivation_status: DerivationStatus = DerivationStatus.VALID
 
     @model_validator(mode="after")
-    def validate_value(self) -> "DerivedValue":
+    def validate_value(self) -> DerivedValue:
         object.__setattr__(self, "valid_at", _require_aware(self.valid_at, "valid_at"))
-        if isinstance(self.value, (int, float)) and not isinstance(self.value, bool) and not self.unit:
+        if (
+            isinstance(self.value, (int, float))
+            and not isinstance(self.value, bool)
+            and not self.unit
+        ):
             raise ValueError("numeric derived values require an explicit unit")
         return self
 
@@ -203,14 +213,18 @@ class Forecast(CanonicalModel):
     upper_bound: float | None = None
 
     @model_validator(mode="after")
-    def validate_forecast(self) -> "Forecast":
+    def validate_forecast(self) -> Forecast:
         object.__setattr__(self, "issued_at", _require_aware(self.issued_at, "issued_at"))
         object.__setattr__(self, "valid_at", _require_aware(self.valid_at, "valid_at"))
         if self.valid_at < self.issued_at:
             raise ValueError("valid_at cannot be earlier than issued_at")
         if (self.lower_bound is None) != (self.upper_bound is None):
             raise ValueError("forecast uncertainty bounds must be supplied together")
-        if self.lower_bound is not None and not (self.lower_bound <= self.value <= self.upper_bound):
+        if (
+            self.lower_bound is not None
+            and self.upper_bound is not None
+            and not (self.lower_bound <= self.value <= self.upper_bound)
+        ):
             raise ValueError("forecast value must lie inside uncertainty bounds")
         return self
 
@@ -243,7 +257,7 @@ class NetworkNode(CanonicalModel):
     provenance: Provenance | None = None
 
     @model_validator(mode="after")
-    def validate_coordinates(self) -> "NetworkNode":
+    def validate_coordinates(self) -> NetworkNode:
         if (self.longitude is None) != (self.latitude is None):
             raise ValueError("longitude and latitude must be supplied together")
         return self
@@ -286,6 +300,6 @@ class AgentHealth(CanonicalModel):
     detail: str | None = None
 
     @model_validator(mode="after")
-    def validate_checked_at(self) -> "AgentHealth":
+    def validate_checked_at(self) -> AgentHealth:
         object.__setattr__(self, "checked_at", _require_aware(self.checked_at, "checked_at"))
         return self

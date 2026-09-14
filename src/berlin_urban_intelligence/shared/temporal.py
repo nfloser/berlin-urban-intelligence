@@ -11,7 +11,9 @@ def ensure_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-def classify_freshness(observed_at: datetime | None, now: datetime, threshold: timedelta) -> FreshnessStatus:
+def classify_freshness(
+    observed_at: datetime | None, now: datetime, threshold: timedelta
+) -> FreshnessStatus:
     if observed_at is None:
         return FreshnessStatus.UNAVAILABLE
     observed = ensure_utc(observed_at)

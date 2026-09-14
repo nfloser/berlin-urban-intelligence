@@ -53,7 +53,12 @@ class Orchestrator:
         WorkflowKind.HEAT_MOBILITY_RESILIENCE: ["live_state", "heat", "mobility", "resilience"],
     }
 
-    def __init__(self, agents: Mapping[str, BaseAgent] | None = None, *, now_factory: Callable[[], datetime] | None = None) -> None:
+    def __init__(
+        self,
+        agents: Mapping[str, BaseAgent] | None = None,
+        *,
+        now_factory: Callable[[], datetime] | None = None,
+    ) -> None:
         self._agents = dict(agents or {})
         self._now_factory = now_factory or (lambda: datetime.now(UTC))
 
@@ -89,7 +94,9 @@ class Orchestrator:
             overall = AvailabilityStatus.DEGRADED
         elif statuses and all(item == AvailabilityStatus.AVAILABLE for item in statuses):
             overall = AvailabilityStatus.AVAILABLE
-        elif any(item in {AvailabilityStatus.AVAILABLE, AvailabilityStatus.DEGRADED} for item in statuses):
+        elif any(
+            item in {AvailabilityStatus.AVAILABLE, AvailabilityStatus.DEGRADED} for item in statuses
+        ):
             overall = AvailabilityStatus.DEGRADED
         else:
             overall = AvailabilityStatus.UNAVAILABLE

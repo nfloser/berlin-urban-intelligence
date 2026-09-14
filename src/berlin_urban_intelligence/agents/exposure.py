@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+
+from pydantic import HttpUrl
 
 from berlin_urban_intelligence.adapters.berlin_air_quality import LqiRecord
 from berlin_urban_intelligence.agents.base import BaseAgent
@@ -49,7 +51,7 @@ class ExposureAgent(BaseAgent):
             provenance = Provenance(
                 provider="Berliner Luftgütemessnetz",
                 dataset="Luftqualitätsindex (LQI)",
-                source_url="https://luftdaten.berlin.de/api/lqis/data",
+                source_url=HttpUrl("https://luftdaten.berlin.de/api/lqis/data"),
                 original_identifier=record.station_code,
                 observation_time=record.observed_at,
                 retrieved_at=retrieved,
@@ -58,7 +60,10 @@ class ExposureAgent(BaseAgent):
                 agent=self.descriptor.id,
                 agent_version=self.descriptor.version,
                 source_licence="Datenlizenz Deutschland - Namensnennung - Version 2.0",
-                quality_note="Current LQI uses automatic measurements that remain subject to quality control.",
+                quality_note=(
+                    "Current LQI uses automatic measurements that remain subject to "
+                    "quality control."
+                ),
             )
             output.append(
                 Observation(
@@ -99,7 +104,11 @@ class ExposureAgent(BaseAgent):
             return self.unavailable_health("No Berlin air-quality snapshot has been ingested.")
         newest = max(item.observed_at for item in self._observations)
         freshness = classify_freshness(newest, now, timedelta(hours=2))
-        status = AvailabilityStatus.AVAILABLE if freshness == FreshnessStatus.VALID else AvailabilityStatus.DEGRADED
+        status = (
+            AvailabilityStatus.AVAILABLE
+            if freshness == FreshnessStatus.VALID
+            else AvailabilityStatus.DEGRADED
+        )
         return AgentHealth(
             agent_id=self.descriptor.id,
             status=status,

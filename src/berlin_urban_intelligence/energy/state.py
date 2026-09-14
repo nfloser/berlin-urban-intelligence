@@ -19,7 +19,7 @@ class EnergyState(BaseModel):
     notes: tuple[str, ...] = ()
 
     @model_validator(mode="after")
-    def validate_state(self) -> "EnergyState":
+    def validate_state(self) -> EnergyState:
         if self.generated_at.tzinfo is None or self.generated_at.utcoffset() is None:
             raise ValueError("generated_at must be timezone-aware")
         object.__setattr__(self, "generated_at", self.generated_at.astimezone(UTC))

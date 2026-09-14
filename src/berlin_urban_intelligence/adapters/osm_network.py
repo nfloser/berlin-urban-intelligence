@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import networkx as nx
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, HttpUrl
 
 from berlin_urban_intelligence.shared.contracts import NetworkEdge, NetworkNode, Provenance
 from berlin_urban_intelligence.shared.temporal import ensure_utc
@@ -34,7 +34,7 @@ def _osmid(value: Any) -> str:
 
 
 def normalize_osmnx_graph(
-    graph: nx.MultiDiGraph,
+    graph: nx.MultiDiGraph[Any],
     *,
     retrieved_at: datetime,
     source_query: str,
@@ -46,7 +46,7 @@ def normalize_osmnx_graph(
     provenance = Provenance(
         provider="OpenStreetMap contributors",
         dataset="OpenStreetMap road network",
-        source_url="https://www.openstreetmap.org/",
+        source_url=HttpUrl("https://www.openstreetmap.org/"),
         retrieved_at=retrieved,
         processed_at=retrieved,
         processing_method=(
@@ -97,6 +97,7 @@ def normalize_osmnx_graph(
         nodes=tuple(sorted(nodes, key=lambda item: item.id)),
         edges=tuple(sorted(edges, key=lambda item: item.id)),
     )
+
 
 class OsmnxRoadNetworkClient:
     """Acquire an OSM road graph and convert it to canonical network contracts.
@@ -161,4 +162,3 @@ class OsmnxRoadNetworkClient:
             source_query=place,
             processing_note=note,
         )
-

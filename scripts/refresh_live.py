@@ -19,7 +19,8 @@ def main() -> int:
     parser.add_argument("--rdf", default="data/generated/latest.ttl")
     args = parser.parse_args()
 
-    state = RefreshCoordinator().refresh()
+    store = RuntimeStateStore(Path(args.state))
+    state = RefreshCoordinator().refresh(previous_state=store.load())
     RuntimeStateStore(Path(args.state)).save(state)
 
     graph = KnowledgeGraph()
@@ -37,7 +38,11 @@ def main() -> int:
             f"source={source_id} availability={source_state.availability.value} "
             f"freshness={source_state.freshness.value} error={source_state.error_code or '-'}"
         )
-    return 0 if any(item.availability.value == "available" for item in state.source_statuses.values()) else 2
+    return (
+        0
+        if any(item.availability.value == "available" for item in state.source_statuses.values())
+        else 2
+    )
 
 
 if __name__ == "__main__":

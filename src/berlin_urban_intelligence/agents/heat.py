@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from typing import Any
+
+from pydantic import HttpUrl
 
 from berlin_urban_intelligence.adapters.dwd import DwdTemperatureRecord
 from berlin_urban_intelligence.agents.base import BaseAgent
-from typing import Any
-
 from berlin_urban_intelligence.shared.contracts import (
     AgentDescriptor,
     AgentHealth,
@@ -17,9 +18,9 @@ from berlin_urban_intelligence.shared.contracts import (
     FreshnessStatus,
     Observation,
     OfficialModelFeature,
-    SpatialReference,
     Provenance,
     QualityFlag,
+    SpatialReference,
 )
 from berlin_urban_intelligence.shared.temporal import classify_freshness, ensure_utc
 
@@ -28,7 +29,10 @@ class HeatAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="heat",
         version="0.1.0",
-        description="Measured meteorology and official urban-climate information with explicit state semantics.",
+        description=(
+            "Measured meteorology and official urban-climate information with"
+            " explicit state semantics."
+        ),
         capabilities=("ingest_dwd_temperature", "ingest_official_climate_features", "heat_state"),
         input_contracts=("DwdTemperatureRecord",),
         output_contracts=("Observation",),
@@ -52,9 +56,11 @@ class HeatAgent(BaseAgent):
             provider="Deutscher Wetterdienst (DWD)",
             dataset="CDC 10-minute station observations of air temperature - now",
             source_url=(
-                "https://opendata.dwd.de/climate_environment/CDC/observations_germany/"
-                "climate/10_minutes/air_temperature/now/"
-                f"10minutenwerte_TU_{record.station_id}_now.zip"
+                HttpUrl(
+                    "https://opendata.dwd.de/climate_environment/CDC/observations_germany/"
+                    "climate/10_minutes/air_temperature/now/"
+                    f"10minutenwerte_TU_{record.station_id}_now.zip"
+                )
             ),
             original_identifier=record.station_id,
             observation_time=record.observed_at,
@@ -65,7 +71,8 @@ class HeatAgent(BaseAgent):
             agent_version=self.descriptor.version,
             source_licence="CC BY 4.0",
             quality_note=(
-                "DWD now data have not completed final quality control; QN is retained in the source record."
+                "DWD now data have not completed final quality control; QN is "
+                "retained in the source record."
             ),
         )
         specs = [
@@ -88,13 +95,14 @@ class HeatAgent(BaseAgent):
                     unit=unit,
                     observed_at=record.observed_at,
                     state=DataState.OBSERVED,
-                    quality=QualityFlag.SUSPECT if record.quality_level in (None, 1) else QualityFlag.VALID,
+                    quality=QualityFlag.SUSPECT
+                    if record.quality_level in (None, 1)
+                    else QualityFlag.VALID,
                     provenance=provenance,
                 )
             )
         self._observations = tuple(observations)
         return observations
-
 
     def ingest_official_climate_features(
         self,
@@ -108,7 +116,9 @@ class HeatAgent(BaseAgent):
         Properties are preserved as published rather than guessed into project-specific metrics.
         This allows later schema-specific mappings only after the upstream fields are verified.
         """
-        if payload.get("type") != "FeatureCollection" or not isinstance(payload.get("features"), list):
+        if payload.get("type") != "FeatureCollection" or not isinstance(
+            payload.get("features"), list
+        ):
             raise ValueError("climate source must be a GeoJSON FeatureCollection")
         retrieved = ensure_utc(retrieved_at or self.now())
         output: list[OfficialModelFeature] = []
@@ -116,15 +126,18 @@ class HeatAgent(BaseAgent):
             if not isinstance(raw, dict) or not isinstance(raw.get("geometry"), dict):
                 continue
             feature_id = str(raw.get("id") or f"feature-{index}")
-            properties = raw.get("properties") if isinstance(raw.get("properties"), dict) else {}
+            raw_properties = raw.get("properties")
+            properties = raw_properties if isinstance(raw_properties, dict) else {}
             provenance = Provenance(
                 provider="Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin",
                 dataset="Klimaanalysekarten 2022 (Umweltatlas)",
-                source_url="https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022",
+                source_url=HttpUrl("https://gdi.berlin.de/services/wfs/ua_klimaanalyse_2022"),
                 original_identifier=feature_id,
                 retrieved_at=retrieved,
                 processed_at=self.now(),
-                processing_method="official Berlin WFS GeoJSON normalization with source properties preserved",
+                processing_method=(
+                    "official Berlin WFS GeoJSON normalization with source properties preserved"
+                ),
                 agent=self.descriptor.id,
                 agent_version=self.descriptor.version,
                 source_licence="Datenlizenz Deutschland - Zero - Version 2.0",
@@ -153,7 +166,11 @@ class HeatAgent(BaseAgent):
             return self.unavailable_health("No measured Berlin meteorology has been ingested.")
         newest = max(item.observed_at for item in self._observations)
         freshness = classify_freshness(newest, now, timedelta(hours=1))
-        status = AvailabilityStatus.AVAILABLE if freshness == FreshnessStatus.VALID else AvailabilityStatus.DEGRADED
+        status = (
+            AvailabilityStatus.AVAILABLE
+            if freshness == FreshnessStatus.VALID
+            else AvailabilityStatus.DEGRADED
+        )
         quality = (
             QualityFlag.SUSPECT
             if any(item.quality == QualityFlag.SUSPECT for item in self._observations)

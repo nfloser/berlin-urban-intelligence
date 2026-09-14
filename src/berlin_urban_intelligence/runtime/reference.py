@@ -12,7 +12,13 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from berlin_urban_intelligence.shared.contracts import CriticalFacility, NetworkEdge, NetworkNode, OfficialModelFeature, UrbanEntity
+from berlin_urban_intelligence.shared.contracts import (
+    CriticalFacility,
+    NetworkEdge,
+    NetworkNode,
+    OfficialModelFeature,
+    UrbanEntity,
+)
 
 
 class ReferenceState(BaseModel):
@@ -26,7 +32,7 @@ class ReferenceState(BaseModel):
     errors: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_time(self) -> "ReferenceState":
+    def validate_time(self) -> ReferenceState:
         if self.generated_at.tzinfo is None or self.generated_at.utcoffset() is None:
             raise ValueError("generated_at must be timezone-aware")
         object.__setattr__(self, "generated_at", self.generated_at.astimezone(UTC))

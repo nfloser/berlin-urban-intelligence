@@ -103,7 +103,7 @@ class DwdTenMinuteAirTemperatureClient:
         if self._owned_client:
             self._client.close()
 
-    def __enter__(self) -> "DwdTenMinuteAirTemperatureClient":
+    def __enter__(self) -> DwdTenMinuteAirTemperatureClient:
         return self
 
     def __exit__(self, *_args: object) -> None:

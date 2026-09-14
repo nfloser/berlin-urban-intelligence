@@ -53,7 +53,9 @@ def fingerprint_frame(frame: pd.DataFrame) -> str:
 class EnergyForecastPipeline:
     """One-step-ahead evaluator using only information available before each target time."""
 
-    def __init__(self, *, target_column: str, seasonal_lag: int = 96, ridge_alpha: float = 1.0) -> None:
+    def __init__(
+        self, *, target_column: str, seasonal_lag: int = 96, ridge_alpha: float = 1.0
+    ) -> None:
         if not target_column.strip():
             raise ValueError("target_column must not be blank")
         if seasonal_lag < 2:
@@ -76,7 +78,10 @@ class EnergyForecastPipeline:
         if not result["timestamp"].is_monotonic_increasing:
             raise ValueError("timestamp column must be strictly increasing")
         result[self.target_column] = pd.to_numeric(result[self.target_column], errors="raise")
-        if result[self.target_column].isna().any() or not np.isfinite(result[self.target_column]).all():
+        if (
+            result[self.target_column].isna().any()
+            or not np.isfinite(result[self.target_column]).all()
+        ):
             raise ValueError("target contains missing or non-finite values")
         return result
 
@@ -185,7 +190,12 @@ class EnergyForecastPipeline:
             raise ValueError("evaluation contains no model metrics")
         return min(
             evaluation.metrics,
-            key=lambda metric: (metric.mae, metric.rmse, priority.get(metric.model_id, 99), metric.model_id),
+            key=lambda metric: (
+                metric.mae,
+                metric.rmse,
+                priority.get(metric.model_id, 99),
+                metric.model_id,
+            ),
         )
 
     def forecast_next(self, frame: pd.DataFrame, *, model_id: str) -> EnergyPointForecast:
@@ -211,15 +221,17 @@ class EnergyForecastPipeline:
         minute_of_day = next_timestamp.hour * 60 + next_timestamp.minute
         phase = 2.0 * np.pi * minute_of_day / (24.0 * 60.0)
         next_features = pd.DataFrame(
-            [{
-                "lag_1": float(target.iloc[-1]),
-                "lag_seasonal": float(target.iloc[seasonal_position]),
-                "rolling_mean_4": float(target.iloc[-4:].mean()),
-                "rolling_mean_16": float(target.iloc[-16:].mean()),
-                "time_sin": float(np.sin(phase)),
-                "time_cos": float(np.cos(phase)),
-                "weekday": float(next_timestamp.dayofweek),
-            }]
+            [
+                {
+                    "lag_1": float(target.iloc[-1]),
+                    "lag_seasonal": float(target.iloc[seasonal_position]),
+                    "rolling_mean_4": float(target.iloc[-4:].mean()),
+                    "rolling_mean_16": float(target.iloc[-16:].mean()),
+                    "time_sin": float(np.sin(phase)),
+                    "time_cos": float(np.cos(phase)),
+                    "weekday": float(next_timestamp.dayofweek),
+                }
+            ]
         )
 
         if model_id == "persistence":

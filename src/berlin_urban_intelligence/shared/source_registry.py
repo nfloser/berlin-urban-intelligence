@@ -33,7 +33,7 @@ class SourceRegistry:
             raise ValueError("source ids must be unique")
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "SourceRegistry":
+    def from_yaml(cls, path: Path) -> SourceRegistry:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict) or not isinstance(raw.get("sources"), list):
             raise ValueError("source registry requires a top-level 'sources' list")

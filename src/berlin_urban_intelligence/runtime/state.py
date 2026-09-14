@@ -22,7 +22,7 @@ class RuntimeState(BaseModel):
     errors: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_time(self) -> "RuntimeState":
+    def validate_time(self) -> RuntimeState:
         if self.generated_at.tzinfo is None or self.generated_at.utcoffset() is None:
             raise ValueError("generated_at must be timezone-aware")
         object.__setattr__(self, "generated_at", self.generated_at.astimezone(UTC))
