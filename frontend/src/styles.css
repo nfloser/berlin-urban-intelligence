@@ -133,3 +133,12 @@ dd { margin: 0; text-align: right; }
   .sidebar { border-left: 0; border-top: 1px solid #263241; }
   .observation-row { grid-template-columns: 1fr 1fr; }
 }
+
+
+.legend p { margin: 0 0 4px; color: #8296a9; font-size: 11px; line-height: 1.35; }
+.layer-toggle { display: flex; align-items: center; gap: 7px; color: #c4d0dc; cursor: pointer; }
+.layer-toggle input { accent-color: #6d9dc0; }
+.layer-swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .8); }
+.layer-swatch.facilities { background: #e36d6d; }
+.layer-swatch.stops { background: #65b3d1; }
+.layer-swatch.climate { border-radius: 2px; background: #e0a458; }
