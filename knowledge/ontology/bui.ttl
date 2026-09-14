@@ -1,0 +1,40 @@
+@prefix bui: <https://w3id.org/berlin-urban-intelligence/ontology#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix sosa: <http://www.w3.org/ns/sosa/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+bui:UrbanEntity a rdfs:Class .
+bui:Observation a rdfs:Class ; rdfs:subClassOf sosa:Observation .
+bui:DerivedValue a rdfs:Class ; rdfs:subClassOf prov:Entity .
+bui:Forecast a rdfs:Class ; rdfs:subClassOf prov:Entity .
+bui:ScenarioValue a rdfs:Class ; rdfs:subClassOf prov:Entity .
+bui:DataSource a rdfs:Class ; rdfs:subClassOf prov:Entity .
+bui:CriticalFacility a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
+bui:District a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
+bui:Building a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
+bui:TransportStop a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
+bui:NetworkNode a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
+bui:NetworkEdge a rdfs:Class ; rdfs:subClassOf bui:UrbanEntity .
+bui:Disruption a rdfs:Class ; rdfs:subClassOf prov:Entity .
+bui:DataStateConcept a rdfs:Class .
+bui:dataState a rdf:Property ; rdfs:range xsd:string .
+bui:qualityFlag a rdf:Property ; rdfs:range xsd:string .
+bui:unit a rdf:Property ; rdfs:range xsd:string .
+bui:agentVersion a rdf:Property ; rdfs:range xsd:string .
+bui:contractVersion a rdf:Property ; rdfs:range xsd:string .
+bui:locatedIn a rdf:Property ; rdfs:domain bui:UrbanEntity ; rdfs:range bui:District .
+bui:serves a rdf:Property ; rdfs:domain bui:TransportStop ; rdfs:range bui:District .
+bui:affects a rdf:Property ; rdfs:domain bui:Disruption .
+bui:baseline a rdf:Property ; rdfs:domain bui:ScenarioValue ; rdfs:range prov:Entity .
+bui:ObservedState a bui:DataStateConcept ; rdfs:label "observed" .
+bui:OfficialModelledState a bui:DataStateConcept ; rdfs:label "official_modelled" .
+bui:ProjectModelledState a bui:DataStateConcept ; rdfs:label "project_modelled" .
+bui:ForecastState a bui:DataStateConcept ; rdfs:label "forecast" .
+bui:DerivedState a bui:DataStateConcept ; rdfs:label "derived" .
+bui:InterpolatedState a bui:DataStateConcept ; rdfs:label "interpolated" .
+bui:ScenarioState a bui:DataStateConcept ; rdfs:label "scenario" .
+bui:UnknownState a bui:DataStateConcept ; rdfs:label "unknown" .
+bui:UnavailableState a bui:DataStateConcept ; rdfs:label "unavailable" .
+bui:StaleState a bui:DataStateConcept ; rdfs:label "stale" .

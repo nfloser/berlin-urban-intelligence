@@ -1,0 +1,10 @@
+PREFIX bui: <https://w3id.org/berlin-urban-intelligence/ontology#>
+PREFIX sosa: <http://www.w3.org/ns/sosa/>
+SELECT ?observation ?phenomenon ?state ?time
+WHERE {
+  ?observation a bui:Observation ;
+               sosa:observedProperty ?phenomenon ;
+               bui:dataState ?state ;
+               sosa:resultTime ?time .
+}
+ORDER BY DESC(?time)

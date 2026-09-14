@@ -1,0 +1,93 @@
+sources:
+  - id: berlin_air_quality
+    provider: Berliner Luftgütemessnetz
+    dataset: Luftgütemessdaten / REST API
+    domain: exposure
+    reference_url: https://luftdaten.berlin.de/api/doc
+    api_url: https://luftdaten.berlin.de/api
+    authoritative: true
+    licence: Datenlizenz Deutschland - Namensnennung - Version 2.0
+    attribution: "luftdaten.berlin.de - Berliner Luftgütemessnetz / [date of retrieval]"
+    expected_update_frequency: hourly
+    temporal_coverage: current and historical, depending on component/aggregation
+    spatial_coverage: Berlin monitoring stations
+    limitations:
+      - Current automatically measured values can be provisional and subject to quality control.
+      - Missing component values must not be interpreted as zero concentration or normal conditions.
+  - id: vbb_gtfs_rt
+    provider: Verkehrsverbund Berlin-Brandenburg (VBB)
+    dataset: GTFS-Realtime
+    domain: mobility
+    reference_url: https://unternehmen.vbb.de/digitale-services/datensaetze/
+    api_url: https://production.gtfsrt.vbb.de/data
+    authoritative: true
+    licence: CC BY 4.0
+    attribution: "Verkehrsverbund Berlin-Brandenburg (VBB)"
+    expected_update_frequency: realtime
+    spatial_coverage: Berlin and Brandenburg public transport covered by VBB
+    limitations:
+      - Realtime coverage depends on operator/feed availability.
+      - Absence of an update is not proof of normal operation.
+  - id: vbb_gtfs_static
+    provider: Verkehrsverbund Berlin-Brandenburg (VBB)
+    dataset: GTFS schedule data
+    domain: mobility
+    reference_url: https://unternehmen.vbb.de/digitale-services/datensaetze/
+    authoritative: true
+    licence: CC BY 4.0
+    attribution: "Verkehrsverbund Berlin-Brandenburg (VBB)"
+    expected_update_frequency: twice-weekly
+    spatial_coverage: Berlin and Brandenburg public transport covered by VBB
+    limitations:
+      - Schedule data is not realtime operational state.
+  - id: berlin_climate_analysis_2022
+    provider: Senatsverwaltung für Stadtentwicklung, Bauen und Wohnen Berlin
+    dataset: Klimaanalysekarten 2022 (Umweltatlas) - WFS
+    domain: heat
+    reference_url: https://daten.berlin.de/datensaetze/klimaanalysekarten-2022-umweltatlas-wfs-255aead2
+    authoritative: true
+    licence: Datenlizenz Deutschland - Zero - Version 2.0
+    expected_update_frequency: irregular-official-model-release
+    spatial_coverage: Berlin
+    status: metadata-verified
+    limitations:
+      - Official modelled urban-climate information is not a live observation.
+      - Original model data can have finer resolution than defensible interpretation at street level.
+  - id: dwd_open_data
+    provider: Deutscher Wetterdienst (DWD)
+    dataset: CDC observations / Open Data
+    domain: heat
+    reference_url: https://opendata.dwd.de/climate_environment/CDC/
+    authoritative: true
+    expected_update_frequency: product-specific
+    spatial_coverage: Germany including Berlin stations where available
+    limitations:
+      - Individual products use different station sets, variables and publication delays.
+      - Source-specific timestamps and missing-value conventions require explicit parsing.
+  - id: osm_berlin
+    provider: OpenStreetMap contributors
+    dataset: OpenStreetMap
+    domain: resilience
+    reference_url: https://www.openstreetmap.org/
+    authoritative: false
+    licence: ODbL 1.0
+    attribution: "© OpenStreetMap contributors"
+    expected_update_frequency: community-updated
+    spatial_coverage: Berlin
+    limitations:
+      - Completeness and correctness vary by feature and area.
+      - OSM objects must not be treated as authoritative critical-infrastructure truth without qualification.
+  - id: energy_reference_uci
+    provider: UCI Machine Learning Repository
+    dataset: Individual Household Electric Power Consumption
+    domain: energy
+    reference_url: https://archive.ics.uci.edu/dataset/235/individual+household+electric+power+consumption
+    authoritative: false
+    licence: CC BY 4.0
+    expected_update_frequency: static
+    temporal_coverage: December 2006 to November 2010
+    spatial_coverage: one household in Sceaux, France
+    status: research-reference-only
+    limitations:
+      - This dataset is not representative of Berlin city energy demand.
+      - It can validate forecasting methodology but must not be presented as Berlin operational energy state.
