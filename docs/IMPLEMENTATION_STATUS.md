@@ -2,11 +2,16 @@
 
 ## Current phase
 
-Phase 13 — interactive dashboard completion and scalable reference-map delivery, while preserving the persisted-state and agent boundaries established by the runtime architecture.
+Phase 14 — repository governance and evidence-driven completion work after the interactive dashboard/reference-map milestone.
 
 ## Current development work
 
-Issue #2 / PR #8 migrates reference-map rendering from fixed 1,000-item canonical list requests to a bounded viewport projection. The branch remains under CI and review and is not considered complete until the full backend, frontend and container/browser acceptance workflow is green.
+Issue #5 formalizes the required Issue → Branch → PR → CI → Review → Merge workflow. Repository inspection on 2026-09-15 showed no configured repository ruleset, while classic `main` branch-protection inspection returned HTTP 403 to the connected integration. The branch therefore documents the exact owner-admin ruleset required instead of claiming protection that could not be configured through the integration.
+
+## Recently completed work
+
+- Issue #2 / PR #8 replaced fixed 1,000-item map slices with bounded viewport-backed reference projection and canonical detail inspection. Final backend, frontend and Docker/Compose/Playwright CI passed before merge.
+- Issue #3 audited stale PR #1 instead of blindly closing or merging it. Three still-needed invariants were recovered tests-first in PR #9: finite canonical numerical values, required heat/energy scenario parameters, and current/valid scenario baselines. PR #9 passed complete CI and merged; PR #1 was then closed without merge or history deletion.
 
 ## Current architectural state
 
@@ -20,20 +25,29 @@ Issue #2 / PR #8 migrates reference-map rendering from fixed 1,000-item canonica
 - The React/MapLibre dashboard exposes reference inspection, observation provenance, platform/derived inspection, deterministic workflows, heat scenarios and map-selected resilience route comparison.
 - Reference-map rendering uses `/api/v1/map/reference` as a compact rendering projection and `/api/v1/map/reference/{layer}/{resource_id}` for full canonical detail inspection.
 - Browser acceptance is part of the normal PR CI path through the composed nginx → FastAPI → persisted-state → React/MapLibre stack.
+- Canonical numerical contracts reject `NaN` and infinities; heat/energy scenario kinds require their explicit deltas; integrated assessment rejects stale/future/invalid heat baselines and energy forecasts outside their validity interval.
+
+## Repository governance state
+
+The current CI workflow emits three merge-critical GitHub Actions check contexts: `backend`, `frontend` and `containers`.
+
+`docs/development/repository-governance.md` defines the required `main` ruleset. At the time of this status update the repository rulesets endpoint returned no configured rulesets, so **technical protection is not yet claimed**. Activating the documented ruleset is an owner-admin action because the connected integration does not expose the required administration mutation.
+
+Until that setting is activated, direct feature pushes to `main` are prohibited by project workflow but are not technically blocked by GitHub.
 
 ## Known external constraints
 
 - No mandatory external credential blocker is currently known for deterministic repository verification.
 - Current live/reference provider availability remains external to deterministic CI and is checked by separate smoke workflows.
 - OSM-backed routing remains source-dependent and must degrade explicitly when acquisition is unavailable.
+- GitHub repository-administration mutation for branch protection/rulesets is not available through the current connected integration; the exact manual setting is documented.
 
 ## Known internal gaps
 
-1. PR #8 must complete full CI and independent review before the viewport map migration can be merged.
+1. `docs/verification.md` is not yet maintained as a repository-wide evidence matrix.
 2. The dependency graph is not yet a complete registry-driven execution backbone for every orchestrated capability; deterministic workflow mappings still exist.
-3. `docs/verification.md` is not yet maintained as a repository-wide evidence matrix.
-4. `main` is currently unprotected; repository-governance work is tracked separately in issue #5.
-5. The repository does not yet claim systematic load/performance testing, long-running soak testing, multi-process consistency guarantees, exhaustive accessibility verification or security penetration testing.
+3. The repository does not yet claim systematic load/performance testing, long-running soak testing, multi-process consistency guarantees, exhaustive accessibility verification or security penetration testing.
+4. The project-wide v1.0 completion gate has not been declared passed.
 
 ## Completed reliability milestones
 
@@ -41,8 +55,9 @@ Issue #2 / PR #8 migrates reference-map rendering from fixed 1,000-item canonica
 - Invalid replacement snapshots preserve last-known-good state and expose diagnostics.
 - Browser-level acceptance exists in CI and uses an explicit acceptance-only fixture rather than a production synthetic fallback.
 - Baseline and hypothetical route results are kept distinct and can be compared end to end.
-- Map-layer readiness has an explicit browser-test signal and the project-owned layers can fall back to a local background style when the external basemap style is unavailable.
+- Map-layer readiness has an explicit browser-test signal and project-owned layers can fall back to a local background style when the external basemap style is unavailable.
 - The bounded reference-map API reports per-layer totals, viewport matches, returned counts and truncation instead of silently implying completeness.
+- Stale repository history is audited behavior-by-behavior before closure; required behavior is ported onto current `main` through new tests rather than merging obsolete integration history.
 
 ## Verification commands enforced by CI
 
@@ -63,15 +78,14 @@ docker compose health/proxy checks
 Playwright browser acceptance against the composed stack
 ```
 
-The current feature branch must pass this complete set before PR #8 leaves draft status. A successful unit or build subset is not treated as proof of feature completion.
+Passing only a subset is not treated as proof that a PR is merge-ready.
 
 ## Next concrete tasks
 
-1. Complete CI and browser acceptance for PR #8, review the complete diff and resolve findings before merge.
-2. Close or supersede the stale integration PR #1 after confirming it contains no unique required work (issue #3).
-3. Address repository branch/CI governance in issue #5 without mixing it into the map feature.
-4. Establish an evidence-based verification matrix for remaining platform completion gates.
-5. Continue dependency/registry-driven orchestration work in independently scoped issues/PRs rather than a single catch-all change.
+1. Repository owner activates the documented `Protect main` ruleset with required checks `backend`, `frontend` and `containers`.
+2. Establish `docs/verification.md` as an evidence-based matrix for remaining platform completion gates.
+3. Continue dependency/registry-driven orchestration work in independently scoped issues/PRs.
+4. Continue final performance, accessibility, security and live-provider acceptance work without overstating project completion.
 
 ## Important migration notes
 
