@@ -39,15 +39,13 @@ test("reference map objects can be selected and inspected with canonical metadat
   await expect(page.getByText("Official climate features · 1")).toBeVisible();
 
   const map = page.getByLabel("Berlin domain map");
+  await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
   const box = await map.boundingBox();
   expect(box).not.toBeNull();
   const center = { x: box!.width / 2, y: box!.height / 2 };
 
-  await expect(async () => {
-    await map.click({ position: center });
-    await expect(page.getByText("Acceptance Hospital", { exact: true })).toBeVisible({ timeout: 750 });
-  }).toPass({ timeout: 15_000 });
-
+  await map.click({ position: center });
+  await expect(page.getByText("Acceptance Hospital", { exact: true })).toBeVisible();
   await expect(page.getByText("Critical facility", { exact: true })).toBeVisible();
   await expect(page.getByText("acceptance facilities", { exact: true })).toBeVisible();
   await expect(page.getByText("deterministic CI acceptance fixture", { exact: true })).toBeVisible();
@@ -60,6 +58,7 @@ test("map-selected routing compares a baseline with an explicit closed-edge scen
 
   await expect(page.getByText("Critical facilities · 1")).toBeVisible();
   const map = page.getByLabel("Berlin domain map");
+  await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
   const box = await map.boundingBox();
   expect(box).not.toBeNull();
   const center = { x: box!.width / 2, y: box!.height / 2 };
