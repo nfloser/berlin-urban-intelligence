@@ -25,7 +25,9 @@ from berlin_urban_intelligence.shared.temporal import classify_freshness, ensure
 class ExposureAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="exposure",
+        name="Exposure Agent",
         version="0.1.0",
+        domain="environmental_exposure",
         description="Environmental observations and transparent exposure-state handling.",
         capabilities=("ingest_berlin_lqi", "exposure_state"),
         input_contracts=("LqiRecord",),
