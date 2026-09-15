@@ -36,6 +36,23 @@ const LAYER_LABELS: Record<ReferenceMapLayer, string> = {
   climate: "Official climate features",
 };
 
+export class ReferenceMapRequestTracker {
+  private generation = 0;
+
+  begin(): number {
+    this.generation += 1;
+    return this.generation;
+  }
+
+  isCurrent(token: number): boolean {
+    return token === this.generation;
+  }
+
+  invalidate(): void {
+    this.generation += 1;
+  }
+}
+
 export function buildReferenceMapPath(
   bounds: ReferenceMapBounds,
   layers: ReferenceMapLayer[],
