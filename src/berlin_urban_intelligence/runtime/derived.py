@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from berlin_urban_intelligence.knowledge.derivations import DerivationDefinition, DerivationRecord
 from berlin_urban_intelligence.runtime.atomic import atomic_write_text
+from berlin_urban_intelligence.shared.dependencies import DependencyGraph
 
 
 class DerivedState(BaseModel):
@@ -38,6 +39,13 @@ class DerivedState(BaseModel):
                     f"{record.definition_id}"
                 )
         return self
+
+    def dependency_graph(self) -> DependencyGraph:
+        graph = DependencyGraph()
+        for record in self.records:
+            graph.add_derivation(record.id, tuple(item.id for item in record.inputs))
+            graph.set_status(record.id, record.status)
+        return graph
 
 
 class DerivedStateStore:
