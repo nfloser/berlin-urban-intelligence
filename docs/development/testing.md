@@ -14,6 +14,8 @@ pytest --cov=berlin_urban_intelligence --cov-report=term-missing
 
 Coverage is reported as diagnostic evidence; the repository does not currently define a numeric coverage threshold as a release criterion.
 
+Road-network unit/integration tests additionally verify canonical OSM readiness, endpoint consistency, ODbL/source provenance, explicit opt-in speed/travel-time imputation, baseline routing, provider/schema degradation and last-known-good retention without synthetic fallback.
+
 ## Frontend tests
 
 The frontend uses Vitest:
@@ -72,6 +74,16 @@ A live-source failure can therefore represent an upstream outage or schema chang
 
 The filename and trigger reflect that this workflow is not currently a permanent scheduled reference-monitoring pipeline.
 
+## Road-network smoke
+
+`.github/workflows/road-network-smoke.yml` is the separate manual/scheduled verification path for optional real OSM road acquisition. It installs `.[osm]` and runs `scripts/road_network_smoke.py` against a real Berlin scope with explicit OSMnx speed/travel-time derivation.
+
+A passing road-network smoke must produce non-empty canonical nodes/edges with valid OSM provenance, prove endpoint consistency and positive routing attributes, and complete a deterministic baseline route through the existing `ResilienceAgent`. The smoke emits JSON evidence and never substitutes a synthetic network.
+
+The Overpass delivery endpoint may be configured explicitly. This is not silent failover: the selected endpoint is visible in the smoke evidence/provenance and the previous OSMnx setting is restored after the fetch.
+
+On 2026-09-15 two real GitHub-hosted attempts remained externally blocked: run `34979600413` timed out connecting to `overpass-api.de`, and run `34980820676` timed out reading from `https://overpass.private.coffee/api`, both after 180 seconds. Failure artifacts were uploaded and both evidence payloads recorded `synthetic_fallback=false`. Because neither run produced non-empty real nodes/edges or a live baseline route, issue #14 remains open. See `docs/road-network-verification.md`.
+
 ## Test-driven development expectations
 
 For behavioral changes, use the following order where practical:
@@ -103,9 +115,10 @@ Particular attention should remain on:
 - bounded map projections never being presented as complete when truncated;
 - stale viewport responses not replacing newer map state;
 - route-selection clicks remaining separate from reference-object inspection;
+- OSM provider/Overpass failure never being hidden by generated road topology;
 - no synthetic composite score; and
 - no production dependence on synthetic fixtures.
 
 ## Current testing gaps
 
-The repository does not currently claim systematic load/performance testing, fault-injection against every provider, long-running soak testing, multi-process consistency testing, broad accessibility testing or security penetration testing. Browser acceptance covers the principal dashboard integration paths but is not a claim of exhaustive UI coverage.
+The repository does not currently claim systematic load/performance testing, fault-injection against every provider, long-running soak testing, multi-process consistency testing, broad accessibility testing or security penetration testing. Browser acceptance covers the principal dashboard integration paths but is not a claim of exhaustive UI coverage. A successful real OSM Berlin road-network smoke is also still outstanding because the captured public Overpass attempts timed out externally.
