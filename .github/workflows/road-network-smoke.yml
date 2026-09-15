@@ -1,0 +1,55 @@
+name: Road network smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      place:
+        description: OSMnx place query for the Berlin smoke scope
+        required: true
+        default: "Mitte, Berlin, Germany"
+        type: string
+      network_type:
+        description: OSMnx network type
+        required: true
+        default: drive
+        type: choice
+        options:
+          - drive
+          - drive_service
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: road-network-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install real OSM acquisition dependencies
+        run: pip install -e ".[osm]"
+      - name: Verify real Berlin road-network acquisition and routing readiness
+        run: |
+          python scripts/road_network_smoke.py \
+            --place "${{ inputs.place || 'Mitte, Berlin, Germany' }}" \
+            --network-type "${{ inputs.network_type || 'drive' }}" \
+            --allow-osmnx-speed-imputation \
+            --output road-network-smoke.json
+      - name: Upload point-in-time smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: road-network-smoke-evidence
+          path: road-network-smoke.json
+          if-no-files-found: warn
+          retention-days: 30
