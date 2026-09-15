@@ -11,10 +11,10 @@ export type ReferenceMapBounds = {
 
 export type ReferenceMapMetadata = {
   bounds: ReferenceMapBounds;
-  totals: Record<ReferenceMapLayer, number>;
-  matched: Record<ReferenceMapLayer, number>;
-  returned: Record<ReferenceMapLayer, number>;
-  truncated: Record<ReferenceMapLayer, boolean>;
+  totals: Partial<Record<ReferenceMapLayer, number>>;
+  matched: Partial<Record<ReferenceMapLayer, number>>;
+  returned: Partial<Record<ReferenceMapLayer, number>>;
+  truncated: Partial<Record<ReferenceMapLayer, boolean>>;
 };
 
 export type ReferenceMapResponse = FeatureCollection & {
