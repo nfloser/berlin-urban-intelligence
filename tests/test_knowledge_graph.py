@@ -2,12 +2,14 @@ from datetime import UTC, datetime
 
 from rdflib.namespace import PROV, RDF
 
+from berlin_urban_intelligence.knowledge.derived_graph import project_derived_state
 from berlin_urban_intelligence.knowledge.derivations import (
     DerivationDefinition,
     DerivationInput,
     DerivationRecord,
 )
 from berlin_urban_intelligence.knowledge.graph import BUI, KnowledgeGraph
+from berlin_urban_intelligence.runtime.derived import DerivedState
 from berlin_urban_intelligence.shared.contracts import (
     DataState,
     DerivationStatus,
@@ -117,10 +119,12 @@ def test_derived_projection_exposes_definition_status_and_upstream_lineage() -> 
             upstream_ids=("fixture:observation",),
         ),
     )
+    state = DerivedState(generated_at=NOW, definitions=(definition,), records=(record,))
 
     graph = KnowledgeGraph()
-    definition_subject = graph.add_derivation_definition(definition)
-    subject = graph.add_derivation_record(record)
+    resources = project_derived_state(graph, state)
+    definition_subject = resources[definition.id]
+    subject = resources[record.id]
 
     assert (definition_subject, RDF.type, BUI.DerivationDefinition) in graph.graph
     assert (subject, RDF.type, BUI.DerivedInformation) in graph.graph
