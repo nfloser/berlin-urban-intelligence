@@ -31,7 +31,7 @@ from berlin_urban_intelligence.api.derived import router as derived_router
 from berlin_urban_intelligence.energy.state import EnergyState, EnergyStateStore
 from berlin_urban_intelligence.knowledge.derived_graph import project_derived_state
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
-from berlin_urban_intelligence.knowledge.relations import resource_relations
+from berlin_urban_intelligence.knowledge.relations import SemanticRelations, resource_relations
 from berlin_urban_intelligence.orchestrator.assessment import (
     AssessmentRequest,
     IntegratedAssessmentService,
@@ -555,7 +555,7 @@ def create_app() -> FastAPI:
         request: Request,
         resource_id: str,
         limit: int = Query(default=100, ge=1, le=500),
-    ) -> dict[str, object]:
+    ) -> SemanticRelations:
         agents = request.app.state.agents
         semantic_graph = _graph(
             request.app.state.runtime,
@@ -568,7 +568,7 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=404, detail=f"semantic resource not found: {resource_id}"
             )
-        return result.model_dump(mode="json")
+        return result
 
     @app.get("/api/v1/graph", response_class=PlainTextResponse)
     def graph(request: Request) -> str:
