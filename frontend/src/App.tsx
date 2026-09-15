@@ -438,6 +438,9 @@ function App() {
     const map = mapRef.current;
     if (!map || loadState !== "ready" || routeSelectionMode !== null) return;
     const tracker = detailRequestTracker.current;
+    const visiblePointLayers: Array<"facilities" | "stops"> = [];
+    if (visibleLayers.facilities) visiblePointLayers.push("facilities");
+    if (visibleLayers.stops) visiblePointLayers.push("stops");
 
     const inspectReferenceObject = async (event: maplibregl.MapMouseEvent) => {
       const inspectableLayers = ["facilities-circle", "stops-circle", "climate-fill"].filter(
@@ -463,10 +466,16 @@ function App() {
                 : "climate";
         }
       } else if (referenceMap) {
-        const pointHit = referencePointHit(referenceMap, event.point, ([longitude, latitude]) => {
-          const projected = map.project([longitude, latitude]);
-          return { x: projected.x, y: projected.y };
-        });
+        const pointHit = referencePointHit(
+          referenceMap,
+          event.point,
+          ([longitude, latitude]) => {
+            const projected = map.project([longitude, latitude]);
+            return { x: projected.x, y: projected.y };
+          },
+          8,
+          visiblePointLayers,
+        );
         if (pointHit) {
           layer = pointHit.layer;
           id = pointHit.id;
@@ -509,7 +518,7 @@ function App() {
       tracker.invalidate();
       map.off("click", inspectReferenceObject);
     };
-  }, [loadState, referenceMap, routeSelectionMode]);
+  }, [loadState, referenceMap, routeSelectionMode, visibleLayers]);
 
   const startRouteSelection = (mode: "origin" | "destination") => {
     detailRequestTracker.current.invalidate();
