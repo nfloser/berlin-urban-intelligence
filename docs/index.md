@@ -11,6 +11,7 @@ Berlin Urban Intelligence is a research-oriented urban intelligence and digital-
 - [Data architecture](data/overview.md) — source acquisition, canonicalization, persistence and provenance.
 - [Installation](usage/installation.md) and [quickstart](usage/quickstart.md) — reproducible local execution.
 - [Testing](development/testing.md) — deterministic CI, live-source checks and current testing gaps.
+- [v1.0 verification matrix](verification.md) — evidence-backed PASS/PARTIAL/NOT VERIFIED status for completion gates and linked follow-up issues.
 - [Evaluation](evaluation/methodology.md) — what is evaluated scientifically and what is not yet evaluated.
 - [Reproducibility](research/reproducibility.md) — software, data and commands required to reproduce the implemented workflows.
 - [Roadmap](roadmap.md) — implemented capabilities and planned development, clearly separated.
@@ -31,19 +32,21 @@ The data section covers [source boundaries](data/data-sources.md), the [canonica
 
 ### Implementation and operation
 
-Implementation documentation covers [project structure](implementation/project-structure.md), [modules](implementation/modules.md), [configuration](implementation/configuration.md), [dependencies](implementation/dependencies.md) and [extension points](implementation/extension-points.md). Operational instructions are under [`usage/`](usage/).
+Implementation documentation covers [project structure](implementation/project-structure.md), [modules](implementation/modules.md), [configuration](implementation/configuration.md), [dependencies](implementation/dependencies.md) and [extension points](implementation/extension-points.md). Operational instructions are under [`usage/`](usage/). The concise current development state is maintained in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), while [verification.md](verification.md) is the authoritative completion-evidence matrix.
 
 ### Development and research
 
-Development guidance covers environment setup, tests, code-quality gates and contribution workflow. Research documentation records assumptions, reproducibility boundaries, current evaluation methodology and future research directions without treating planned functionality as implemented.
+Development guidance covers environment setup, tests, code-quality gates, repository governance and contribution workflow. Research documentation records assumptions, reproducibility boundaries, current evaluation methodology and future research directions without treating planned functionality as implemented.
 
 ## Current implementation status
 
-The repository currently implements canonical Pydantic contracts, source adapters, six domain/aggregation agents, live and reference acquisition workflows, a leakage-safe energy evaluation and one-step forecasting workflow, network resilience calculations, explicit hypothetical scenarios, deterministic orchestration, RDF projection, a FastAPI API, a React/MapLibre dashboard and deterministic CI/container smoke testing.
+The repository currently implements canonical Pydantic contracts, source adapters, six domain/aggregation agents, live and reference acquisition workflows, a leakage-safe energy evaluation and one-step forecasting workflow, network resilience calculations, explicit hypothetical scenarios, registry/capability-driven deterministic orchestration, first-class derived information/dependencies, RDF projection, a FastAPI API, a React/MapLibre dashboard and protected deterministic CI/container/browser acceptance.
 
 Some capabilities are conditional on data availability. In particular, the Energy Agent requires a successfully evaluated Berlin-scoped input dataset before it exposes forecasts, and Resilience routing requires a persisted network snapshot. Optional OpenStreetMap acquisition is not part of the default reference refresh.
 
-The repository does not implement a municipal control system, a universal Berlin score, causal inference across domains, calibrated forecast intervals, automatic background data acquisition by the API, or an LLM-dependent execution core.
+The current aggregate v1.0 verification status is **NOT READY**. This does not mean the implemented application is unusable; it means critical evidence gaps remain and are explicitly tracked rather than being converted into completion claims. See [verification.md](verification.md) for the exact gates and issues.
+
+The repository does not implement a municipal control system, a universal Berlin score, causal inference across domains, calibrated forecast intervals, an authoritative real-time facility-capacity system, or an LLM-dependent execution core.
 
 ## Documentation authority
 
