@@ -39,15 +39,18 @@ test("populated derived and platform inspectors expose persisted lineage and run
   await expect(derived.getByText("acceptance derived lineage", { exact: true })).toBeVisible();
 
   const platform = page.getByLabel("Platform registry and source inspector");
-  const sourceRow = platform
-    .locator(".observation-row")
-    .filter({ hasText: "Luftgütemessdaten / REST API" });
-  await expect(sourceRow.getByText("Berliner Luftgütemessnetz · exposure", { exact: true })).toBeVisible();
+  const sourceRow = platform.locator('[data-source-id="berlin_air_quality"]');
+  await expect(sourceRow).toBeVisible();
+  await expect(sourceRow).toContainText("Luftgütemessdaten / REST API");
+  await expect(sourceRow).toContainText("Berliner Luftgütemessnetz");
+  await expect(sourceRow).toContainText("exposure");
   await expect(sourceRow.getByText("unavailable", { exact: true })).toBeVisible();
   await expect(sourceRow.getByText("stale", { exact: true })).toBeVisible();
   await expect(sourceRow.getByText("Failure: SOURCE_UNAVAILABLE", { exact: true })).toBeVisible();
 
-  const liveStateRow = platform.locator(".observation-row").filter({ hasText: "Live State Agent" });
+  const liveStateRow = platform.locator('[data-agent-id="live_state"]');
+  await expect(liveStateRow).toBeVisible();
+  await expect(liveStateRow.getByText("Live State Agent", { exact: true })).toBeVisible();
   await expect(liveStateRow.getByText("degraded", { exact: true })).toBeVisible();
   await expect(liveStateRow.getByText("agent_health_snapshot", { exact: true })).toBeVisible();
   await expect(
