@@ -31,7 +31,9 @@ NOW = datetime(2026, 9, 15, 10, 0, tzinfo=UTC)
 RESOURCE_BASE = "https://w3id.org/berlin-urban-intelligence/resource/"
 
 
-def provenance(*, agent: str, dataset: str = "fixture", upstream_ids: tuple[str, ...] = ()) -> Provenance:
+def provenance(
+    *, agent: str, dataset: str = "fixture", upstream_ids: tuple[str, ...] = ()
+) -> Provenance:
     return Provenance(
         provider="fixture-provider",
         dataset=dataset,
@@ -62,7 +64,9 @@ def client_with_semantic_state(monkeypatch, tmp_path) -> TestClient:
         quality=QualityFlag.VALID,
         provenance=provenance(agent="heat", dataset="temperature-fixture"),
     )
-    RuntimeStateStore(runtime_path).save(RuntimeState(generated_at=NOW, observations=(observation,)))
+    RuntimeStateStore(runtime_path).save(
+        RuntimeState(generated_at=NOW, observations=(observation,))
+    )
 
     facility = CriticalFacility(
         id="facility:hospital",
@@ -143,7 +147,9 @@ def client_with_semantic_state(monkeypatch, tmp_path) -> TestClient:
     return TestClient(create_app())
 
 
-def _relation(body: dict[str, object], predicate_uri: str, related_suffix: str) -> dict[str, object]:
+def _relation(
+    body: dict[str, object], predicate_uri: str, related_suffix: str
+) -> dict[str, object]:
     relations = body["relations"]
     assert isinstance(relations, list)
     return next(
