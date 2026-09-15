@@ -184,13 +184,19 @@ def reference_feature_collection(
 
     for layer in layers:
         items = _layer_items(state, layer)
-        matches = [item for item in items if _mappable(item, bounds)]
-        selected = matches[:limit_per_layer]
+        selected: list[MapItem] = []
+        matched_count = 0
+        for item in items:
+            if not _mappable(item, bounds):
+                continue
+            matched_count += 1
+            if len(selected) < limit_per_layer:
+                selected.append(item)
         features.extend(_feature(item, layer) for item in selected)
         totals[layer] = len(items)
-        matched[layer] = len(matches)
+        matched[layer] = matched_count
         returned[layer] = len(selected)
-        truncated[layer] = len(matches) > len(selected)
+        truncated[layer] = matched_count > len(selected)
 
     return {
         "type": "FeatureCollection",

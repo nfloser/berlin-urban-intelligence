@@ -1,0 +1,43 @@
+name: Performance baseline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * 1"
+  pull_request:
+    paths:
+      - ".github/workflows/performance.yml"
+      - "scripts/benchmark_performance.py"
+      - "src/berlin_urban_intelligence/performance.py"
+      - "src/berlin_urban_intelligence/api/map_reference.py"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev,live]"
+      - name: Run deterministic API and map benchmark
+        run: |
+          python scripts/benchmark_performance.py \
+            --output performance-baseline.json \
+            --stops 10000 \
+            --facilities 250 \
+            --network-nodes 750 \
+            --iterations 7 \
+            --warmups 2
+      - name: Upload point-in-time evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-baseline-${{ github.sha }}
+          path: performance-baseline.json
+          retention-days: 30
