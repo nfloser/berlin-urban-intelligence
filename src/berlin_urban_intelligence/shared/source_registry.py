@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml
@@ -34,7 +35,9 @@ class SourceRegistry:
 
     @classmethod
     def from_yaml(cls, path: Path) -> SourceRegistry:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        configured = os.environ.get("BUI_SOURCE_REGISTRY")
+        registry_path = Path(configured) if configured else path
+        raw = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict) or not isinstance(raw.get("sources"), list):
             raise ValueError("source registry requires a top-level 'sources' list")
         return cls([SourceDefinition.model_validate(item) for item in raw["sources"]])

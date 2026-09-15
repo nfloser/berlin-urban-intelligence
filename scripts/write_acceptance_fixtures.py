@@ -1,22 +1,33 @@
-"""Write a tiny deterministic reference snapshot for browser acceptance tests.
+"""Write deterministic persisted snapshots for browser acceptance tests.
 
-The fixture is deliberately generated during CI and is never used as a production fallback. It
-contains enough Berlin-local reference geometry and network topology to exercise map inspection,
-nearest-node selection and baseline-versus-disruption routing through the real API stack.
+These fixtures are generated only during CI and are never used as production fallbacks. They use
+exactly the same persisted-state contracts/stores as the running application so browser acceptance
+covers the real nginx -> FastAPI -> persisted state -> React/MapLibre path.
 """
 
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from pydantic import HttpUrl
 
+from berlin_urban_intelligence.knowledge.derivations import (
+    DerivationContext,
+    DerivationDefinition,
+    DerivationInput,
+    DerivationRecord,
+)
+from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedStateStore
 from berlin_urban_intelligence.runtime.reference import ReferenceState, ReferenceStateStore
+from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
 from berlin_urban_intelligence.shared.contracts import (
+    AvailabilityStatus,
     CriticalFacility,
     DataState,
+    DerivationStatus,
+    FreshnessStatus,
     NetworkEdge,
     NetworkNode,
     OfficialModelFeature,
@@ -25,12 +36,20 @@ from berlin_urban_intelligence.shared.contracts import (
     SpatialReference,
     UrbanEntity,
 )
+from berlin_urban_intelligence.shared.source_status import SourceRuntimeStatus
 
 FIXTURE_TIME = datetime(2026, 9, 15, 8, 0, tzinfo=UTC)
 FIXTURE_URL = HttpUrl("https://example.invalid/berlin-urban-intelligence/acceptance-fixture")
 
 
-def fixture_provenance(dataset: str, identifier: str) -> Provenance:
+def fixture_provenance(
+    dataset: str,
+    identifier: str,
+    *,
+    agent: str = "acceptance-fixture",
+    agent_version: str = "1.0.0",
+    upstream_ids: tuple[str, ...] = (),
+) -> Provenance:
     return Provenance(
         provider="Berlin Urban Intelligence acceptance fixture",
         dataset=dataset,
@@ -39,9 +58,10 @@ def fixture_provenance(dataset: str, identifier: str) -> Provenance:
         retrieved_at=FIXTURE_TIME,
         processed_at=FIXTURE_TIME,
         processing_method="deterministic CI acceptance fixture",
-        agent="acceptance-fixture",
-        agent_version="1.0.0",
+        agent=agent,
+        agent_version=agent_version,
         quality_note="Synthetic test fixture used only by browser acceptance tests.",
+        upstream_ids=upstream_ids,
     )
 
 
@@ -137,14 +157,86 @@ def build_reference_fixture() -> ReferenceState:
     )
 
 
+def build_runtime_fixture() -> RuntimeState:
+    """Expose explicit source degradation without inventing an observation."""
+
+    return RuntimeState(
+        generated_at=FIXTURE_TIME,
+        source_statuses={
+            "berlin_air_quality": SourceRuntimeStatus(
+                source_id="berlin_air_quality",
+                availability=AvailabilityStatus.UNAVAILABLE,
+                freshness=FreshnessStatus.STALE,
+                last_retrieval_attempt=FIXTURE_TIME,
+                last_successful_retrieval=FIXTURE_TIME - timedelta(hours=3),
+                latest_observation_time=FIXTURE_TIME - timedelta(hours=6),
+                error_code="SOURCE_UNAVAILABLE",
+            )
+        },
+    )
+
+
+def build_derived_fixture() -> DerivedState:
+    input_id = "observation:acceptance:mobility-input"
+    definition = DerivationDefinition(
+        id="derivation:acceptance:mobility-delay-share",
+        name="Acceptance mobility delay share",
+        description="Acceptance-only persisted derivation used to verify dashboard lineage UI.",
+        producer_agent_id="mobility",
+        producer_version="0.1.0",
+        algorithm_version="acceptance-v1",
+        output_kind="ratio",
+    )
+    record = DerivationRecord(
+        id="derived:acceptance:mobility-delay-share",
+        definition_id=definition.id,
+        entity_id="berlin:acceptance",
+        phenomenon="acceptance_mobility_delay_share",
+        value=0.25,
+        unit="1",
+        valid_at=FIXTURE_TIME - timedelta(hours=6),
+        computed_at=FIXTURE_TIME,
+        quality=QualityFlag.PARTIAL,
+        freshness=FreshnessStatus.STALE,
+        status=DerivationStatus.VALID,
+        inputs=(DerivationInput(id=input_id, role="mobility_observation"),),
+        provenance=fixture_provenance(
+            "acceptance derived lineage",
+            "mobility-delay-share-1",
+            agent="mobility",
+            agent_version="0.1.0",
+            upstream_ids=(input_id,),
+        ),
+        context=DerivationContext.BASELINE,
+    )
+    return DerivedState(
+        generated_at=FIXTURE_TIME,
+        definitions=(definition,),
+        records=(record,),
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--reference", default="data/runtime/reference.json")
+    parser.add_argument("--runtime", default="data/runtime/state.json")
+    parser.add_argument("--derived", default="data/runtime/derived.json")
     args = parser.parse_args()
-    state = build_reference_fixture()
-    ReferenceStateStore(Path(args.reference)).save(state)
+
+    reference = build_reference_fixture()
+    runtime = build_runtime_fixture()
+    derived = build_derived_fixture()
+    ReferenceStateStore(Path(args.reference)).save(reference)
+    RuntimeStateStore(Path(args.runtime)).save(runtime)
+    DerivedStateStore(Path(args.derived)).save(derived)
+
     print(f"reference_fixture={args.reference}")
-    print(f"network_nodes={len(state.network_nodes)} network_edges={len(state.network_edges)}")
+    print(f"runtime_fixture={args.runtime}")
+    print(f"derived_fixture={args.derived}")
+    print(
+        f"network_nodes={len(reference.network_nodes)} network_edges={len(reference.network_edges)}"
+    )
+    print(f"derived_records={len(derived.records)} source_statuses={len(runtime.source_statuses)}")
     return 0
 
 

@@ -5,13 +5,12 @@ function isReferenceViewportResponse(url: string): boolean {
   return parsed.pathname === "/api/v1/map/reference";
 }
 
-test("dashboard renders explicit empty state and completes a hypothetical heat assessment", async ({
+test("dashboard completes a hypothetical heat assessment with persisted acceptance state", async ({
   page,
 }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Berlin Urban Intelligence" })).toBeVisible();
-  await expect(page.getByText("No persisted derived products are available.")).toBeVisible();
 
   const temperature = page.getByPlaceholder("Enter delta, e.g. 3");
   await temperature.fill("3");
@@ -20,6 +19,51 @@ test("dashboard renders explicit empty state and completes a hypothetical heat a
   await expect(page.getByText("Heat delta +3 Cel")).toBeVisible();
   await expect(page.getByText("Hypothetical: yes")).toBeVisible();
   await expect(page.getByText(/Unavailable dimensions: heat/)).toBeVisible();
+});
+
+test("populated derived and platform inspectors expose persisted lineage and runtime semantics", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const derived = page.getByLabel("Derived information inspector");
+  await expect(derived.getByText("Acceptance mobility delay share", { exact: true })).toBeVisible();
+  await expect(derived.getByText("Freshness: stale", { exact: true })).toBeVisible();
+  await expect(derived.getByText("mobility 0.1.0", { exact: true })).toBeVisible();
+  await expect(
+    derived.getByText("observation:acceptance:mobility-input", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    derived.getByText("Berlin Urban Intelligence acceptance fixture", { exact: true }),
+  ).toBeVisible();
+  await expect(derived.getByText("acceptance derived lineage", { exact: true })).toBeVisible();
+
+  const platform = page.getByLabel("Platform registry and source inspector");
+  const sourceRow = platform.locator('[data-source-id="berlin_air_quality"]');
+  await expect(sourceRow).toBeVisible();
+  await expect(sourceRow).toContainText("Luftgütemessdaten / REST API");
+  await expect(sourceRow).toContainText("Berliner Luftgütemessnetz");
+  await expect(sourceRow).toContainText("exposure");
+  await expect(sourceRow.getByText("unavailable", { exact: true })).toBeVisible();
+  await expect(sourceRow.getByText("stale", { exact: true })).toBeVisible();
+  await expect(sourceRow.getByText("Failure: SOURCE_UNAVAILABLE", { exact: true })).toBeVisible();
+
+  const liveStateRow = platform.locator('[data-agent-id="live_state"]');
+  await expect(liveStateRow).toBeVisible();
+  await expect(liveStateRow.getByText("Live State Agent", { exact: true })).toBeVisible();
+  await expect(liveStateRow.getByText("degraded", { exact: true })).toBeVisible();
+  await expect(liveStateRow.getByText("agent_health_snapshot", { exact: true })).toBeVisible();
+  await expect(
+    liveStateRow.getByText(/Depends on: mobility, exposure, heat, energy, resilience/),
+  ).toBeVisible();
+
+  const reloadCard = platform.locator("article").filter({ hasText: "Reload diagnostics" });
+  await expect(reloadCard.getByText("runtime", { exact: true })).toBeVisible();
+  await expect(reloadCard.getByText("reference", { exact: true })).toBeVisible();
+  await expect(reloadCard.getByText("derived", { exact: true })).toBeVisible();
+  await expect(reloadCard.getByText("energy", { exact: true })).toBeVisible();
+  await expect(reloadCard.getByText("current", { exact: true })).toHaveCount(3);
+  await expect(reloadCard.getByText("missing", { exact: true })).toHaveCount(1);
 });
 
 test("deterministic workflow remains inspectable when source-backed agents are unavailable", async ({

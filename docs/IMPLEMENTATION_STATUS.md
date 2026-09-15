@@ -6,12 +6,15 @@ Phase 15 — evidence-driven v1.0 completion audit and independently scoped foll
 
 ## Current development work
 
-Issue #14 / PR #27 implements the real-road verification and degradation infrastructure identified by the v1.0 audit. The repository now has a dedicated road-network smoke path, strict canonical OSM readiness validation, explicit opt-in speed/travel-time imputation, baseline-route verification through the existing resilience router, provider/schema failure handling with last-known-good retention, and explicit per-fetch Overpass endpoint selection without silent failover.
+Issue #15 / PR #28 closes the populated dashboard-inspector acceptance gap identified by the v1.0 audit. Deterministic acceptance state now persists minimal explicit reference, runtime/source-status and derived-lineage snapshots through the same typed stores used by the application. The composed nginx → FastAPI → persisted state → React/MapLibre browser path verifies derived definition/producer/upstream provenance/freshness, configured source metadata plus runtime availability/freshness/error semantics, real agent identity/capabilities/dependencies/health, snapshot reload diagnostics, existing map/detail behavior and baseline-versus-disruption routing.
 
-Repository-side work is green, but #14 remains **EXTERNAL/BLOCKED** because the two captured point-in-time public Overpass attempts on 2026-09-15 both timed out before a real Berlin network could be produced: run `34979600413` hit a 180-second `ConnectTimeout` at `overpass-api.de`; run `34980820676` hit a 180-second `ReadTimeout` at `https://overpass.private.coffee/api`. Both failure artifacts recorded `synthetic_fallback=false`. A real non-empty network plus baseline route is still required before #14 can close.
+Implementation head `0e49f7644406af54964300b44468ce253c0fe4f2` passed GitHub Actions run `34989105040`: `backend`, `frontend` and `containers` were all successful, and Playwright reported **6 passed**. The work also exposed and fixed a production-installation path defect for the source registry: `BUI_SOURCE_REGISTRY` is now an explicit configuration input and Compose points it to `/app/config/sources.yaml`. The remaining step for PR #28 is final documentation-head CI and merge.
+
+Issue #14 remains separately **EXTERNAL/BLOCKED**. Its repository verification/degradation infrastructure is already merged on `main`, but the two captured point-in-time public Overpass attempts on 2026-09-15 both timed out before a real Berlin network could be produced: run `34979600413` hit a 180-second `ConnectTimeout` at `overpass-api.de`; run `34980820676` hit a 180-second `ReadTimeout` at `https://overpass.private.coffee/api`. Both failure artifacts recorded `synthetic_fallback=false`. A real non-empty network plus baseline route is still required before #14 can close.
 
 ## Recently completed work
 
+- Issue #14 / PR #27 merged the real-road verification/degradation infrastructure without fabricating provider success. A dedicated road-network smoke path, strict canonical OSM readiness validation, opt-in provenance-visible routing imputation, real baseline-route verification contract and last-known-good failure semantics are now on `main`; #14 remains open because live Overpass acquisition is externally blocked.
 - Issue #13 / PR #26 completed the real-agent metadata/composition boundary. All six real agents expose explicit name/domain/capability/input/output metadata; `AgentRegistry` owns capability resolution; Live State aggregates typed `AgentHealth` values supplied by the API composition boundary rather than invoking domain agents. Full protected CI passed before merge.
 - Issue #12 / PR #23 closed semantic API parity: public graph serialization now includes persisted derived lineage and the API exposes bounded typed incoming/outgoing semantic relationship inspection. Full protected CI passed before merge.
 - Issue #11 / PR #22 established `docs/verification.md` as the repository-wide completion evidence matrix, corrected orchestration/snapshot documentation drift and converted remaining gaps into independently scoped issues. Full protected CI passed before merge.
@@ -26,6 +29,7 @@ Repository-side work is green, but #14 remains **EXTERNAL/BLOCKED** because the 
 - The API snapshot controller watches persisted runtime, reference, energy and derived files and reloads changed snapshots without requiring a backend restart.
 - Invalid replacement snapshots retain the previous validated in-process value and expose reload diagnostics instead of replacing good state.
 - Agent/orchestrator state is rebuilt after validated snapshot changes.
+- Source registry loading supports the explicit `BUI_SOURCE_REGISTRY` deployment path; Compose uses `/app/config/sources.yaml`, avoiding assumptions about package-install filesystem layout.
 - All six real `AgentDescriptor` instances expose explicit names/domains plus capabilities and typed input/output contracts; domain agents retain explicit source dependencies where applicable.
 - `AgentRegistry` validates required/optional agent dependencies, topological ordering and missing/cyclic dependencies, and owns unique capability resolution/ambiguity errors used by the orchestrator.
 - Live State declares required dependencies on Mobility, Exposure, Heat, Energy and Resilience but does not own or invoke those agents. The API composition layer collects typed domain `AgentHealth` values and supplies them to `LiveStateAgent` for aggregation.
@@ -35,7 +39,7 @@ Repository-side work is green, but #14 remains **EXTERNAL/BLOCKED** because the 
 - FastAPI exposes domain state, provenance, source/agent health, resilience routing/scenario operations, derived/dependency/semantic inspection and bounded reference-map projections.
 - The React/MapLibre dashboard exposes reference inspection, observation provenance, platform/derived inspection, deterministic workflows, heat scenarios and map-selected resilience route comparison.
 - Reference-map rendering uses `/api/v1/map/reference` as a compact rendering projection and `/api/v1/map/reference/{layer}/{resource_id}` for full canonical detail inspection.
-- Browser acceptance is part of the normal PR CI path through the composed nginx → FastAPI → persisted-state → React/MapLibre stack.
+- Browser acceptance is part of the normal PR CI path through the composed nginx → FastAPI → persisted-state → React/MapLibre stack and now includes populated source/agent/derived/reload inspector verification.
 - Canonical numerical contracts reject `NaN` and infinities; heat/energy scenario kinds require their explicit deltas; integrated assessment rejects stale/future/invalid heat baselines and energy forecasts outside their validity interval.
 - Optional real road-network acquisition can be verified separately from deterministic CI. Its readiness contract requires non-empty OSM nodes/edges, valid coordinates/endpoints, positive routing attributes, ODbL/source provenance, provenance-visible imputation where enabled, and a real baseline route. Provider failure never becomes a synthetic success.
 
@@ -53,16 +57,17 @@ All three are bound to the GitHub Actions integration.
 
 ## Current v1.0 evidence gaps
 
-The authoritative detail is in [`verification.md`](verification.md). The remaining concrete follow-up issues are:
+The authoritative detail is in [`verification.md`](verification.md). After #15 acceptance, the remaining concrete follow-up issues are:
 
 1. #14 — **EXTERNAL/BLOCKED**: repository verification/degradation infrastructure is implemented, but a successful real Berlin OSM network plus baseline route is still missing because both captured public Overpass attempts timed out.
-2. #15 — complete populated dashboard inspector browser acceptance.
-3. #16 — add accessibility and keyboard verification.
-4. #17 — establish performance/load evidence.
-5. #18 — establish repository/deployment security baseline.
-6. #19 — extend structured observability across refresh/derivation/scenarios.
-7. #20 — verify a reproducible real Berlin energy evaluation/forecast artefact.
-8. #21 — verify multiple source-backed cross-domain workflows end to end.
+2. #16 — add accessibility and keyboard verification.
+3. #17 — establish performance/load evidence.
+4. #18 — establish repository/deployment security baseline.
+5. #19 — extend structured observability across refresh/derivation/scenarios.
+6. #20 — verify a reproducible real Berlin energy evaluation/forecast artefact.
+7. #21 — verify multiple source-backed cross-domain workflows end to end.
+
+Issue #15 is no longer an evidence gap once PR #28 merges: its persisted inspector behavior has complete composed browser acceptance.
 
 ## Known external constraints
 
@@ -74,7 +79,8 @@ The authoritative detail is in [`verification.md`](verification.md). The remaini
 
 - Persisted snapshots can hot-reload into a running API.
 - Invalid replacement snapshots preserve last-known-good state and expose diagnostics.
-- Browser-level acceptance exists in CI and uses an explicit acceptance-only fixture rather than a production synthetic fallback.
+- Browser-level acceptance exists in CI and uses explicit acceptance-only reference/runtime/derived fixtures rather than a production synthetic fallback.
+- Populated derived provenance/lineage, source health/error semantics, agent capabilities/dependencies/health and reload diagnostics are verified through the actual composed browser stack.
 - Baseline and hypothetical route results are kept distinct and can be compared end to end.
 - Map-layer readiness has an explicit browser-test signal and project-owned layers can fall back to a local background style when the external basemap style is unavailable.
 - The bounded reference-map API reports per-layer totals, viewport matches, returned counts and truncation instead of silently implying completeness.
@@ -83,7 +89,8 @@ The authoritative detail is in [`verification.md`](verification.md). The remaini
 - The repository maintains an explicit PASS/PARTIAL/EXTERNAL-BLOCKED/NOT VERIFIED completion matrix rather than treating implementation presence as proof of v1.0 readiness.
 - Public semantic graph serialization and typed semantic relation inspection use the same validated snapshot projection, including derived lineage.
 - Real-agent dependency/capability metadata is executable registry data rather than documentation-only metadata; Live State aggregation no longer creates an agent-to-agent call path.
-- Real OSM road verification is now reproducible as a separate smoke workflow with explicit failure evidence, endpoint selection, opt-in imputation and no synthetic production fallback.
+- Real OSM road verification is reproducible as a separate smoke workflow with explicit failure evidence, endpoint selection, opt-in imputation and no synthetic production fallback.
+- Installed Docker deployments resolve the source registry through an explicit configured path instead of relying on source-checkout-relative `__file__` assumptions.
 
 ## Verification commands enforced by CI
 
@@ -108,10 +115,10 @@ Passing only a subset is not treated as proof that a PR is merge-ready.
 
 ## Next concrete tasks
 
-1. Merge the tested #14 verification/degradation infrastructure without closing #14; retain its real-provider gate as EXTERNAL/BLOCKED until a later successful road smoke.
-2. Address #15 next: populate deterministic acceptance state for derived/source/agent/reload inspectors and prove those dashboard paths in the real composed browser stack.
-3. Verify the real Berlin energy gate #20 independently of deterministic model tests.
-4. Close dashboard/operational quality gaps #16–#19 in independent PRs.
+1. Merge PR #28 only after the final documentation head again passes `backend`, `frontend` and `containers`; close #15 through that verified merge.
+2. Keep #14 open as EXTERNAL/BLOCKED and rerun its live road smoke later when a public provider is responsive; do not substitute deterministic fixtures for live evidence.
+3. Address #16–#19 as independent dashboard/operational quality PRs, preserving the same TDD/evidence discipline.
+4. Verify the real Berlin energy gate #20 independently of deterministic model tests.
 5. Complete #21 only after its dependent source/semantic evidence is sufficient.
 6. Reassess the project-wide v1.0 completion gate only when `docs/verification.md` contains no unqualified critical gap.
 
