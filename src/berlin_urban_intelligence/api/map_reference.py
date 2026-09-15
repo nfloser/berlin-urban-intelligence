@@ -157,7 +157,9 @@ def _layer_items(state: ReferenceState | None, layer: MapLayer) -> Sequence[MapI
     return state.official_model_features
 
 
-def reference_item(state: ReferenceState | None, *, layer: MapLayer, resource_id: str) -> MapItem | None:
+def reference_item(
+    state: ReferenceState | None, *, layer: MapLayer, resource_id: str
+) -> MapItem | None:
     for item in _layer_items(state, layer):
         if item.id == resource_id:
             return item
