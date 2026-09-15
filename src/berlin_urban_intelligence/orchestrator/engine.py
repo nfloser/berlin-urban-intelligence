@@ -104,7 +104,9 @@ class Orchestrator:
             selected_ids.add(candidates[0].descriptor.id)
 
         ordered = [
-            agent for agent in self._registry.dependency_order() if agent.descriptor.id in selected_ids
+            agent
+            for agent in self._registry.dependency_order()
+            if agent.descriptor.id in selected_ids
         ]
         return ordered, missing
 
