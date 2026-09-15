@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from berlin_urban_intelligence.knowledge.derivations import DerivationRecord
+from berlin_urban_intelligence.knowledge.derivations import (
+    DerivationDefinition,
+    DerivationRecord,
+)
 from berlin_urban_intelligence.knowledge.execution import (
     DerivationExecutionReport,
     DerivationExecutor,
@@ -55,13 +58,16 @@ class DerivedRefreshCoordinator:
         desired_definitions = {item.id for item in desired.definitions}
         previous_records = {item.id: item for item in previous.records}
         desired_records = {item.id: item for item in desired.records}
-        if previous_definitions != desired_definitions or set(previous_records) != set(desired_records):
+        if previous_definitions != desired_definitions or set(previous_records) != set(
+            desired_records
+        ):
             return DerivedRefreshOutcome(state=desired, changed=desired != previous)
 
         changed_record_ids = [
             record_id
             for record_id, candidate in desired_records.items()
-            if self._semantic_payload(candidate) != self._semantic_payload(previous_records[record_id])
+            if self._semantic_payload(candidate)
+            != self._semantic_payload(previous_records[record_id])
         ]
         if not changed_record_ids:
             return DerivedRefreshOutcome(state=previous, changed=False)
@@ -74,7 +80,9 @@ class DerivedRefreshCoordinator:
             )
         )
 
-        def handler(_definition: object, record: DerivationRecord) -> DerivationRecord:
+        def handler(
+            _definition: DerivationDefinition, record: DerivationRecord
+        ) -> DerivationRecord:
             return desired_records[record.id]
 
         handlers = {definition.id: handler for definition in desired.definitions}
