@@ -31,8 +31,8 @@ class JsonFormatter(logging.Formatter):
             value = getattr(record, field, None)
             if value is not None:
                 payload[field] = value
-        if record.exc_info:
-            payload["exception"] = self.formatException(record.exc_info)
+        if record.exc_info and record.exc_info[0] is not None:
+            payload["exception_type"] = record.exc_info[0].__name__
         return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
 
 
@@ -57,6 +57,8 @@ def structured_log(
 
     Unknown context keys are ignored by :class:`JsonFormatter`, which prevents request bodies,
     query strings or arbitrary external payloads from accidentally entering structured logs.
+    Raw exception messages and tracebacks are likewise excluded because provider exceptions may
+    contain URLs or other sensitive external context.
     """
 
     configure_structured_logging()
