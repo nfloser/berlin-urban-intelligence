@@ -49,11 +49,14 @@ export type UrbanEntity = {
   name?: string | null;
   entity_type: string;
   spatial?: Spatial | null;
+  source_identifier?: string | null;
 };
 
 export type CriticalFacility = UrbanEntity & {
   category: string;
-  confidence: string;
+  confidence?: string | null;
+  quality: string;
+  provenance?: Provenance | null;
 };
 
 export type OfficialModelFeature = {
@@ -62,7 +65,9 @@ export type OfficialModelFeature = {
   model_name: string;
   feature_type: string;
   state: "official_modelled";
+  quality: string;
   properties: Record<string, unknown>;
+  provenance: Provenance;
   spatial: Spatial;
 };
 
