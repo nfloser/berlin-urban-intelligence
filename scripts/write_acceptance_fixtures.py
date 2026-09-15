@@ -233,10 +233,7 @@ def main() -> int:
     print(f"reference_fixture={args.reference}")
     print(f"runtime_fixture={args.runtime}")
     print(f"derived_fixture={args.derived}")
-    print(
-        f"network_nodes={len(reference.network_nodes)} "
-        f"network_edges={len(reference.network_edges)}"
-    )
+    print(f"network_nodes={len(reference.network_nodes)} network_edges={len(reference.network_edges)}")
     print(f"derived_records={len(derived.records)} source_statuses={len(runtime.source_statuses)}")
     return 0
 
