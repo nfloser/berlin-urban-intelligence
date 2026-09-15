@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from berlin_urban_intelligence.agents.mobility import MobilitySnapshot
+from berlin_urban_intelligence.runtime.atomic import atomic_write_text
 from berlin_urban_intelligence.shared.contracts import Observation
 from berlin_urban_intelligence.shared.source_status import SourceRuntimeStatus
 
@@ -36,10 +36,7 @@ class RuntimeStateStore:
         self.path = Path(path)
 
     def save(self, state: RuntimeState) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
-        temporary.write_text(state.model_dump_json(indent=2), encoding="utf-8")
-        os.replace(temporary, self.path)
+        atomic_write_text(self.path, state.model_dump_json(indent=2))
 
     def load(self) -> RuntimeState | None:
         if not self.path.exists():
