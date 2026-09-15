@@ -6,7 +6,7 @@ Phase 14 — repository governance and evidence-driven completion work after the
 
 ## Current development work
 
-Issue #5 formalizes the required Issue → Branch → PR → CI → Review → Merge workflow. Repository inspection on 2026-09-15 showed no configured repository ruleset, while classic `main` branch-protection inspection returned HTTP 403 to the connected integration. The branch therefore documents the exact owner-admin ruleset required instead of claiming protection that could not be configured through the integration.
+Issue #5 formalizes the required Issue → Branch → PR → CI → Review → Merge workflow. Repository owner configuration has now activated the `Protect main` ruleset; the branch records the verified technical state and the repository workflow that future work must follow.
 
 ## Recently completed work
 
@@ -29,18 +29,21 @@ Issue #5 formalizes the required Issue → Branch → PR → CI → Review → M
 
 ## Repository governance state
 
-The current CI workflow emits three merge-critical GitHub Actions check contexts: `backend`, `frontend` and `containers`.
+The `Protect main` repository ruleset is **Active** and targets the default branch. It has no bypass actors, blocks branch deletion and force/non-fast-forward pushes, requires pull requests, requires review-thread resolution, and uses strict required-status-check semantics.
 
-`docs/development/repository-governance.md` defines the required `main` ruleset. At the time of this status update the repository rulesets endpoint returned no configured rulesets, so **technical protection is not yet claimed**. Activating the documented ruleset is an owner-admin action because the connected integration does not expose the required administration mutation.
+The three merge-critical GitHub Actions checks are:
 
-Until that setting is activated, direct feature pushes to `main` are prohibited by project workflow but are not technically blocked by GitHub.
+- `backend`
+- `frontend`
+- `containers`
+
+All three are bound to the GitHub Actions integration. Future substantive development is therefore technically constrained to the documented issue-linked branch/PR workflow rather than relying only on convention.
 
 ## Known external constraints
 
 - No mandatory external credential blocker is currently known for deterministic repository verification.
 - Current live/reference provider availability remains external to deterministic CI and is checked by separate smoke workflows.
 - OSM-backed routing remains source-dependent and must degrade explicitly when acquisition is unavailable.
-- GitHub repository-administration mutation for branch protection/rulesets is not available through the current connected integration; the exact manual setting is documented.
 
 ## Known internal gaps
 
@@ -58,6 +61,7 @@ Until that setting is activated, direct feature pushes to `main` are prohibited 
 - Map-layer readiness has an explicit browser-test signal and project-owned layers can fall back to a local background style when the external basemap style is unavailable.
 - The bounded reference-map API reports per-layer totals, viewport matches, returned counts and truncation instead of silently implying completeness.
 - Stale repository history is audited behavior-by-behavior before closure; required behavior is ported onto current `main` through new tests rather than merging obsolete integration history.
+- `main` is protected by an active ruleset requiring PRs and all three project CI jobs.
 
 ## Verification commands enforced by CI
 
@@ -82,10 +86,10 @@ Passing only a subset is not treated as proof that a PR is merge-ready.
 
 ## Next concrete tasks
 
-1. Repository owner activates the documented `Protect main` ruleset with required checks `backend`, `frontend` and `containers`.
-2. Establish `docs/verification.md` as an evidence-based matrix for remaining platform completion gates.
-3. Continue dependency/registry-driven orchestration work in independently scoped issues/PRs.
-4. Continue final performance, accessibility, security and live-provider acceptance work without overstating project completion.
+1. Establish `docs/verification.md` as an evidence-based matrix for remaining platform completion gates.
+2. Continue dependency/registry-driven orchestration work in independently scoped issues/PRs.
+3. Continue final performance, accessibility, security and live-provider acceptance work without overstating project completion.
+4. Reassess the project-wide v1.0 completion gate only after the evidence matrix has no unqualified critical gaps.
 
 ## Important migration notes
 
