@@ -104,6 +104,14 @@ test("keyboard-only analytical controls expose visible focus and a non-map routi
   await baseline.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByLabel("Keyboard disrupted route segment")).toBeVisible();
+  await expect(keyboardRouting.getByText("Travel time: 100 s", { exact: true })).toBeVisible();
+
+  const disruption = page.getByRole("button", { name: "Simulate keyboard-selected disruption" });
+  await disruption.focus();
+  await page.keyboard.press("Enter");
+  await expect(keyboardRouting.getByText("Baseline: 100 s", { exact: true })).toBeVisible();
+  await expect(keyboardRouting.getByText("Scenario: 160 s", { exact: true })).toBeVisible();
+  await expect(keyboardRouting.getByText("Change: 60 s (60.0%)", { exact: true })).toBeVisible();
 
   await expectNoCriticalOrSeriousViolations(page, "keyboard routing result");
 });
