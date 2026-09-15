@@ -86,12 +86,18 @@ export type EnergyResponse = {
   forecasts: Array<Record<string, unknown>>;
 };
 
+export type SnapshotReloadDiagnostic = {
+  status: "current" | "missing" | "invalid";
+  last_error: string | null;
+};
+
 export type SystemResponse = {
   name: string;
   version: string;
   contract_version: string;
   runtime_generated_at: string | null;
   reference_generated_at: string | null;
+  snapshot_reload: Record<string, SnapshotReloadDiagnostic>;
   synthetic_production_fallback: boolean;
 };
 
@@ -256,7 +262,6 @@ export function toFeatureCollection(
   return { type: "FeatureCollection", features };
 }
 
-
 export function mapLayerCounts(counts: {
   facilities: number;
   stops: number;
@@ -268,4 +273,10 @@ export function mapLayerCounts(counts: {
     ["Official climate features", counts.climate],
   ];
   return layers.filter(([, count]) => count > 0);
+}
+
+export function systemSnapshotToken(system: SystemResponse): string {
+  return [system.runtime_generated_at ?? "missing", system.reference_generated_at ?? "missing"].join(
+    "|",
+  );
 }
