@@ -4,7 +4,7 @@ Testing separates deterministic repository correctness from live external-provid
 
 ## Deterministic backend tests
 
-Backend tests use pytest and synthetic fixtures that are never read by production runtime paths. Current test areas include canonical contracts, API behavior, integrated assessment, data/source pipelines, energy evaluation, knowledge projection, reference acquisition, resilience calculations, scenarios and source-registry behavior.
+Backend tests use pytest and synthetic fixtures that are never read by production runtime paths. Current test areas include canonical contracts, API behavior, integrated assessment, data/source pipelines, energy evaluation, knowledge projection, reference acquisition, resilience calculations, scenarios, source-registry behavior and bounded reference-map projections.
 
 The main command used by CI is:
 
@@ -26,6 +26,8 @@ npm run build
 
 The build command runs TypeScript checking (`tsc --noEmit`) before Vite production build, so type errors fail the build even when unit tests pass.
 
+Map-specific unit tests cover viewport URL construction, invalid bounding boxes, per-layer truncation metadata, mixed-feature projection into independent MapLibre sources, encoded canonical-detail paths and stale-request generation handling.
+
 ## Static and semantic verification
 
 CI additionally runs:
@@ -41,15 +43,22 @@ python scripts/check_secrets.py
 
 It also generates the FastAPI OpenAPI schema, ensuring route/model construction remains valid.
 
-## Container/system smoke test
+## Container and browser acceptance
 
-After backend and frontend jobs pass, CI validates the Compose file, builds both images, starts the composed services and verifies:
+After backend and frontend jobs pass, CI validates the Compose file, builds both images, seeds a deterministic acceptance-only reference snapshot, starts the composed services and verifies the real deployment path:
 
 - backend `/health` responds;
-- frontend root responds; and
-- frontend nginx successfully proxies `/health` to the backend.
+- frontend root responds;
+- frontend nginx successfully proxies `/health` to the backend;
+- Playwright loads the dashboard through nginx against the real FastAPI process;
+- a hypothetical heat assessment remains explicit about unavailable dimensions;
+- deterministic orchestration remains inspectable when source-backed agents are unavailable;
+- the reference map loads compact GeoJSON for the current bbox rather than fixed 1,000-item canonical lists;
+- navigation triggers another reference viewport request;
+- clicking a rendered facility fetches its complete canonical detail object and exposes provenance in the UI; and
+- map-selected routing compares the deterministic baseline with an explicit edge-closure scenario.
 
-This is the current end-to-end deployment smoke boundary. It does not populate every external dataset or execute every analytical scenario.
+The acceptance fixture is created only inside CI and is not a production fallback. Browser tests therefore validate integration behavior without claiming live provider availability or city-wide data completeness.
 
 ## Live-source smoke
 
@@ -91,9 +100,12 @@ Particular attention should remain on:
 - network parallel edges and immutable scenario overlays;
 - facility snapping distance limits;
 - persistence/restart behavior;
-- no synthetic composite score;
+- bounded map projections never being presented as complete when truncated;
+- stale viewport responses not replacing newer map state;
+- route-selection clicks remaining separate from reference-object inspection;
+- no synthetic composite score; and
 - no production dependence on synthetic fixtures.
 
 ## Current testing gaps
 
-The repository does not currently claim systematic load/performance testing, browser-level end-to-end UI automation, fault-injection against every provider, long-running soak testing, multi-process consistency testing or security penetration testing. These should be added before making production-scale reliability claims.
+The repository does not currently claim systematic load/performance testing, fault-injection against every provider, long-running soak testing, multi-process consistency testing, broad accessibility testing or security penetration testing. Browser acceptance covers the principal dashboard integration paths but is not a claim of exhaustive UI coverage.
