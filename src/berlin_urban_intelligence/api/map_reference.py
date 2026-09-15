@@ -55,6 +55,12 @@ def parse_layers(value: str) -> tuple[MapLayer, ...]:
     return cast(tuple[MapLayer, ...], deduplicated)
 
 
+def parse_layer(value: str) -> MapLayer:
+    if value not in MAP_LAYERS:
+        raise ValueError(f"unknown map layer: {value}")
+    return cast(MapLayer, value)
+
+
 def _coordinate_pairs(value: Any) -> Iterable[tuple[float, float]]:
     if isinstance(value, (list, tuple)):
         if (
@@ -149,6 +155,13 @@ def _layer_items(state: ReferenceState | None, layer: MapLayer) -> Sequence[MapI
     if layer == "stops":
         return state.transport_stops
     return state.official_model_features
+
+
+def reference_item(state: ReferenceState | None, *, layer: MapLayer, resource_id: str) -> MapItem | None:
+    for item in _layer_items(state, layer):
+        if item.id == resource_id:
+            return item
+    return None
 
 
 def reference_feature_collection(
