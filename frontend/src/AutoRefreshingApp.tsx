@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import AccessibleRoutingPanel from "./AccessibleRoutingPanel";
 import App from "./App";
 import { fetchJson, systemSnapshotToken, type SystemResponse } from "./api";
 import DerivedInspector from "./DerivedInspector";
@@ -46,6 +47,7 @@ export default function AutoRefreshingApp() {
   return (
     <>
       <App key={`dashboard-${revision}`} />
+      <AccessibleRoutingPanel key={`accessible-routing-${revision}`} />
       <DerivedInspector key={`derived-${revision}`} />
       <PlatformInspector key={`platform-${revision}`} />
     </>
