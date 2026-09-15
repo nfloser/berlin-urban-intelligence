@@ -86,6 +86,47 @@ describe("viewport reference map semantics", () => {
     ]);
   });
 
+  it("models metadata from a request that selected only one layer", () => {
+    const response: ReferenceMapResponse = {
+      type: "FeatureCollection",
+      features: [],
+      metadata: {
+        bounds: { west: 13.3, south: 52.4, east: 13.6, north: 52.7 },
+        totals: { stops: 42133 },
+        matched: { stops: 2 },
+        returned: { stops: 2 },
+        truncated: { stops: false },
+      },
+    };
+
+    expect(referenceLayerSummaries(response.metadata)).toEqual([
+      {
+        key: "facilities",
+        label: "Critical facilities",
+        returned: 0,
+        matched: 0,
+        total: 0,
+        truncated: false,
+      },
+      {
+        key: "stops",
+        label: "VBB stops",
+        returned: 2,
+        matched: 2,
+        total: 42133,
+        truncated: false,
+      },
+      {
+        key: "climate",
+        label: "Official climate features",
+        returned: 0,
+        matched: 0,
+        total: 0,
+        truncated: false,
+      },
+    ]);
+  });
+
   it("projects a mixed viewport response into one map source per layer", () => {
     const facilities = featureCollectionForLayer(fixtureResponse(), "facilities");
     const stops = featureCollectionForLayer(fixtureResponse(), "stops");
