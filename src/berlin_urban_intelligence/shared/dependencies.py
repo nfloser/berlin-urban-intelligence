@@ -41,6 +41,35 @@ class DependencyGraph:
             raise KeyError(f"unknown derived product: {product_id}")
         return tuple(self._graph.predecessors(product_id))
 
+    def direct_downstream(self, input_id: str) -> tuple[str, ...]:
+        if input_id not in self._graph:
+            return ()
+        return tuple(
+            node for node in self._graph.successors(input_id) if node in self._statuses
+        )
+
+    def upstream(self, product_id: str) -> tuple[str, ...]:
+        """Return lineage depth-first so every dependency appears before its consumer."""
+
+        if product_id not in self._statuses:
+            raise KeyError(f"unknown derived product: {product_id}")
+        ordered: list[str] = []
+        seen: set[str] = set()
+
+        def visit(node_id: str) -> None:
+            for dependency in self._graph.predecessors(node_id):
+                if dependency in seen:
+                    continue
+                visit(dependency)
+                seen.add(dependency)
+                ordered.append(dependency)
+
+        visit(product_id)
+        return tuple(ordered)
+
+    def downstream(self, input_id: str) -> tuple[str, ...]:
+        return self.affected_order((input_id,))
+
     def affected_order(self, upstream_ids: Iterable[str]) -> tuple[str, ...]:
         affected: set[str] = set()
         for upstream_id in upstream_ids:
