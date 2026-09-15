@@ -7,6 +7,8 @@ source values and timestamps separate so the result remains descriptive rather t
 
 from __future__ import annotations
 
+from pydantic import HttpUrl
+
 from berlin_urban_intelligence.knowledge.derivations import (
     DerivationDefinition,
     DerivationInput,
@@ -22,7 +24,7 @@ from berlin_urban_intelligence.shared.contracts import (
     QualityFlag,
 )
 
-_PROJECT_URL = "https://github.com/nfloser/berlin-urban-intelligence"
+_PROJECT_URL = HttpUrl("https://github.com/nfloser/berlin-urban-intelligence")
 
 
 class DerivedProductBuilder:
