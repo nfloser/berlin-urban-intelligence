@@ -81,6 +81,33 @@ test("reference map loads the viewport, reloads after navigation and inspects ca
   await expect(page.getByText("deterministic CI acceptance fixture", { exact: true })).toBeVisible();
 });
 
+test("a failed current viewport request clears the previous rendering projection", async ({ page }) => {
+  let viewportRequests = 0;
+  await page.route(/\/api\/v1\/map\/reference\?/, async (route) => {
+    viewportRequests += 1;
+    if (viewportRequests === 1) {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "viewport fixture failure" }),
+    });
+  });
+
+  await page.goto("/");
+  const map = page.getByLabel("Berlin domain map");
+  await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
+  await expect(page.getByText(/Critical facilities · 1 visible/)).toBeVisible();
+
+  await page.locator(".maplibregl-ctrl-zoom-in").click();
+
+  await expect(page.getByText(/Reference map data unavailable:/)).toBeVisible();
+  await expect(map).toHaveAttribute("data-reference-layers-ready", "false");
+  await expect(page.getByText(/Critical facilities · 1 visible/)).toHaveCount(0);
+});
+
 test("map-selected routing compares a baseline with an explicit closed-edge scenario", async ({
   page,
 }) => {
