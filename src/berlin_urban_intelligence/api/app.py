@@ -29,7 +29,9 @@ from berlin_urban_intelligence.agents.mobility import MobilityAgent
 from berlin_urban_intelligence.agents.resilience import ResilienceAgent, nearest_network_node
 from berlin_urban_intelligence.api.derived import router as derived_router
 from berlin_urban_intelligence.energy.state import EnergyState, EnergyStateStore
+from berlin_urban_intelligence.knowledge.derived_graph import project_derived_state
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
+from berlin_urban_intelligence.knowledge.relations import SemanticRelations, resource_relations
 from berlin_urban_intelligence.orchestrator.assessment import (
     AssessmentRequest,
     IntegratedAssessmentService,
@@ -109,7 +111,10 @@ def _build_agents(
 
 
 def _graph(
-    runtime: RuntimeState | None, reference: ReferenceState | None, energy: EnergyAgent
+    runtime: RuntimeState | None,
+    reference: ReferenceState | None,
+    energy: EnergyAgent,
+    derived: DerivedState | None,
 ) -> KnowledgeGraph:
     graph = KnowledgeGraph()
     if runtime:
@@ -128,6 +133,8 @@ def _graph(
             graph.add_network_edge(edge)
     for forecast in energy.forecasts():
         graph.add_forecast(forecast)
+    if derived:
+        project_derived_state(graph, derived)
     return graph
 
 
@@ -543,6 +550,26 @@ def create_app() -> FastAPI:
         )
         return service.assess(payload).model_dump(mode="json")
 
+    @app.get("/api/v1/knowledge/relations/{resource_id:path}")
+    def knowledge_relations(
+        request: Request,
+        resource_id: str,
+        limit: int = Query(default=100, ge=1, le=500),
+    ) -> SemanticRelations:
+        agents = request.app.state.agents
+        semantic_graph = _graph(
+            request.app.state.runtime,
+            request.app.state.reference,
+            agents["energy"],
+            request.app.state.derived,
+        )
+        result = resource_relations(semantic_graph, resource_id, limit=limit)
+        if result is None:
+            raise HTTPException(
+                status_code=404, detail=f"semantic resource not found: {resource_id}"
+            )
+        return result
+
     @app.get("/api/v1/graph", response_class=PlainTextResponse)
     def graph(request: Request) -> str:
         agents = request.app.state.agents
@@ -550,6 +577,7 @@ def create_app() -> FastAPI:
             request.app.state.runtime,
             request.app.state.reference,
             agents["energy"],
+            request.app.state.derived,
         ).serialize()
 
     return app
