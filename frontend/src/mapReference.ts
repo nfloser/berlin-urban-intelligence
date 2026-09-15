@@ -37,11 +37,19 @@ export type ReferenceHitTestPoint = {
 
 export type ReferenceHitTestBox = [[number, number], [number, number]];
 
+export type ReferencePointHit = {
+  layer: "facilities" | "stops";
+  id: string;
+};
+
+export type ReferencePointProjector = (coordinates: [number, number]) => ReferenceHitTestPoint;
+
 const LAYER_LABELS: Record<ReferenceMapLayer, string> = {
   facilities: "Critical facilities",
   stops: "VBB stops",
   climate: "Official climate features",
 };
+const POINT_LAYER_PRIORITY: Array<ReferencePointHit["layer"]> = ["facilities", "stops"];
 
 export class ReferenceMapRequestTracker {
   private generation = 0;
@@ -114,6 +122,36 @@ export function referenceHitTestBox(
     [point.x - radius, point.y - radius],
     [point.x + radius, point.y + radius],
   ];
+}
+
+export function referencePointHit(
+  response: ReferenceMapResponse,
+  point: ReferenceHitTestPoint,
+  project: ReferencePointProjector,
+  radius = 8,
+): ReferencePointHit | null {
+  if (!Number.isFinite(radius) || radius <= 0) {
+    throw new Error("reference point-hit radius must be positive");
+  }
+
+  for (const layer of POINT_LAYER_PRIORITY) {
+    for (const feature of response.features) {
+      if (feature.properties?.layer !== layer || feature.geometry?.type !== "Point") continue;
+      const [longitude, latitude] = feature.geometry.coordinates;
+      if (typeof longitude !== "number" || typeof latitude !== "number") continue;
+      const projected = project([longitude, latitude]);
+      if (
+        Math.abs(projected.x - point.x) > radius ||
+        Math.abs(projected.y - point.y) > radius
+      ) {
+        continue;
+      }
+      const rawId = feature.properties?.id ?? feature.id;
+      if (rawId === null || rawId === undefined) continue;
+      return { layer, id: String(rawId) };
+    }
+  }
+  return null;
 }
 
 export function referenceLayerSummaries(metadata: ReferenceMapMetadata): ReferenceLayerSummary[] {
