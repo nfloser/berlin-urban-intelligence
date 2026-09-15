@@ -129,12 +129,15 @@ export function referencePointHit(
   point: ReferenceHitTestPoint,
   project: ReferencePointProjector,
   radius = 8,
+  eligibleLayers: readonly ReferencePointHit["layer"][] = POINT_LAYER_PRIORITY,
 ): ReferencePointHit | null {
   if (!Number.isFinite(radius) || radius <= 0) {
     throw new Error("reference point-hit radius must be positive");
   }
 
+  const eligible = new Set(eligibleLayers);
   for (const layer of POINT_LAYER_PRIORITY) {
+    if (!eligible.has(layer)) continue;
     for (const feature of response.features) {
       if (feature.properties?.layer !== layer || feature.geometry?.type !== "Point") continue;
       const [longitude, latitude] = feature.geometry.coordinates;
