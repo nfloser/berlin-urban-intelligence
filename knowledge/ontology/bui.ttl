@@ -9,6 +9,8 @@
 bui:UrbanEntity a rdfs:Class ; rdfs:label "Urban entity" .
 bui:Observation a rdfs:Class ; rdfs:subClassOf sosa:Observation ; rdfs:label "Observation" .
 bui:DerivedValue a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Derived value" .
+bui:DerivedInformation a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Derived information" .
+bui:DerivationDefinition a rdfs:Class ; rdfs:label "Derivation definition" .
 bui:Forecast a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Forecast" .
 bui:ScenarioValue a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Scenario value" .
 bui:OfficialModelFeature a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Official model feature" .
@@ -23,6 +25,8 @@ bui:Disruption a rdfs:Class ; rdfs:subClassOf prov:Entity ; rdfs:label "Disrupti
 
 bui:dataState a rdf:Property ; rdfs:label "data state" ; rdfs:range xsd:string .
 bui:qualityFlag a rdf:Property ; rdfs:label "quality flag" ; rdfs:range xsd:string .
+bui:freshnessStatus a rdf:Property ; rdfs:label "freshness status" ; rdfs:range xsd:string .
+bui:derivationStatus a rdf:Property ; rdfs:label "derivation status" ; rdfs:range xsd:string .
 bui:unit a rdf:Property ; rdfs:label "unit symbol/code" ; rdfs:range xsd:string .
 bui:agentVersion a rdf:Property ; rdfs:label "agent version" ; rdfs:range xsd:string .
 bui:contractVersion a rdf:Property ; rdfs:label "contract version" ; rdfs:range xsd:string .
@@ -30,10 +34,23 @@ bui:locatedIn a rdf:Property ; rdfs:domain bui:UrbanEntity ; rdfs:range bui:Dist
 bui:serves a rdf:Property ; rdfs:domain bui:TransportStop ; rdfs:range bui:District .
 bui:affects a rdf:Property ; rdfs:domain bui:Disruption .
 bui:baseline a rdf:Property ; rdfs:domain bui:ScenarioValue ; rdfs:range prov:Entity .
+bui:derivationDefinition a rdf:Property ; rdfs:domain bui:DerivedInformation ; rdfs:range bui:DerivationDefinition .
+bui:derivationInput a rdf:Property ; rdfs:domain bui:DerivedInformation ; rdfs:range xsd:string .
+bui:derivationContext a rdf:Property ; rdfs:domain bui:DerivedInformation ; rdfs:range xsd:string .
+bui:producerAgent a rdf:Property ; rdfs:domain bui:DerivationDefinition ; rdfs:range xsd:string .
+bui:producerVersion a rdf:Property ; rdfs:domain bui:DerivationDefinition ; rdfs:range xsd:string .
+bui:algorithmVersion a rdf:Property ; rdfs:domain bui:DerivationDefinition ; rdfs:range xsd:string .
+bui:outputKind a rdf:Property ; rdfs:domain bui:DerivationDefinition ; rdfs:range xsd:string .
 
 bui:entity a rdf:Property .
 bui:phenomenon a rdf:Property .
 bui:value a rdf:Property .
+bui:valueJSON a rdf:Property ; rdfs:range xsd:string .
+bui:name a rdf:Property ; rdfs:range xsd:string .
+bui:description a rdf:Property ; rdfs:range xsd:string .
+bui:validAt a rdf:Property ; rdfs:range xsd:dateTime .
+bui:computedAt a rdf:Property ; rdfs:range xsd:dateTime .
+bui:scenarioId a rdf:Property ; rdfs:range xsd:string .
 bui:modelName a rdf:Property ; rdfs:range xsd:string .
 bui:featureType a rdf:Property ; rdfs:range xsd:string .
 bui:propertiesJSON a rdf:Property ; rdfs:range xsd:string .
