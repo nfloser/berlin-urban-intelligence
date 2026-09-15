@@ -11,7 +11,15 @@ ROOT = Path(__file__).resolve().parents[1]
 def main() -> int:
     ontology = Graph().parse(ROOT / "knowledge/ontology/bui.ttl", format="turtle")
     Graph().parse(ROOT / "knowledge/ontology/shapes.ttl", format="turtle")
-    required = (BUI.UrbanEntity, BUI.Observation, BUI.DerivedValue, BUI.Forecast, BUI.ScenarioValue)
+    required = (
+        BUI.UrbanEntity,
+        BUI.Observation,
+        BUI.DerivedValue,
+        BUI.DerivedInformation,
+        BUI.DerivationDefinition,
+        BUI.Forecast,
+        BUI.ScenarioValue,
+    )
     missing = [term for term in required if (term, RDF.type, RDFS.Class) not in ontology]
     if missing:
         raise SystemExit(f"missing ontology classes: {', '.join(map(str, missing))}")
