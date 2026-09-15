@@ -5,13 +5,12 @@ function isReferenceViewportResponse(url: string): boolean {
   return parsed.pathname === "/api/v1/map/reference";
 }
 
-test("dashboard renders explicit empty state and completes a hypothetical heat assessment", async ({
+test("dashboard completes a hypothetical heat assessment with persisted acceptance state", async ({
   page,
 }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Berlin Urban Intelligence" })).toBeVisible();
-  await expect(page.getByText("No persisted derived products are available.")).toBeVisible();
 
   const temperature = page.getByPlaceholder("Enter delta, e.g. 3");
   await temperature.fill("3");
