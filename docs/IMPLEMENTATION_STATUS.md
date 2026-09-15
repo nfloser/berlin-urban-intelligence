@@ -6,10 +6,13 @@ Phase 15 — evidence-driven v1.0 completion audit and independently scoped foll
 
 ## Current development work
 
-Issue #13 / PR #26 completes the real-agent metadata and composition boundary identified by the v1.0 verification audit. All six real agents are explicitly named and assigned domains, Live State declares its five domain-agent dependencies, capability ambiguity is resolved centrally by `AgentRegistry`, and `LiveStateAgent` now aggregates typed `AgentHealth` values supplied by the API composition boundary instead of owning or invoking other agents.
+Issue #14 / PR #27 implements the real-road verification and degradation infrastructure identified by the v1.0 audit. The repository now has a dedicated road-network smoke path, strict canonical OSM readiness validation, explicit opt-in speed/travel-time imputation, baseline-route verification through the existing resilience router, provider/schema failure handling with last-known-good retention, and explicit per-fetch Overpass endpoint selection without silent failover.
+
+Repository-side work is green, but #14 remains **EXTERNAL/BLOCKED** because the two captured point-in-time public Overpass attempts on 2026-09-15 both timed out before a real Berlin network could be produced: run `34979600413` hit a 180-second `ConnectTimeout` at `overpass-api.de`; run `34980820676` hit a 180-second `ReadTimeout` at `https://overpass.private.coffee/api`. Both failure artifacts recorded `synthetic_fallback=false`. A real non-empty network plus baseline route is still required before #14 can close.
 
 ## Recently completed work
 
+- Issue #13 / PR #26 completed the real-agent metadata/composition boundary. All six real agents expose explicit name/domain/capability/input/output metadata; `AgentRegistry` owns capability resolution; Live State aggregates typed `AgentHealth` values supplied by the API composition boundary rather than invoking domain agents. Full protected CI passed before merge.
 - Issue #12 / PR #23 closed semantic API parity: public graph serialization now includes persisted derived lineage and the API exposes bounded typed incoming/outgoing semantic relationship inspection. Full protected CI passed before merge.
 - Issue #11 / PR #22 established `docs/verification.md` as the repository-wide completion evidence matrix, corrected orchestration/snapshot documentation drift and converted remaining gaps into independently scoped issues. Full protected CI passed before merge.
 - Issue #2 / PR #8 replaced fixed 1,000-item map slices with bounded viewport-backed reference projection and canonical detail inspection. Final backend, frontend and Docker/Compose/Playwright CI passed before merge.
@@ -24,7 +27,7 @@ Issue #13 / PR #26 completes the real-agent metadata and composition boundary id
 - Invalid replacement snapshots retain the previous validated in-process value and expose reload diagnostics instead of replacing good state.
 - Agent/orchestrator state is rebuilt after validated snapshot changes.
 - All six real `AgentDescriptor` instances expose explicit names/domains plus capabilities and typed input/output contracts; domain agents retain explicit source dependencies where applicable.
-- `AgentRegistry` validates required/optional agent dependencies, topological ordering and missing/cyclic dependencies, and now owns unique capability resolution/ambiguity errors used by the orchestrator.
+- `AgentRegistry` validates required/optional agent dependencies, topological ordering and missing/cyclic dependencies, and owns unique capability resolution/ambiguity errors used by the orchestrator.
 - Live State declares required dependencies on Mobility, Exposure, Heat, Energy and Resilience but does not own or invoke those agents. The API composition layer collects typed domain `AgentHealth` values and supplies them to `LiveStateAgent` for aggregation.
 - Derived information retains explicit definitions, upstream lineage, freshness/quality and dependency status and supports dependency-aware incremental recomputation.
 - The API RDF projection includes persisted derivation definitions/records and PROV upstream lineage in addition to runtime observations, reference objects and validated energy forecasts.
@@ -34,6 +37,7 @@ Issue #13 / PR #26 completes the real-agent metadata and composition boundary id
 - Reference-map rendering uses `/api/v1/map/reference` as a compact rendering projection and `/api/v1/map/reference/{layer}/{resource_id}` for full canonical detail inspection.
 - Browser acceptance is part of the normal PR CI path through the composed nginx → FastAPI → persisted-state → React/MapLibre stack.
 - Canonical numerical contracts reject `NaN` and infinities; heat/energy scenario kinds require their explicit deltas; integrated assessment rejects stale/future/invalid heat baselines and energy forecasts outside their validity interval.
+- Optional real road-network acquisition can be verified separately from deterministic CI. Its readiness contract requires non-empty OSM nodes/edges, valid coordinates/endpoints, positive routing attributes, ODbL/source provenance, provenance-visible imputation where enabled, and a real baseline route. Provider failure never becomes a synthetic success.
 
 ## Repository governance state
 
@@ -49,9 +53,9 @@ All three are bound to the GitHub Actions integration.
 
 ## Current v1.0 evidence gaps
 
-The authoritative detail is in [`verification.md`](verification.md). After the agent metadata/boundary work in #13, the remaining concrete follow-up issues are:
+The authoritative detail is in [`verification.md`](verification.md). The remaining concrete follow-up issues are:
 
-1. #14 — verify real Berlin road-network acquisition and resilience readiness.
+1. #14 — **EXTERNAL/BLOCKED**: repository verification/degradation infrastructure is implemented, but a successful real Berlin OSM network plus baseline route is still missing because both captured public Overpass attempts timed out.
 2. #15 — complete populated dashboard inspector browser acceptance.
 3. #16 — add accessibility and keyboard verification.
 4. #17 — establish performance/load evidence.
@@ -63,7 +67,7 @@ The authoritative detail is in [`verification.md`](verification.md). After the a
 ## Known external constraints
 
 - Current provider availability remains external to deterministic CI and is checked through separate smoke/evaluation workflows.
-- OSM-backed routing remains source-dependent and must degrade explicitly when acquisition is unavailable; deterministic routing fixtures are not proof of current Berlin road-network acquisition.
+- OSM-backed routing remains source-dependent and must degrade explicitly when acquisition is unavailable; deterministic routing fixtures are not proof of current Berlin road-network acquisition. The current #14 blocker is backed by two explicit public Overpass timeout artifacts rather than inferred from fixture behavior.
 - Real Berlin energy evidence depends on an accessible, semantically appropriate Stromnetz Berlin publication; external unavailability must remain explicit rather than being replaced with synthetic data.
 
 ## Completed reliability milestones
@@ -76,9 +80,10 @@ The authoritative detail is in [`verification.md`](verification.md). After the a
 - The bounded reference-map API reports per-layer totals, viewport matches, returned counts and truncation instead of silently implying completeness.
 - Stale repository history is audited behavior-by-behavior before closure; required behavior is ported onto current `main` through new tests rather than merging obsolete integration history.
 - `main` is protected by an active ruleset requiring PRs and all three project CI jobs.
-- The repository maintains an explicit PASS/PARTIAL/NOT VERIFIED completion matrix rather than treating implementation presence as proof of v1.0 readiness.
+- The repository maintains an explicit PASS/PARTIAL/EXTERNAL-BLOCKED/NOT VERIFIED completion matrix rather than treating implementation presence as proof of v1.0 readiness.
 - Public semantic graph serialization and typed semantic relation inspection use the same validated snapshot projection, including derived lineage.
 - Real-agent dependency/capability metadata is executable registry data rather than documentation-only metadata; Live State aggregation no longer creates an agent-to-agent call path.
+- Real OSM road verification is now reproducible as a separate smoke workflow with explicit failure evidence, endpoint selection, opt-in imputation and no synthetic production fallback.
 
 ## Verification commands enforced by CI
 
@@ -103,10 +108,10 @@ Passing only a subset is not treated as proof that a PR is merge-ready.
 
 ## Next concrete tasks
 
-1. Finish issue #13 through final protected CI/review and merge.
-2. Address #14 next: prove real Berlin OSM road-network acquisition and resilience readiness without turning provider failure into synthetic success.
+1. Merge the tested #14 verification/degradation infrastructure without closing #14; retain its real-provider gate as EXTERNAL/BLOCKED until a later successful road smoke.
+2. Address #15 next: populate deterministic acceptance state for derived/source/agent/reload inspectors and prove those dashboard paths in the real composed browser stack.
 3. Verify the real Berlin energy gate #20 independently of deterministic model tests.
-4. Close dashboard/operational quality gaps #15–#19 in independent PRs.
+4. Close dashboard/operational quality gaps #16–#19 in independent PRs.
 5. Complete #21 only after its dependent source/semantic evidence is sufficient.
 6. Reassess the project-wide v1.0 completion gate only when `docs/verification.md` contains no unqualified critical gap.
 

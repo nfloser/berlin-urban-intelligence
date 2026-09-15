@@ -105,11 +105,22 @@ class OsmnxRoadNetworkClient:
 
     OSM edges commonly lack a complete speed field. Speed/travel-time imputation is therefore an
     explicit opt-in, never a silent fallback. When enabled, the provenance records that OSMnx
-    derived/imputed speeds before travel-time calculation.
+    derived/imputed speeds before travel-time calculation. An alternate Overpass delivery endpoint
+    may also be configured explicitly; the OSM data source/licence remain unchanged.
     """
 
-    def __init__(self, *, osmnx_module: Any | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        osmnx_module: Any | None = None,
+        overpass_url: str | None = None,
+    ) -> None:
+        if overpass_url is not None:
+            overpass_url = overpass_url.strip().rstrip("/")
+            if not overpass_url.startswith(("https://", "http://")):
+                raise ValueError("overpass_url must be an absolute HTTP(S) base API URL")
         self._osmnx = osmnx_module
+        self._overpass_url = overpass_url
 
     def _module(self) -> Any:
         if self._osmnx is not None:
@@ -131,6 +142,20 @@ class OsmnxRoadNetworkClient:
             raise RuntimeError(f"installed OSMnx version does not expose {name}")
         return function
 
+    def _graph_from_place(self, ox: Any, place: str, network_type: str) -> Any:
+        if self._overpass_url is None:
+            return ox.graph_from_place(place, network_type=network_type, simplify=True)
+
+        settings = getattr(ox, "settings", None)
+        if settings is None or not hasattr(settings, "overpass_url"):
+            raise RuntimeError("installed OSMnx version does not expose settings.overpass_url")
+        previous_url = settings.overpass_url
+        settings.overpass_url = self._overpass_url
+        try:
+            return ox.graph_from_place(place, network_type=network_type, simplify=True)
+        finally:
+            settings.overpass_url = previous_url
+
     def fetch(
         self,
         place: str,
@@ -144,14 +169,16 @@ class OsmnxRoadNetworkClient:
         if network_type not in {"drive", "drive_service", "walk", "bike", "all", "all_public"}:
             raise ValueError("unsupported OSMnx network_type")
         ox = self._module()
-        graph = ox.graph_from_place(place, network_type=network_type, simplify=True)
-        note = None
+        graph = self._graph_from_place(ox, place, network_type)
+        notes: list[str] = []
+        if self._overpass_url is not None:
+            notes.append(f"Overpass delivery endpoint {self._overpass_url} explicitly configured")
         if allow_speed_imputation:
             add_speeds = self._routing_function(ox, "add_edge_speeds")
             add_times = self._routing_function(ox, "add_edge_travel_times")
             graph = add_speeds(graph)
             graph = add_times(graph)
-            note = (
+            notes.append(
                 "OSMnx add_edge_speeds/add_edge_travel_times explicitly enabled; missing speed "
                 "values may be imputed by OSMnx and travel time is therefore derived"
             )
@@ -160,5 +187,5 @@ class OsmnxRoadNetworkClient:
             graph,
             retrieved_at=retrieved,
             source_query=place,
-            processing_note=note,
+            processing_note="; ".join(notes) or None,
         )

@@ -37,6 +37,10 @@ The reference acquisition workflow ingests the official Climate Analysis WFS plu
 
 OSM network acquisition is optional because it is heavier than the default WFS/GTFS reference refresh. It is qualified as non-authoritative. Missing speed/travel-time information is not silently invented; OSMnx speed imputation requires explicit opt-in and is recorded in provenance.
 
+The delivery endpoint used by OSMnx can be selected explicitly for one acquisition through `OsmnxRoadNetworkClient.fetch(..., overpass_url=...)`, `scripts/refresh_reference.py --overpass-url ...`, or the dedicated road-network smoke. The previous OSMnx setting is restored after the fetch. This is explicit configuration, not silent provider failover, and the selected delivery endpoint is recorded in smoke/provenance evidence.
+
+The canonical source remains OpenStreetMap regardless of which public Overpass delivery endpoint serves the query. A successful delivery request does not turn community-maintained OSM topology into authoritative municipal road data.
+
 ### Energy
 
 The Stromnetz Berlin workflow requires explicit upstream timestamp/value column names and units. The published high-voltage/network-level load curve must not be relabelled as total Berlin electricity demand. Forecasts are only persisted after chronological evaluation and dataset-fingerprint binding.
@@ -46,5 +50,7 @@ The UCI household electricity dataset remains a research/methodology reference: 
 ## Live verification
 
 A point-in-time live smoke run on **2026-09-14** successfully verified the current adapters against Berlin air quality, DWD and VBB GTFS-Realtime. All three sources were available and fresh enough for their configured thresholds in that run, producing 70 canonical observations. Provider availability may change later, so this result is evidence of compatibility at that timestamp rather than a permanent availability guarantee.
+
+Real road-network verification is tracked separately because it is heavier and depends on Overpass availability. On **2026-09-15**, GitHub Actions run `34979600413` attempted `Mitte, Berlin, Germany` through `overpass-api.de` and failed with a 180-second `ConnectTimeout`; run `34980820676` retried the same real Berlin scope through explicit `https://overpass.private.coffee/api` and failed with a 180-second `ReadTimeout`. Both runs wrote failure evidence with `synthetic_fallback=false`. No real network or route success is claimed from these attempts. See `docs/road-network-verification.md`.
 
 The platform does not redistribute external datasets under a new licence. Generated state retains provider/source identifiers and licence metadata.

@@ -54,7 +54,11 @@ On **2026-09-14**, a real live smoke run passed against the three current live s
 - VBB GTFS-Realtime: `available`, freshness `valid`;
 - 70 canonical observations produced.
 
-The manual reference smoke verifies official facilities, climate features and VBB static stops, but it does not enable optional OSM road acquisition. Real Berlin road-network verification is tracked in issue #14.
+The manual reference smoke verifies official facilities, climate features and VBB static stops, but it does not enable optional OSM road acquisition.
+
+Real road-network verification is handled by `.github/workflows/road-network-smoke.yml`. It installs the optional `osm` dependency, requires real non-empty OSM nodes/edges with routing attributes and provenance, and verifies a baseline route through the existing resilience router. Speed/travel-time imputation remains opt-in and provenance-visible; no synthetic production road network is permitted.
+
+On **2026-09-15**, two real Berlin road-network attempts remained externally blocked: run `34979600413` timed out connecting to `overpass-api.de`, and run `34980820676` timed out reading from explicit `https://overpass.private.coffee/api`, both after 180 seconds. Both failure artifacts recorded `synthetic_fallback=false`. Issue #14 therefore remains open until a later live run proves a real Berlin network and baseline route. See [road-network-verification.md](road-network-verification.md).
 
 ## High-risk coverage
 
@@ -72,6 +76,7 @@ Tests prioritize:
 - dependency cycles/stale propagation and incremental derivation execution;
 - parallel network edges and immutable scenario overlays;
 - facility-to-network snapping bounds;
+- OSM provider/schema failure semantics and explicit imputation provenance;
 - provenance and RDF projection;
 - API degradation without state files;
 - integrated assessment without a synthetic composite score;
@@ -80,4 +85,4 @@ Tests prioritize:
 
 ## Known verification gaps
 
-Systematic performance/load/soak evidence, broad accessibility verification, the security baseline, full operational observability, real OSM road-network evidence, current real Berlin energy evaluation and several cross-domain/browser-inspector gates remain open. The authoritative status and issue links are maintained in [verification.md](verification.md).
+Systematic performance/load/soak evidence, broad accessibility verification, the security baseline, full operational observability, a successful real OSM Berlin road-network smoke, current real Berlin energy evaluation and several cross-domain/browser-inspector gates remain open. The authoritative status and issue links are maintained in [verification.md](verification.md).
