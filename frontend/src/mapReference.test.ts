@@ -4,6 +4,7 @@ import {
   buildReferenceDetailPath,
   buildReferenceMapPath,
   featureCollectionForLayer,
+  referenceHitTestBox,
   referenceLayerSummaries,
   type ReferenceMapResponse,
 } from "./mapReference";
@@ -141,6 +142,17 @@ describe("viewport reference map semantics", () => {
     expect(buildReferenceDetailPath("facilities", "facility:inside/ward a")).toBe(
       "/api/v1/map/reference/facilities/facility%3Ainside%2Fward%20a",
     );
+  });
+
+  it("expands a map click into a deterministic reference hit-test box", () => {
+    expect(referenceHitTestBox({ x: 100, y: 200 })).toEqual([
+      [92, 192],
+      [108, 208],
+    ]);
+    expect(referenceHitTestBox({ x: 100, y: 200 }, 4)).toEqual([
+      [96, 196],
+      [104, 204],
+    ]);
   });
 
   it("marks an older viewport request stale as soon as a newer request starts", () => {
