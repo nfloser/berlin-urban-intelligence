@@ -200,3 +200,32 @@ def test_reference_map_endpoint_rejects_invalid_bounds_and_layers(monkeypatch, t
     assert "west must be smaller than east" in invalid_bounds.json()["detail"]
     assert invalid_layer.status_code == 422
     assert "unknown map layer" in invalid_layer.json()["detail"]
+
+
+def test_reference_detail_endpoint_returns_full_canonical_object(monkeypatch, tmp_path) -> None:
+    with client_with_reference(monkeypatch, tmp_path) as client:
+        facility = client.get("/api/v1/map/reference/facilities/facility:inside")
+        stop = client.get("/api/v1/map/reference/stops/stop:inside:1")
+        climate = client.get("/api/v1/map/reference/climate/climate:intersects")
+
+    assert facility.status_code == 200
+    assert facility.json()["name"] == "Inside hospital"
+    assert facility.json()["provenance"]["dataset"] == "map-api"
+    assert stop.status_code == 200
+    assert stop.json()["entity_type"] == "transport_stop"
+    assert climate.status_code == 200
+    assert climate.json()["properties"] == {"class": "warm"}
+    assert climate.json()["provenance"]["original_identifier"] == "climate-intersects"
+
+
+def test_reference_detail_endpoint_distinguishes_invalid_layer_and_missing_id(
+    monkeypatch, tmp_path
+) -> None:
+    with client_with_reference(monkeypatch, tmp_path) as client:
+        invalid_layer = client.get("/api/v1/map/reference/unknown/facility:inside")
+        missing = client.get("/api/v1/map/reference/facilities/facility:missing")
+
+    assert invalid_layer.status_code == 422
+    assert "unknown map layer" in invalid_layer.json()["detail"]
+    assert missing.status_code == 404
+    assert "reference object not found" in missing.json()["detail"]
