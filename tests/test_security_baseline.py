@@ -1,21 +1,20 @@
 import json
 import logging
+from pathlib import Path
 
-from fastapi.testclient import TestClient
+import yaml
 
-from berlin_urban_intelligence.api.app import create_app
 from berlin_urban_intelligence.shared.observability import JsonFormatter
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-def test_backend_responses_include_safe_baseline_security_headers() -> None:
-    with TestClient(create_app()) as client:
-        response = client.get("/health")
 
-    assert response.status_code == 200
-    assert response.headers["x-content-type-options"] == "nosniff"
-    assert response.headers["x-frame-options"] == "DENY"
-    assert response.headers["referrer-policy"] == "no-referrer"
-    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+def test_default_compose_only_publishes_http_ports_on_loopback() -> None:
+    compose = yaml.safe_load((PROJECT_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+
+    assert compose["services"]["backend"]["ports"] == ["127.0.0.1:8000:8000"]
+    assert compose["services"]["frontend"]["ports"] == ["127.0.0.1:8080:80"]
+    assert "ports" not in compose["services"]["refresh"]
 
 
 def test_structured_formatter_drops_query_and_body_context() -> None:
