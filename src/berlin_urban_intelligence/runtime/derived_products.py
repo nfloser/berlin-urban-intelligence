@@ -97,7 +97,7 @@ class DerivedProductBuilder:
             return None
         input_id = f"vbb-gtfs-rt:{snapshot.observed_at.isoformat()}"
         return DerivationRecord(
-            id=f"derived:mobility:delay-share:{snapshot.observed_at.isoformat()}",
+            id="derived:mobility:delay-share:current",
             definition_id="mobility-delay-share-v1",
             entity_id="berlin:public-transport",
             phenomenon="vbb_delayed_trip_update_share",
@@ -136,7 +136,7 @@ class DerivedProductBuilder:
         input_ids = (temperature.id, lqi.id)
         valid_at = max(temperature.observed_at, lqi.observed_at)
         return DerivationRecord(
-            id=f"derived:context:heat-air-quality:{valid_at.isoformat()}",
+            id="derived:context:heat-air-quality:current",
             definition_id="heat-air-quality-context-v1",
             entity_id="berlin:measured-context",
             phenomenon="heat_air_quality_context",
