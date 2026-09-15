@@ -6,10 +6,11 @@ Phase 15 — evidence-driven v1.0 completion audit and independently scoped foll
 
 ## Current development work
 
-Issue #11 establishes `docs/verification.md` as the repository-wide completion evidence matrix. The audit distinguishes implemented architecture from verified behavior, marks the aggregate v1.0 gate **NOT READY**, corrects documentation drift and converts concrete gaps into issues #12–#21 rather than hiding them in prose.
+Issue #12 / PR #23 closes the semantic API parity gap identified by the v1.0 verification audit. The API now builds one RDF projection from validated runtime, reference, energy and derived snapshots, and exposes bounded typed incoming/outgoing semantic relationship inspection without introducing a second source of truth or unrestricted SPARQL execution.
 
 ## Recently completed work
 
+- Issue #11 / PR #22 established `docs/verification.md` as the repository-wide completion evidence matrix, corrected orchestration/snapshot documentation drift and converted remaining gaps into independently scoped issues. Full protected CI passed before merge.
 - Issue #2 / PR #8 replaced fixed 1,000-item map slices with bounded viewport-backed reference projection and canonical detail inspection. Final backend, frontend and Docker/Compose/Playwright CI passed before merge.
 - Issue #3 audited stale PR #1 instead of blindly closing or merging it. Three still-needed invariants were recovered tests-first in PR #9: finite canonical numerical values, required heat/energy scenario parameters, and current/valid scenario baselines. PR #9 passed complete CI and merged; PR #1 was then closed without merge or history deletion.
 - Issue #5 / PR #10 established the protected repository workflow. `Protect main` is active, has no bypass actors, requires pull requests/review-thread resolution and strictly requires GitHub Actions checks `backend`, `frontend` and `containers`.
@@ -23,7 +24,9 @@ Issue #11 establishes `docs/verification.md` as the repository-wide completion e
 - Agent/orchestrator state is rebuilt after validated snapshot changes.
 - `AgentRegistry` validates identifiers/dependencies and the orchestrator resolves workflow capabilities through the registry; real-agent metadata/cross-agent aggregation boundaries still need completion in issue #13.
 - Derived information retains explicit definitions, upstream lineage, freshness/quality and dependency status and supports dependency-aware incremental recomputation.
-- FastAPI exposes domain state, provenance, source/agent health, resilience routing/scenario operations, derived/dependency inspection and bounded reference-map projections.
+- The API RDF projection now includes persisted derivation definitions/records and PROV upstream lineage in addition to runtime observations, reference objects and validated energy forecasts.
+- `/api/v1/knowledge/relations/{resource_id}` queries the same in-memory semantic projection with deterministic incoming/outgoing relations and explicit total/returned/truncated metadata.
+- FastAPI exposes domain state, provenance, source/agent health, resilience routing/scenario operations, derived/dependency/semantic inspection and bounded reference-map projections.
 - The React/MapLibre dashboard exposes reference inspection, observation provenance, platform/derived inspection, deterministic workflows, heat scenarios and map-selected resilience route comparison.
 - Reference-map rendering uses `/api/v1/map/reference` as a compact rendering projection and `/api/v1/map/reference/{layer}/{resource_id}` for full canonical detail inspection.
 - Browser acceptance is part of the normal PR CI path through the composed nginx → FastAPI → persisted-state → React/MapLibre stack.
@@ -43,18 +46,17 @@ All three are bound to the GitHub Actions integration.
 
 ## Current v1.0 evidence gaps
 
-The authoritative detail is in [`verification.md`](verification.md). The current concrete follow-up issues are:
+The authoritative detail is in [`verification.md`](verification.md). After semantic API parity is closed, the remaining concrete follow-up issues are:
 
-1. #12 — complete semantic API projection and relationship queries.
-2. #13 — complete agent metadata and enforce orchestration boundaries.
-3. #14 — verify real Berlin road-network acquisition and resilience readiness.
-4. #15 — complete populated dashboard inspector browser acceptance.
-5. #16 — add accessibility and keyboard verification.
-6. #17 — establish performance/load evidence.
-7. #18 — establish repository/deployment security baseline.
-8. #19 — extend structured observability across refresh/derivation/scenarios.
-9. #20 — verify a reproducible real Berlin energy evaluation/forecast artefact.
-10. #21 — verify multiple source-backed cross-domain workflows end to end.
+1. #13 — complete agent metadata and enforce orchestration boundaries.
+2. #14 — verify real Berlin road-network acquisition and resilience readiness.
+3. #15 — complete populated dashboard inspector browser acceptance.
+4. #16 — add accessibility and keyboard verification.
+5. #17 — establish performance/load evidence.
+6. #18 — establish repository/deployment security baseline.
+7. #19 — extend structured observability across refresh/derivation/scenarios.
+8. #20 — verify a reproducible real Berlin energy evaluation/forecast artefact.
+9. #21 — verify multiple source-backed cross-domain workflows end to end.
 
 ## Known external constraints
 
@@ -72,7 +74,8 @@ The authoritative detail is in [`verification.md`](verification.md). The current
 - The bounded reference-map API reports per-layer totals, viewport matches, returned counts and truncation instead of silently implying completeness.
 - Stale repository history is audited behavior-by-behavior before closure; required behavior is ported onto current `main` through new tests rather than merging obsolete integration history.
 - `main` is protected by an active ruleset requiring PRs and all three project CI jobs.
-- The repository now maintains an explicit PASS/PARTIAL/NOT VERIFIED completion matrix rather than treating implementation presence as proof of v1.0 readiness.
+- The repository maintains an explicit PASS/PARTIAL/NOT VERIFIED completion matrix rather than treating implementation presence as proof of v1.0 readiness.
+- Public semantic graph serialization and typed semantic relation inspection now use the same validated snapshot projection, including derived lineage.
 
 ## Verification commands enforced by CI
 
@@ -97,8 +100,8 @@ Passing only a subset is not treated as proof that a PR is merge-ready.
 
 ## Next concrete tasks
 
-1. Complete issue #11 through full required CI/review and merge the verification matrix.
-2. Address #12 and #13 as the next contained architectural gaps.
+1. Finish issue #12 through final protected CI/review and merge.
+2. Address #13 next: complete real-agent metadata and remove direct cross-agent invocation from the Live State boundary.
 3. Run/implement the external real-data verification gates #14 and #20 without converting provider failure into synthetic success.
 4. Close dashboard/operational quality gaps #15–#19 in independent PRs.
 5. Complete #21 only after its dependent source/semantic evidence is sufficient.
@@ -106,4 +109,4 @@ Passing only a subset is not treated as proof that a PR is merge-ready.
 
 ## Important migration notes
 
-Do not replace the existing source/agent/domain architecture. Provider acquisition remains outside request handlers. Canonical persisted state stays authoritative; bounded map GeoJSON is a rendering projection only. Large reference snapshots should be reparsed only when their persisted file identity changes, while the browser should request only the active viewport and fetch full canonical objects on demand.
+Do not replace the existing source/agent/domain architecture. Provider acquisition remains outside request handlers. Canonical persisted state stays authoritative; RDF and bounded map GeoJSON are projections only. Large reference snapshots should be reparsed only when their persisted file identity changes, while the browser should request only the active viewport and fetch full canonical objects on demand.
