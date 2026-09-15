@@ -5,6 +5,7 @@ import {
   mapLayerCounts,
   networkDisruptionRequest,
   routeRequest,
+  systemSnapshotToken,
   toFeatureCollection,
 } from "./api";
 
@@ -79,5 +80,23 @@ describe("dashboard data semantics", () => {
   it("rejects implausible dashboard heat deltas before calling the API", () => {
     expect(() => heatAssessmentRequest(21)).toThrow(/between -20 and 20/);
     expect(() => heatAssessmentRequest(Number.NaN)).toThrow(/between -20 and 20/);
+  });
+
+  it("detects active runtime or reference snapshot changes", () => {
+    const base = {
+      name: "Berlin Urban Intelligence",
+      version: "0.1.0",
+      contract_version: "1.0.0",
+      runtime_generated_at: "2026-09-15T07:00:00Z",
+      reference_generated_at: "2026-09-14T18:00:00Z",
+      snapshot_reload: {},
+      synthetic_production_fallback: false,
+    };
+    expect(systemSnapshotToken(base)).not.toBe(
+      systemSnapshotToken({ ...base, runtime_generated_at: "2026-09-15T07:05:00Z" }),
+    );
+    expect(systemSnapshotToken(base)).not.toBe(
+      systemSnapshotToken({ ...base, reference_generated_at: "2026-09-15T08:00:00Z" }),
+    );
   });
 });
