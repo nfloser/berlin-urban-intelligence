@@ -1,8 +1,8 @@
 """Change-aware loading for persisted application snapshots.
 
-The API serves validated persisted state and never performs provider acquisition in request handlers.
-This module only detects atomic snapshot replacement and reloads changed files. Invalid replacements
-leave the last-known-good value intact while exposing an explicit diagnostic state.
+The API serves validated persisted state and never performs provider acquisition in request
+handlers. This module only detects atomic snapshot replacement and reloads changed files. Invalid
+replacements leave the last-known-good value intact while exposing an explicit diagnostic state.
 """
 
 from __future__ import annotations
@@ -10,11 +10,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
-from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-T = TypeVar("T")
 FileSignature = tuple[int, int, int]
 
 
@@ -31,7 +29,7 @@ class SnapshotReloadDiagnostic(BaseModel):
     last_error: str | None = None
 
 
-class ReloadingSnapshot(Generic[T]):
+class ReloadingSnapshot[T]:
     """Cache a validated snapshot and reload only when the backing file identity changes."""
 
     def __init__(self, path: Path, loader: Callable[[], T | None]) -> None:
