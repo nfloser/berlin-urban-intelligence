@@ -12,23 +12,25 @@ This page describes architectural responsibilities rather than mirroring directo
 | Reference refresh | Acquire slow-changing facilities and official climate layers; preserve prior data per failed source. | Berlin WFS clients; previous reference state. | `ReferenceState`. | `runtime/reference_refresh.py` |
 | Energy workflow | Parse explicit grid-load input, evaluate candidates chronologically, select a candidate and produce one next-step artefact. | Explicitly configured tabular dataset. | Evaluation metadata and forecast artefact persisted as energy state. | `energy/`, `scripts/evaluate_energy.py` |
 | Domain agents | Encapsulate domain state, calculations and health semantics. | Canonical/provider-domain records. | Domain snapshots, observations, forecasts or analysis results. | `agents/` |
+| Agent registry | Validate unique agent identity, capabilities and declared agent dependencies and provide dependency order. | Registered `BaseAgent` implementations. | Validated registry/capability lookup. | `agents/registry.py` |
 | Resilience engine | Routing, route comparison, facility snapping and accessibility under scenario overlays. | Network nodes/edges, facilities, scenarios. | Route/accessibility results. | `agents/resilience.py` |
 | Scenario engine | Apply bounded hypothetical deltas while retaining baseline identity. | Baseline observation/forecast plus `Scenario`. | Scenario result types. | `scenario_engine/` |
-| Deterministic orchestrator | Select fixed supported agent combinations and report workflow health. | `OrchestrationRequest`, agent registry. | `ExecutionPlan`, `ExecutionResult`. | `orchestrator/engine.py` |
+| Deterministic orchestrator | Resolve supported workflow capability sets through the agent registry and report workflow health. | `OrchestrationRequest`, agent registry. | `ExecutionPlan`, `ExecutionResult`. | `orchestrator/engine.py` |
 | Integrated assessment | Coordinate independent Heat, Energy and Resilience scenario calculations. | `AssessmentRequest`, agents and reference data. | `IntegratedAssessment` with per-dimension errors and no composite score. | `orchestrator/assessment.py` |
-| Knowledge projection | Convert canonical state/lineage into RDF. | Canonical entities, values, network objects. | Turtle/RDF graph. | `knowledge/graph.py` |
-| HTTP API | Serve persisted state and analytical operations with operation IDs. | Persisted stores + typed requests. | Versioned JSON/text responses. | `api/app.py` |
+| Derived execution | Validate derivation definitions/dependencies and update affected products deterministically. | Runtime state, derivation definitions, previous derived state. | `DerivedState`, execution report/lineage. | `runtime/derived_refresh.py`, `knowledge/execution.py` |
+| Knowledge projection | Convert canonical state/lineage into RDF. | Canonical entities, values, network objects and, in the live RDF writer, derived state. | Turtle/RDF graph. | `knowledge/graph.py`, `knowledge/derived_graph.py` |
+| HTTP API | Serve persisted state and analytical operations with operation IDs. | Persisted stores + typed requests. | Versioned JSON/text responses. | `api/app.py`, `api/derived.py` |
 | Dashboard | Visualize API state and initiate supported requests. | Backend HTTP API. | Browser research UI and map views. | `frontend/` |
 
 ## Agents
 
-All agents derive from `BaseAgent`, which provides an injectable timezone-aware clock and requires a `health()` implementation. `AgentDescriptor` exposes identity, version, capabilities, input/output contract names and source dependencies.
+All agents derive from `BaseAgent`, which provides an injectable timezone-aware clock and requires a `health()` implementation. `AgentDescriptor` can expose identity, name/domain metadata, version, capabilities, input/output contract names, source dependencies and agent dependencies.
 
 ### Live State Agent
 
-**Purpose:** aggregate health from registered domain agents.
+**Purpose:** aggregate health/availability without calculating a city score or manufacturing missing measurements.
 
-**Behavior:** reports overall availability only. It does not combine measurements or calculate a city score. All available -> available; a mixture containing available/degraded -> degraded; otherwise unavailable/unknown according to the actual health set.
+**Current boundary:** the implementation currently receives other agent instances and calls their `health()` methods directly. That behavior is explicit but is not the target cross-agent boundary; issue #13 tracks moving coordination outside the domain-agent implementation and completing real descriptor metadata.
 
 ### Mobility Agent
 
@@ -70,9 +72,9 @@ It uses a NetworkX `MultiDiGraph` so parallel edges are preserved. Scenario edge
 
 ## Orchestrator behavior
 
-The orchestrator currently supports five hard-coded workflow families: `urban_snapshot`, `heat_energy`, `mobility_exposure`, `mobility_resilience`, and `heat_mobility_resilience`.
+The orchestrator currently supports five typed workflow families: `urban_snapshot`, `heat_energy`, `mobility_exposure`, `mobility_resilience`, and `heat_mobility_resilience`.
 
-The mapping is defined in `Orchestrator._PLANS`. It is not dynamically inferred from descriptors. `plan()` returns the expected agent identifiers; `execute()` queries the corresponding agents' health and returns overall availability/missing agents. Domain numerical analysis remains the responsibility of domain components.
+Each workflow declares required capabilities in `Orchestrator._WORKFLOW_CAPABILITIES`. The registry resolves each capability to exactly one agent and then returns selected agents in validated dependency order. Missing capabilities are reported explicitly; ambiguous capability providers raise an error rather than being selected arbitrarily. `plan()` exposes required/missing capabilities and resolved agent IDs; `execute()` queries the resolved agents' health and reports overall availability. Domain numerical analysis remains the responsibility of domain components.
 
 ## Failure boundaries
 
