@@ -33,6 +33,14 @@ def main() -> int:
     )
     parser.add_argument("--network-type", default="drive")
     parser.add_argument(
+        "--overpass-url",
+        default=None,
+        help=(
+            "Optional explicit OSMnx Overpass base API URL, for example "
+            "https://overpass.private.coffee/api."
+        ),
+    )
+    parser.add_argument(
         "--allow-osmnx-speed-imputation",
         action="store_true",
         help=(
@@ -48,8 +56,15 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    evidence_context = {
+        "place": args.place,
+        "network_type": args.network_type,
+        "overpass_url": args.overpass_url,
+        "speed_imputation_enabled": args.allow_osmnx_speed_imputation,
+        "synthetic_fallback": False,
+    }
     try:
-        snapshot = OsmnxRoadNetworkClient().fetch(
+        snapshot = OsmnxRoadNetworkClient(overpass_url=args.overpass_url).fetch(
             args.place,
             network_type=args.network_type,
             allow_speed_imputation=args.allow_osmnx_speed_imputation,
@@ -62,13 +77,10 @@ def main() -> int:
         _write_evidence(
             args.output,
             {
+                **evidence_context,
                 "status": "failed",
-                "place": args.place,
-                "network_type": args.network_type,
-                "speed_imputation_enabled": args.allow_osmnx_speed_imputation,
                 "error_type": type(exc).__name__,
                 "error": str(exc),
-                "synthetic_fallback": False,
             },
         )
         return 2
@@ -76,11 +88,8 @@ def main() -> int:
     _write_evidence(
         args.output,
         {
+            **evidence_context,
             "status": "passed",
-            "place": args.place,
-            "network_type": args.network_type,
-            "speed_imputation_enabled": args.allow_osmnx_speed_imputation,
-            "synthetic_fallback": False,
             "readiness": report.model_dump(mode="json"),
         },
     )
