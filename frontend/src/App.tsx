@@ -35,6 +35,7 @@ import {
   buildReferenceDetailPath,
   buildReferenceMapPath,
   featureCollectionForLayer,
+  referenceHitTestBox,
   referenceLayerSummaries,
   type ReferenceMapLayer,
   type ReferenceMapResponse,
@@ -442,7 +443,10 @@ function App() {
         (layerId) => map.getLayer(layerId) !== undefined,
       );
       if (inspectableLayers.length === 0) return;
-      const hit = map.queryRenderedFeatures(event.point, { layers: inspectableLayers })[0];
+      const hitBox = referenceHitTestBox(event.point);
+      const hit = inspectableLayers
+        .map((layerId) => map.queryRenderedFeatures(hitBox, { layers: [layerId] })[0])
+        .find((feature) => feature !== undefined);
       if (!hit) {
         tracker.invalidate();
         setMapSelection(null);
