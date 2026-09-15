@@ -98,7 +98,7 @@ export default function PlatformInspector() {
             {sources.map((source) => {
               const runtime = statuses[source.id];
               return (
-                <div className="observation-row" key={source.id}>
+                <div className="observation-row" data-source-id={source.id} key={source.id}>
                   <span>
                     <strong>{source.dataset}</strong>
                     <small>{source.provider} · {source.domain}</small>
@@ -128,7 +128,7 @@ export default function PlatformInspector() {
             {agents.map((agent) => {
               const health = agentHealth[agent.id];
               return (
-                <div className="observation-row" key={agent.id}>
+                <div className="observation-row" data-agent-id={agent.id} key={agent.id}>
                   <span>
                     <strong>{agent.name ?? agent.id}</strong>
                     <small>{agent.domain ?? "cross-domain"} · v{agent.version}</small>
