@@ -1,6 +1,12 @@
 name: Road network smoke
 
 on:
+  push:
+    paths:
+      - .github/workflows/road-network-smoke.yml
+      - scripts/road_network_smoke.py
+      - src/berlin_urban_intelligence/adapters/osm_network.py
+      - src/berlin_urban_intelligence/runtime/road_readiness.py
   workflow_dispatch:
     inputs:
       place:
