@@ -33,4 +33,15 @@ services:
       BUI_RUNTIME_STATE: /app/data/runtime/state.json
     volumes:
       - ./data:/app/data
-    command: ["python", "scripts/refresh_live.py", "--state", "/app/data/runtime/state.json", "--rdf", "/app/data/generated/latest.ttl"]
+    restart: unless-stopped
+    command:
+      [
+        "python",
+        "scripts/refresh_live.py",
+        "--state",
+        "/app/data/runtime/state.json",
+        "--rdf",
+        "/app/data/generated/latest.ttl",
+        "--interval-seconds",
+        "${BUI_REFRESH_INTERVAL_SECONDS:-300}",
+      ]
