@@ -303,7 +303,9 @@ def create_app() -> FastAPI:
         domain_health = {
             name: agent.health() for name, agent in agents_by_id.items() if name != "live_state"
         }
-        live_state: LiveStateAgent = agents_by_id["live_state"]  # type: ignore[assignment]
+        live_state = agents_by_id["live_state"]
+        if not isinstance(live_state, LiveStateAgent):
+            raise RuntimeError("live_state registry entry must be a LiveStateAgent")
         live_state.snapshot(domain_health)
         return {
             "live_state": live_state.health().model_dump(mode="json"),
