@@ -10,51 +10,51 @@ Direct feature development on `main` is not part of the project workflow.
 
 ## Verified repository state
 
-The governance state was inspected on 2026-09-15 while addressing issue #5.
+The governance state was inspected on 2026-09-15 while addressing issue #5 and re-verified after repository-owner configuration.
 
-- The repository rulesets endpoint was readable and returned an empty list: no repository ruleset was configured at that time.
-- Reading classic branch protection for `main` returned HTTP 403 `Resource not accessible by integration`.
-- The connected GitHub integration can work with repository content, branches, issues, pull requests and CI, but it does not expose an administration mutation that can create or edit branch protection/rulesets in this session.
+- Repository ruleset `Protect main` (ruleset id `23438336`) is **Active** and targets the default branch.
+- The ruleset has no bypass actors; the connected user cannot bypass it under the current configuration.
+- Branch deletion and non-fast-forward/force-push updates are blocked.
+- Changes to the default branch require a pull request.
+- Required approving review count is `0`, appropriate for the current single-maintainer repository, while review-thread resolution is required.
+- Required status checks use strict/up-to-date branch semantics.
+- The required checks are exactly `backend`, `frontend` and `containers`, each bound to the GitHub Actions integration.
 - The current `CI` workflow runs on pull requests and on pushes to `main` and was not weakened by the governance change.
-- The check-run contexts emitted by the current GitHub Actions workflow are exactly `backend`, `frontend` and `containers`, and the observed source application for each check is GitHub Actions.
 
-Therefore this document does **not** claim that `main` is currently protected. Repository-owner administration is required to activate the rule below.
+This means `main` is now technically protected as well as governed by project policy.
 
 ## Required `main` ruleset
 
-Configure the repository in GitHub under **Settings → Rules → Rulesets → New ruleset → New branch ruleset**.
+The active `Protect main` ruleset is expected to retain this configuration:
 
-Use the following configuration:
-
-1. Name the ruleset `Protect main`.
-2. Set **Enforcement status** to **Active**.
-3. Under **Target branches**, include the repository's **default branch** (`main`).
-4. Leave the bypass list empty for normal development. Add a bypass actor only for a documented emergency process; routine feature work must not bypass the ruleset.
-5. Enable **Restrict deletions**.
-6. Enable **Block force pushes**.
-7. Enable **Require a pull request before merging**.
-   - For this single-maintainer repository, use **0 required approving reviews** so the owner is not locked out of their own PRs. Review still occurs through the documented self-review/diff-review process and resolved conversations.
-   - Enable **Require conversation resolution before merging** if that option is presented separately in the current GitHub UI.
-8. Enable **Require status checks to pass** and add these checks:
+1. **Enforcement status:** `Active`.
+2. **Target:** repository default branch (`main`).
+3. **Bypass actors:** none for routine development.
+4. **Restrict deletions:** enabled.
+5. **Block force pushes / non-fast-forward updates:** enabled.
+6. **Require a pull request before merging:** enabled.
+   - Required approving reviews: `0` for the current single-maintainer setup.
+   - Review conversations must be resolved before merge.
+7. **Require status checks to pass:** enabled with strict/up-to-date branch semantics.
    - `backend`
    - `frontend`
    - `containers`
-   - For each required check, select **GitHub Actions** as the expected source application when GitHub offers the source selector. Do not allow an unrelated app or external status with the same context name to satisfy the gate.
-9. Enable **Require branches to be up to date before merging** for those required checks so the result corresponds to the current `main` base.
-10. Do **not** enable **Require linear history** while the project intentionally uses merge commits to preserve the test-first and incremental commit history of reviewed PRs.
-11. Do not replace the three required checks with a weaker aggregate or skip the `containers` gate; it includes Docker/Compose and Playwright browser acceptance.
-12. Save the ruleset and confirm its status is **Active**.
+   - Expected source application for each check: GitHub Actions.
+8. **Require linear history:** not required while the project intentionally preserves merge commits and incremental test-first history.
 
-With an active ruleset and no routine bypass actor, direct feature pushes to `main` are rejected and changes must arrive through a pull request satisfying the required checks.
+Do not replace the three required checks with a weaker aggregate or skip the `containers` gate; it includes Docker/Compose and Playwright browser acceptance.
 
-## How to verify the rule after manual activation
+## How to verify the rule
 
-After saving the ruleset:
+Repository maintainers should periodically verify:
 
-1. Re-open **Settings → Rules → Rulesets** and verify `Protect main` is **Active** and targets the default branch.
-2. Confirm the ruleset lists required checks `backend`, `frontend`, and `containers`, sourced from GitHub Actions where the UI exposes an expected-source selector.
-3. Open a small PR from a non-`main` branch and verify GitHub reports all three checks as required before merge.
-4. Do not test protection by force-pushing or rewriting useful history. If a direct-push verification is desired, use a disposable no-op branch/ref workflow or inspect GitHub's rule evaluation UI instead.
+1. **Settings → Rules → Rulesets** shows `Protect main` as **Active**.
+2. The ruleset targets the default branch and has no unintended bypass actor.
+3. Required checks remain `backend`, `frontend`, and `containers`, sourced from GitHub Actions.
+4. Pull requests cannot merge while one of those checks is pending/failing or while the branch is behind `main`.
+5. Review conversations must be resolved before merge.
+
+Do not test protection by force-pushing or rewriting useful history. Inspect the ruleset/rule evaluation UI or use an ordinary disposable PR if verification is needed.
 
 ## CI contract
 
@@ -64,11 +64,11 @@ After saving the ruleset:
 - `frontend` runs frontend tests and the production build;
 - `containers` depends on backend and frontend, validates Compose, builds both images, seeds deterministic acceptance-only state, starts the composed application and runs Playwright browser acceptance.
 
-A feature PR is not considered merge-ready because only one or two of these jobs passed. All required jobs must succeed on the current PR head/base combination.
+A feature PR is not considered merge-ready because only one or two of these jobs passed. All required jobs must succeed on the final PR head/base combination.
 
 ## Emergency changes
 
-If a production-critical repository change ever requires bypassing the normal flow, record why in an issue/PR and restore normal protection immediately afterward. The research repository currently has no standing emergency-bypass actor and no reason to weaken normal CI for routine work.
+There is no standing bypass actor. If a future production-critical repository change genuinely requires temporary relaxation of a rule, record why in an issue/PR, make the smallest possible administrative change, and restore the normal ruleset immediately afterward.
 
 ## Scope and limitations
 
