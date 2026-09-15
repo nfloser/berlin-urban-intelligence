@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from berlin_urban_intelligence.adapters.osm_network import OsmnxRoadNetworkClient
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
 from berlin_urban_intelligence.runtime.reference import ReferenceStateStore
 from berlin_urban_intelligence.runtime.reference_acquisition import ReferenceAcquisitionCoordinator
@@ -24,6 +25,14 @@ def main() -> int:
     parser.add_argument("--place", default="Berlin, Germany", help="OSMnx place query")
     parser.add_argument("--network-type", default="drive")
     parser.add_argument(
+        "--overpass-url",
+        default=None,
+        help=(
+            "Optional explicit OSMnx Overpass base API URL. If omitted, OSMnx keeps its own "
+            "configured default endpoint."
+        ),
+    )
+    parser.add_argument(
         "--allow-osmnx-speed-imputation",
         action="store_true",
         help=(
@@ -35,7 +44,10 @@ def main() -> int:
 
     store = ReferenceStateStore(Path(args.state))
     previous = store.load()
-    state = ReferenceAcquisitionCoordinator().refresh(
+    coordinator = ReferenceAcquisitionCoordinator(
+        road_client=OsmnxRoadNetworkClient(overpass_url=args.overpass_url)
+    )
+    state = coordinator.refresh(
         previous=previous,
         include_gtfs=not args.skip_gtfs,
         include_osm=args.with_osm,
