@@ -225,6 +225,22 @@ def test_relationship_endpoint_is_bounded_and_reports_truncation(monkeypatch, tm
     assert len(body["relations"]) == 1
 
 
+def test_relationship_endpoint_limit_is_hard_bounded(monkeypatch, tmp_path) -> None:
+    with client_with_semantic_state(monkeypatch, tmp_path) as client:
+        response = client.get("/api/v1/knowledge/relations/derived:context?limit=501")
+    assert response.status_code == 422
+
+
+def test_relationship_endpoint_has_typed_openapi_response(monkeypatch, tmp_path) -> None:
+    with client_with_semantic_state(monkeypatch, tmp_path) as client:
+        schema = client.get("/openapi.json").json()
+
+    response_schema = schema["paths"]["/api/v1/knowledge/relations/{resource_id}"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"]
+    assert response_schema["$ref"].endswith("/SemanticRelations")
+
+
 def test_unknown_semantic_resource_is_404(monkeypatch, tmp_path) -> None:
     with client_with_semantic_state(monkeypatch, tmp_path) as client:
         response = client.get("/api/v1/knowledge/relations/not-present")
