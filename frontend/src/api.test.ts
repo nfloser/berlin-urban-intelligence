@@ -82,13 +82,15 @@ describe("dashboard data semantics", () => {
     expect(() => heatAssessmentRequest(Number.NaN)).toThrow(/between -20 and 20/);
   });
 
-  it("detects active runtime or reference snapshot changes", () => {
+  it("detects changes to every hot-reloaded snapshot family", () => {
     const base = {
       name: "Berlin Urban Intelligence",
       version: "0.1.0",
       contract_version: "1.0.0",
       runtime_generated_at: "2026-09-15T07:00:00Z",
       reference_generated_at: "2026-09-14T18:00:00Z",
+      energy_generated_at: "2026-09-14T12:00:00Z",
+      derived_generated_at: "2026-09-14T12:05:00Z",
       snapshot_reload: {},
       synthetic_production_fallback: false,
     };
@@ -97,6 +99,12 @@ describe("dashboard data semantics", () => {
     );
     expect(systemSnapshotToken(base)).not.toBe(
       systemSnapshotToken({ ...base, reference_generated_at: "2026-09-15T08:00:00Z" }),
+    );
+    expect(systemSnapshotToken(base)).not.toBe(
+      systemSnapshotToken({ ...base, energy_generated_at: "2026-09-15T08:01:00Z" }),
+    );
+    expect(systemSnapshotToken(base)).not.toBe(
+      systemSnapshotToken({ ...base, derived_generated_at: "2026-09-15T08:02:00Z" }),
     );
   });
 });
