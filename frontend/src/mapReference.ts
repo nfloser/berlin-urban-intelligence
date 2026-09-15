@@ -30,6 +30,13 @@ export type ReferenceLayerSummary = {
   truncated: boolean;
 };
 
+export type ReferenceHitTestPoint = {
+  x: number;
+  y: number;
+};
+
+export type ReferenceHitTestBox = [[number, number], [number, number]];
+
 const LAYER_LABELS: Record<ReferenceMapLayer, string> = {
   facilities: "Critical facilities",
   stops: "VBB stops",
@@ -94,6 +101,19 @@ export function featureCollectionForLayer(
     type: "FeatureCollection",
     features: response.features.filter((feature) => feature.properties?.layer === layer),
   };
+}
+
+export function referenceHitTestBox(
+  point: ReferenceHitTestPoint,
+  radius = 8,
+): ReferenceHitTestBox {
+  if (!Number.isFinite(radius) || radius <= 0) {
+    throw new Error("reference hit-test radius must be positive");
+  }
+  return [
+    [point.x - radius, point.y - radius],
+    [point.x + radius, point.y + radius],
+  ];
 }
 
 export function referenceLayerSummaries(metadata: ReferenceMapMetadata): ReferenceLayerSummary[] {
