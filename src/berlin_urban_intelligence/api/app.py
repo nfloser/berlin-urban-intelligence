@@ -11,6 +11,7 @@ import os
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
+from threading import RLock
 from time import perf_counter
 from uuid import uuid4
 
@@ -26,7 +27,7 @@ from berlin_urban_intelligence.agents.heat import HeatAgent
 from berlin_urban_intelligence.agents.live_state import LiveStateAgent
 from berlin_urban_intelligence.agents.mobility import MobilityAgent
 from berlin_urban_intelligence.agents.resilience import ResilienceAgent, nearest_network_node
-from berlin_urban_intelligence.energy.state import EnergyStateStore
+from berlin_urban_intelligence.energy.state import EnergyState, EnergyStateStore
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
 from berlin_urban_intelligence.orchestrator.assessment import (
     AssessmentRequest,
@@ -37,6 +38,7 @@ from berlin_urban_intelligence.orchestrator.engine import (
     Orchestrator,
 )
 from berlin_urban_intelligence.runtime.reference import ReferenceState, ReferenceStateStore
+from berlin_urban_intelligence.runtime.reload import ReloadingSnapshot
 from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
 from berlin_urban_intelligence.scenario_engine.models import Scenario
 from berlin_urban_intelligence.shared.contracts import NetworkNode
@@ -71,19 +73,8 @@ def _path_from_env(name: str, default: Path) -> Path:
     return Path(os.environ.get(name, str(default)))
 
 
-def _load_runtime() -> RuntimeState | None:
-    return RuntimeStateStore(_path_from_env("BUI_RUNTIME_STATE", DEFAULT_RUNTIME_STATE)).load()
-
-
-def _load_reference() -> ReferenceState | None:
-    return ReferenceStateStore(
-        _path_from_env("BUI_REFERENCE_STATE", DEFAULT_REFERENCE_STATE)
-    ).load()
-
-
-def _build_energy_agent() -> EnergyAgent:
+def _build_energy_agent(state: EnergyState | None) -> EnergyAgent:
     agent = EnergyAgent()
-    state = EnergyStateStore(_path_from_env("BUI_ENERGY_STATE", DEFAULT_ENERGY_STATE)).load()
     if state is None:
         return agent
     agent.register_berlin_evaluation(state.evaluation)
@@ -93,13 +84,15 @@ def _build_energy_agent() -> EnergyAgent:
 
 
 def _build_agents(
-    runtime: RuntimeState | None, reference: ReferenceState | None
+    runtime: RuntimeState | None,
+    reference: ReferenceState | None,
+    energy_state: EnergyState | None,
 ) -> dict[str, BaseAgent]:
     observations = tuple(runtime.observations if runtime else ())
     exposure = ExposureAgent([item for item in observations if item.provenance.agent == "exposure"])
     heat = HeatAgent([item for item in observations if item.provenance.agent == "heat"])
     mobility = MobilityAgent(runtime.mobility if runtime else None)
-    energy = _build_energy_agent()
+    energy = _build_energy_agent(energy_state)
     resilience = ResilienceAgent(list(reference.network_edges if reference else ()))
     live_state = LiveStateAgent([mobility, exposure, heat, energy, resilience])
     return {
@@ -139,13 +132,67 @@ def _slice[T](items: Sequence[T], offset: int, limit: int) -> list[T]:
     return list(items[offset : offset + limit])
 
 
+class _ApiStateController:
+    """Keep process state synchronized with validated persisted snapshots."""
+
+    def __init__(self) -> None:
+        runtime_path = _path_from_env("BUI_RUNTIME_STATE", DEFAULT_RUNTIME_STATE)
+        reference_path = _path_from_env("BUI_REFERENCE_STATE", DEFAULT_REFERENCE_STATE)
+        energy_path = _path_from_env("BUI_ENERGY_STATE", DEFAULT_ENERGY_STATE)
+        self._runtime: ReloadingSnapshot[RuntimeState] = ReloadingSnapshot(
+            runtime_path, RuntimeStateStore(runtime_path).load
+        )
+        self._reference: ReloadingSnapshot[ReferenceState] = ReloadingSnapshot(
+            reference_path, ReferenceStateStore(reference_path).load
+        )
+        self._energy: ReloadingSnapshot[EnergyState] = ReloadingSnapshot(
+            energy_path, EnergyStateStore(energy_path).load
+        )
+        self._lock = RLock()
+
+    def initialize(self, app: FastAPI) -> None:
+        with self._lock:
+            self._runtime.refresh(force=True)
+            self._reference.refresh(force=True)
+            self._energy.refresh(force=True)
+            self._apply(app)
+
+    def refresh(self, app: FastAPI) -> None:
+        with self._lock:
+            changed = [
+                self._runtime.refresh(),
+                self._reference.refresh(),
+                self._energy.refresh(),
+            ]
+            if any(changed):
+                self._apply(app)
+
+    def diagnostics(self) -> dict[str, object]:
+        with self._lock:
+            return {
+                "runtime": self._runtime.diagnostic.model_dump(mode="json"),
+                "reference": self._reference.diagnostic.model_dump(mode="json"),
+                "energy": self._energy.diagnostic.model_dump(mode="json"),
+            }
+
+    def _apply(self, app: FastAPI) -> None:
+        app.state.runtime = self._runtime.value
+        app.state.reference = self._reference.value
+        app.state.agents = _build_agents(
+            self._runtime.value,
+            self._reference.value,
+            self._energy.value,
+        )
+        app.state.orchestrator = Orchestrator(app.state.agents)
+
+
 def create_app() -> FastAPI:
+    state_controller = _ApiStateController()
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        app.state.runtime = _load_runtime()
-        app.state.reference = _load_reference()
-        app.state.agents = _build_agents(app.state.runtime, app.state.reference)
-        app.state.orchestrator = Orchestrator(app.state.agents)
+        app.state.snapshot_controller = state_controller
+        state_controller.initialize(app)
         yield
 
     app = FastAPI(
@@ -166,6 +213,8 @@ def create_app() -> FastAPI:
         started = perf_counter()
         response: Response | None = None
         try:
+            controller: _ApiStateController = request.app.state.snapshot_controller
+            controller.refresh(request.app)
             response = await call_next(request)
             error_state = None if response.status_code < 400 else f"HTTP_{response.status_code}"
             return response
@@ -207,12 +256,14 @@ def create_app() -> FastAPI:
     def system(request: Request) -> dict[str, object]:
         runtime: RuntimeState | None = request.app.state.runtime
         reference: ReferenceState | None = request.app.state.reference
+        controller: _ApiStateController = request.app.state.snapshot_controller
         return {
             "name": "Berlin Urban Intelligence",
             "version": __version__,
             "contract_version": "1.0.0",
             "runtime_generated_at": runtime.generated_at if runtime else None,
             "reference_generated_at": reference.generated_at if reference else None,
+            "snapshot_reload": controller.diagnostics(),
             "synthetic_production_fallback": False,
         }
 
