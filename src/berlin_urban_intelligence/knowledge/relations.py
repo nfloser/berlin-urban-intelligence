@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-from rdflib import BNode, Literal as RDFLiteral, URIRef
+from rdflib import BNode, URIRef
+from rdflib import Literal as RDFLiteral
 
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph, _resource
 
