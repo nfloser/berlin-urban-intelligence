@@ -6,8 +6,10 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from berlin_urban_intelligence.api.map_reference import (
     MapBounds,
+    parse_layer,
     parse_layers,
     reference_feature_collection,
+    reference_item,
 )
 from berlin_urban_intelligence.runtime.derived import DerivedState
 from berlin_urban_intelligence.runtime.reference import ReferenceState
@@ -92,3 +94,16 @@ def reference_map(
         layers=selected_layers,
         limit_per_layer=limit_per_layer,
     )
+
+
+@router.get("/map/reference/{layer}/{resource_id:path}")
+def reference_map_detail(request: Request, layer: str, resource_id: str) -> dict[str, object]:
+    try:
+        selected_layer = parse_layer(layer)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    reference: ReferenceState | None = request.app.state.reference
+    item = reference_item(reference, layer=selected_layer, resource_id=resource_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"reference object not found: {resource_id}")
+    return item.model_dump(mode="json")
