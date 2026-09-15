@@ -73,6 +73,7 @@ dd { margin: 0; text-align: right; }
 }
 .observations-card, .provenance-card { min-height: 360px; }
 .section-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 12px; }
+.compact-heading { align-items: center; margin: 12px 0 0; }
 .count-pill { padding: 3px 8px; border: 1px solid #344354; border-radius: 999px; color: #9fb0c2; font-size: 11px; }
 .observation-list { display: grid; max-height: 300px; overflow: auto; border: 1px solid #263241; border-radius: 7px; }
 .observation-row {
@@ -95,6 +96,17 @@ dd { margin: 0; text-align: right; }
 .state-label, .quality-label { color: #9fb0c2; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 .provenance-list { grid-template-columns: 120px minmax(0, 1fr); align-items: start; }
 .provenance-list dd { text-align: left; overflow-wrap: anywhere; color: #c7d3df; }
+.map-inspector-list { max-height: 310px; overflow: auto; padding-right: 4px; }
+.inspector-clear {
+  padding: 5px 8px;
+  border: 1px solid #536d86;
+  border-radius: 6px;
+  background: #101b25;
+  color: #b8c6d4;
+  cursor: pointer;
+  font-size: 11px;
+}
+.inspector-clear:hover { background: #24394c; }
 .empty-state { color: #8296a9; font-size: 13px; line-height: 1.5; }
 .field { display: grid; gap: 7px; margin: 14px 0; color: #9fb0c2; font-size: 12px; }
 .field select, .field input {
