@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchJson, type SystemResponse } from "./api";
+import { fetchJson, type Health, type SystemResponse } from "./api";
 
 type SourceDefinition = {
   id: string;
@@ -40,12 +40,17 @@ type AgentDescriptor = {
 
 type InspectorState = "loading" | "ready" | "error";
 
+function timeValue(value?: string | null): string {
+  return value ?? "never";
+}
+
 export default function PlatformInspector() {
   const [state, setState] = useState<InspectorState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [sources, setSources] = useState<SourceDefinition[]>([]);
   const [statuses, setStatuses] = useState<Record<string, SourceRuntimeStatus>>({});
   const [agents, setAgents] = useState<AgentDescriptor[]>([]);
+  const [agentHealth, setAgentHealth] = useState<Record<string, Health>>({});
   const [system, setSystem] = useState<SystemResponse | null>(null);
 
   useEffect(() => {
@@ -54,13 +59,15 @@ export default function PlatformInspector() {
       fetchJson<SourceDefinition[]>("/api/v1/sources"),
       fetchJson<Record<string, SourceRuntimeStatus>>("/api/v1/source-status"),
       fetchJson<AgentDescriptor[]>("/api/v1/agents"),
+      fetchJson<Record<string, Health>>("/api/v1/agents/health"),
       fetchJson<SystemResponse>("/api/v1/system"),
     ])
-      .then(([sourceValue, statusValue, agentValue, systemValue]) => {
+      .then(([sourceValue, statusValue, agentValue, healthValue, systemValue]) => {
         if (cancelled) return;
         setSources(sourceValue);
         setStatuses(statusValue);
         setAgents(agentValue);
+        setAgentHealth(healthValue);
         setSystem(systemValue);
         setState("ready");
       })
@@ -95,10 +102,15 @@ export default function PlatformInspector() {
                   <span>
                     <strong>{source.dataset}</strong>
                     <small>{source.provider} · {source.domain}</small>
+                    <small>Last attempt: {timeValue(runtime?.last_retrieval_attempt)}</small>
+                    <small>Last success: {timeValue(runtime?.last_successful_retrieval)}</small>
+                    <small>Latest data: {timeValue(runtime?.latest_observation_time)}</small>
                   </span>
-                  <span>{runtime?.availability ?? "not loaded"}</span>
+                  <span>{runtime?.availability ?? "never loaded"}</span>
                   <span className="state-label">{runtime?.freshness ?? source.status}</span>
-                  <span className="quality-label">{runtime?.error_code ?? "no error"}</span>
+                  <span className="quality-label">
+                    {runtime?.error_code ? `Failure: ${runtime.error_code}` : "No current failure"}
+                  </span>
                 </div>
               );
             })}
@@ -113,21 +125,29 @@ export default function PlatformInspector() {
           <p className="empty-state">No registered agent descriptors are available.</p>
         ) : (
           <div className="observation-list">
-            {agents.map((agent) => (
-              <div className="observation-row" key={agent.id}>
-                <span>
-                  <strong>{agent.name ?? agent.id}</strong>
-                  <small>{agent.domain ?? "cross-domain"} · v{agent.version}</small>
-                </span>
-                <span>{agent.capabilities.length} capabilities</span>
-                <span className="state-label">
-                  deps {agent.agent_dependencies.length}
-                </span>
-                <span className="quality-label">
-                  sources {agent.source_dependencies.length}
-                </span>
-              </div>
-            ))}
+            {agents.map((agent) => {
+              const health = agentHealth[agent.id];
+              return (
+                <div className="observation-row" key={agent.id}>
+                  <span>
+                    <strong>{agent.name ?? agent.id}</strong>
+                    <small>{agent.domain ?? "cross-domain"} · v{agent.version}</small>
+                    <small>{agent.description}</small>
+                    <small>Checked: {timeValue(health?.checked_at)}</small>
+                  </span>
+                  <span>{health?.status ?? "unknown"}</span>
+                  <span className="state-label">
+                    {agent.capabilities.length > 0 ? agent.capabilities.join(", ") : "no capabilities"}
+                  </span>
+                  <span className="quality-label">
+                    {agent.agent_dependencies.length > 0
+                      ? `Depends on: ${agent.agent_dependencies.join(", ")}`
+                      : "No agent dependencies"}
+                    {health?.detail ? ` · ${health.detail}` : ""}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </article>
