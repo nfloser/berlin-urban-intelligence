@@ -16,7 +16,7 @@ The governance state was inspected on 2026-09-15 while addressing issue #5.
 - Reading classic branch protection for `main` returned HTTP 403 `Resource not accessible by integration`.
 - The connected GitHub integration can work with repository content, branches, issues, pull requests and CI, but it does not expose an administration mutation that can create or edit branch protection/rulesets in this session.
 - The current `CI` workflow runs on pull requests and on pushes to `main` and was not weakened by the governance change.
-- The check-run contexts emitted by the current GitHub Actions workflow are exactly `backend`, `frontend` and `containers`.
+- The check-run contexts emitted by the current GitHub Actions workflow are exactly `backend`, `frontend` and `containers`, and the observed source application for each check is GitHub Actions.
 
 Therefore this document does **not** claim that `main` is currently protected. Repository-owner administration is required to activate the rule below.
 
@@ -35,10 +35,11 @@ Use the following configuration:
 7. Enable **Require a pull request before merging**.
    - For this single-maintainer repository, use **0 required approving reviews** so the owner is not locked out of their own PRs. Review still occurs through the documented self-review/diff-review process and resolved conversations.
    - Enable **Require conversation resolution before merging** if that option is presented separately in the current GitHub UI.
-8. Enable **Require status checks to pass** and add these GitHub Actions checks:
+8. Enable **Require status checks to pass** and add these checks:
    - `backend`
    - `frontend`
    - `containers`
+   - For each required check, select **GitHub Actions** as the expected source application when GitHub offers the source selector. Do not allow an unrelated app or external status with the same context name to satisfy the gate.
 9. Enable **Require branches to be up to date before merging** for those required checks so the result corresponds to the current `main` base.
 10. Do **not** enable **Require linear history** while the project intentionally uses merge commits to preserve the test-first and incremental commit history of reviewed PRs.
 11. Do not replace the three required checks with a weaker aggregate or skip the `containers` gate; it includes Docker/Compose and Playwright browser acceptance.
@@ -51,7 +52,7 @@ With an active ruleset and no routine bypass actor, direct feature pushes to `ma
 After saving the ruleset:
 
 1. Re-open **Settings → Rules → Rulesets** and verify `Protect main` is **Active** and targets the default branch.
-2. Confirm the ruleset lists required checks `backend`, `frontend`, and `containers`.
+2. Confirm the ruleset lists required checks `backend`, `frontend`, and `containers`, sourced from GitHub Actions where the UI exposes an expected-source selector.
 3. Open a small PR from a non-`main` branch and verify GitHub reports all three checks as required before merge.
 4. Do not test protection by force-pushing or rewriting useful history. If a direct-push verification is desired, use a disposable no-op branch/ref workflow or inspect GitHub's rule evaluation UI instead.
 
