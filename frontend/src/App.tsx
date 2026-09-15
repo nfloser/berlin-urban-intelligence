@@ -60,6 +60,7 @@ const WORKFLOWS: Array<{ value: WorkflowKind; label: string }> = [
   { value: "heat_mobility_resilience", label: "Heat + mobility + resilience" },
 ];
 const REFERENCE_LAYERS: ReferenceMapLayer[] = ["facilities", "stops", "climate"];
+const EMPTY_FEATURE_COLLECTION: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 type LoadState = "loading" | "ready" | "error";
 type ActionState = "idle" | "running" | "error";
@@ -176,9 +177,17 @@ function App() {
     let disposed = false;
     const tracker = mapRequestTracker.current;
 
+    const clearReferenceSources = () => {
+      for (const sourceId of REFERENCE_LAYERS) {
+        const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+        source?.setData(EMPTY_FEATURE_COLLECTION);
+      }
+    };
+
     const loadViewport = async () => {
       const token = tracker.begin();
       const bounds = map.getBounds();
+      setMapLayersReady(false);
       try {
         const response = await fetchJson<ReferenceMapResponse>(
           buildReferenceMapPath(
@@ -196,6 +205,9 @@ function App() {
         setMapDataError(null);
       } catch (reason) {
         if (disposed || !tracker.isCurrent(token)) return;
+        clearReferenceSources();
+        setReferenceMap(null);
+        setMapLayersReady(false);
         setMapDataError(
           reason instanceof Error ? reason.message : "Could not load reference map data.",
         );
@@ -224,7 +236,7 @@ function App() {
     const climateData = featureCollectionForLayer(referenceMap, "climate");
     const inspectionData: FeatureCollection = mapSelection
       ? toFeatureCollection([mapSelection.item])
-      : { type: "FeatureCollection", features: [] };
+      : EMPTY_FEATURE_COLLECTION;
     const routeData = (geometry: RouteComparisonResponse["baseline_geometry"]): FeatureCollection => ({
       type: "FeatureCollection",
       features: geometry ? [{ type: "Feature", properties: {}, geometry }] : [],
