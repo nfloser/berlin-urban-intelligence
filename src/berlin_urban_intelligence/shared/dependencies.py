@@ -1,6 +1,8 @@
-"""Small dependency graph for freshness propagation of derived products."""
+"""Deterministic dependency graph for derived products and freshness propagation."""
 
 from __future__ import annotations
+
+from collections.abc import Iterable
 
 import networkx as nx
 
@@ -15,24 +17,40 @@ class DependencyGraph:
     def add_derivation(self, product_id: str, upstream_ids: list[str] | tuple[str, ...]) -> None:
         if not product_id:
             raise ValueError("product_id must not be empty")
+        if product_id in self._statuses:
+            raise ValueError(f"derived product already registered: {product_id}")
         if not upstream_ids:
             raise ValueError("a derivation requires at least one upstream dependency")
-        self._graph.add_node(product_id)
+        if len(set(upstream_ids)) != len(upstream_ids):
+            raise ValueError("duplicate upstream dependencies are not allowed")
+        if any(not upstream_id for upstream_id in upstream_ids):
+            raise ValueError("upstream dependency id must not be empty")
+
+        candidate = self._graph.copy()
+        candidate.add_node(product_id)
         for upstream_id in upstream_ids:
-            if not upstream_id:
-                raise ValueError("upstream dependency id must not be empty")
-            self._graph.add_edge(upstream_id, product_id)
-        if not nx.is_directed_acyclic_graph(self._graph):
-            self._graph.remove_node(product_id)
+            candidate.add_edge(upstream_id, product_id)
+        if not nx.is_directed_acyclic_graph(candidate):
             raise ValueError("derivation dependencies must remain acyclic")
+
+        self._graph = candidate
         self._statuses[product_id] = DerivationStatus.VALID
 
+    def dependencies(self, product_id: str) -> tuple[str, ...]:
+        if product_id not in self._statuses:
+            raise KeyError(f"unknown derived product: {product_id}")
+        return tuple(self._graph.predecessors(product_id))
+
+    def affected_order(self, upstream_ids: Iterable[str]) -> tuple[str, ...]:
+        affected: set[str] = set()
+        for upstream_id in upstream_ids:
+            if upstream_id in self._graph:
+                affected.update(nx.descendants(self._graph, upstream_id))
+        ordered = nx.topological_sort(self._graph)
+        return tuple(node for node in ordered if node in affected and node in self._statuses)
+
     def mark_upstream_changed(self, upstream_id: str) -> set[str]:
-        if upstream_id not in self._graph:
-            return set()
-        affected = {
-            node for node in nx.descendants(self._graph, upstream_id) if node in self._statuses
-        }
+        affected = set(self.affected_order((upstream_id,)))
         for product_id in affected:
             self._statuses[product_id] = DerivationStatus.STALE
         return affected
@@ -47,3 +65,6 @@ class DependencyGraph:
         if product_id not in self._statuses:
             raise KeyError(f"unknown derived product: {product_id}")
         self._statuses[product_id] = status
+
+    def products(self) -> tuple[str, ...]:
+        return tuple(node for node in nx.topological_sort(self._graph) if node in self._statuses)
