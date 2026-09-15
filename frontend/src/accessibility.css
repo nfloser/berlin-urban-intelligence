@@ -1,4 +1,4 @@
-:where(button, input, select, [tabindex]):focus-visible {
+:is(button, input, select, [tabindex]):focus-visible {
   outline: 3px solid #f0c75e;
   outline-offset: 3px;
 }
