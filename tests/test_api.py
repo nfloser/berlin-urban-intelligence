@@ -99,9 +99,9 @@ def test_invalid_runtime_replacement_preserves_last_known_good_state(monkeypatch
     RuntimeStateStore(runtime_path).save(RuntimeState(generated_at=generated_at))
 
     with TestClient(create_app()) as client:
-        assert client.get("/api/v1/system").json()["runtime_generated_at"] == generated_at.isoformat().replace(
-            "+00:00", "Z"
-        )
+        assert client.get("/api/v1/system").json()[
+            "runtime_generated_at"
+        ] == generated_at.isoformat().replace("+00:00", "Z")
         runtime_path.write_text("{not-valid-json", encoding="utf-8")
         response = client.get("/api/v1/system")
 
