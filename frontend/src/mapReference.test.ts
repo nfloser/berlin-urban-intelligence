@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ReferenceMapRequestTracker,
   buildReferenceMapPath,
   referenceLayerSummaries,
   type ReferenceMapResponse,
@@ -66,5 +67,18 @@ describe("viewport reference map semantics", () => {
         truncated: false,
       },
     ]);
+  });
+
+  it("marks an older viewport request stale as soon as a newer request starts", () => {
+    const tracker = new ReferenceMapRequestTracker();
+    const first = tracker.begin();
+    expect(tracker.isCurrent(first)).toBe(true);
+
+    const second = tracker.begin();
+    expect(tracker.isCurrent(first)).toBe(false);
+    expect(tracker.isCurrent(second)).toBe(true);
+
+    tracker.invalidate();
+    expect(tracker.isCurrent(second)).toBe(false);
   });
 });
