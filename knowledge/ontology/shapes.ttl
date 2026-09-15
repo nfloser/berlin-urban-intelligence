@@ -11,6 +11,16 @@ bui:ObservationShape a sh:NodeShape ;
     sh:property [ sh:path sosa:resultTime ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
     sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ] .
 
+bui:DerivedInformationShape a sh:NodeShape ;
+    sh:targetClass bui:DerivedInformation ;
+    sh:property [ sh:path bui:derivationDefinition ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path bui:derivationStatus ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path bui:freshnessStatus ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ;
+    sh:property [ sh:path bui:validAt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:property [ sh:path bui:computedAt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:property [ sh:path prov:wasGeneratedBy ; sh:minCount 1 ] ;
+    sh:property [ sh:path prov:wasDerivedFrom ; sh:minCount 1 ] .
+
 bui:ScenarioValueShape a sh:NodeShape ;
     sh:targetClass bui:ScenarioValue ;
     sh:property [ sh:path bui:dataState ; sh:hasValue "scenario" ] ;
