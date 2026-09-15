@@ -282,13 +282,17 @@ class CriticalFacility(UrbanEntity):
 
 
 class AgentDescriptor(CanonicalModel):
-    id: str
-    version: str
+    id: str = Field(min_length=1)
+    name: str | None = None
+    version: str = Field(min_length=1)
+    domain: str | None = None
     description: str
     capabilities: tuple[str, ...]
     input_contracts: tuple[str, ...] = ()
     output_contracts: tuple[str, ...] = ()
     source_dependencies: tuple[str, ...] = ()
+    agent_dependencies: tuple[str, ...] = ()
+    optional_agent_dependencies: tuple[str, ...] = ()
 
 
 class AgentHealth(CanonicalModel):
