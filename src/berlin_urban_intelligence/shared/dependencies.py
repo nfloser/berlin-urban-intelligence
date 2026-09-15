@@ -44,9 +44,7 @@ class DependencyGraph:
     def direct_downstream(self, input_id: str) -> tuple[str, ...]:
         if input_id not in self._graph:
             return ()
-        return tuple(
-            node for node in self._graph.successors(input_id) if node in self._statuses
-        )
+        return tuple(node for node in self._graph.successors(input_id) if node in self._statuses)
 
     def upstream(self, product_id: str) -> tuple[str, ...]:
         """Return lineage depth-first so every dependency appears before its consumer."""
