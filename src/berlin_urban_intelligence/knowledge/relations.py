@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from rdflib import BNode, URIRef
 from rdflib import Literal as RDFLiteral
+from rdflib.term import Node
 
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph, _resource
 
@@ -41,8 +42,8 @@ class SemanticRelations(BaseModel):
 def _relation(
     *,
     direction: Literal["incoming", "outgoing"],
-    predicate: URIRef,
-    related: object,
+    predicate: Node,
+    related: Node,
 ) -> SemanticRelation:
     if isinstance(related, URIRef):
         kind: Literal["resource", "literal", "blank_node"] = "resource"
