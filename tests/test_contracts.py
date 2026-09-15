@@ -5,9 +5,12 @@ from pydantic import ValidationError
 
 from berlin_urban_intelligence.shared.contracts import (
     DataState,
+    DerivedValue,
+    Forecast,
     Observation,
     Provenance,
     QualityFlag,
+    ScenarioValue,
     SpatialReference,
 )
 
@@ -68,6 +71,66 @@ def test_naive_time_is_rejected() -> None:
             state=DataState.OBSERVED,
             quality=QualityFlag.VALID,
             provenance=provenance(),
+        )
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_observation_rejects_non_finite_numeric_values(value: float) -> None:
+    with pytest.raises(ValidationError):
+        Observation(
+            id="fixture:obs",
+            entity_id="fixture:entity",
+            phenomenon="temperature",
+            value=value,
+            unit="Cel",
+            observed_at=NOW,
+            state=DataState.OBSERVED,
+            quality=QualityFlag.VALID,
+            provenance=provenance(),
+        )
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_derived_value_rejects_non_finite_numeric_values(value: float) -> None:
+    with pytest.raises(ValidationError):
+        DerivedValue(
+            id="fixture:derived",
+            entity_id="fixture:entity",
+            phenomenon="heat_signal",
+            value=value,
+            unit="1",
+            valid_at=NOW,
+            state=DataState.DERIVED,
+            quality=QualityFlag.VALID,
+            provenance=provenance(),
+        )
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_forecast_rejects_non_finite_numeric_values(value: float) -> None:
+    with pytest.raises(ValidationError):
+        Forecast(
+            id="fixture:forecast",
+            entity_id="fixture:entity",
+            phenomenon="load",
+            value=value,
+            unit="MW",
+            issued_at=NOW,
+            valid_at=NOW,
+            quality=QualityFlag.VALID,
+            provenance=provenance(),
+        )
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_scenario_value_rejects_non_finite_numeric_values(value: float) -> None:
+    with pytest.raises(ValidationError):
+        ScenarioValue(
+            id="fixture:scenario",
+            phenomenon="temperature_delta",
+            value=value,
+            unit="Cel",
+            scenario_id="fixture:scenario-id",
         )
 
 
