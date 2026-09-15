@@ -2,7 +2,8 @@
 
 This command performs network I/O. It has no synthetic fallback. With ``--interval-seconds`` it runs
 as a persistent acquisition worker; otherwise it performs one refresh and exits. Derived products
-are rebuilt only from the successfully persisted source-backed runtime snapshot.
+are updated through the dependency-aware refresh coordinator after the source-backed runtime state
+has been persisted.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from pathlib import Path
 from berlin_urban_intelligence.knowledge.derived_graph import project_derived_state
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
 from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedStateStore
-from berlin_urban_intelligence.runtime.derived_products import DerivedProductBuilder
+from berlin_urban_intelligence.runtime.derived_refresh import DerivedRefreshCoordinator
 from berlin_urban_intelligence.runtime.refresh import RefreshCoordinator
 from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
 from berlin_urban_intelligence.runtime.worker import SnapshotRefreshWorker
@@ -58,7 +59,7 @@ def main() -> int:
 
     store = RuntimeStateStore(Path(args.state))
     derived_store = DerivedStateStore(Path(args.derived))
-    product_builder = DerivedProductBuilder()
+    derived_refresh = DerivedRefreshCoordinator()
     worker = SnapshotRefreshWorker(
         coordinator=RefreshCoordinator(),
         store=store,
@@ -67,10 +68,12 @@ def main() -> int:
     rdf_path = Path(args.rdf)
 
     def after_refresh(state: RuntimeState) -> None:
-        derived = product_builder.build(state)
-        derived_store.save(derived)
-        _write_rdf(state, derived, rdf_path)
-        _print_summary(state, args.state, len(derived.records))
+        previous_derived = derived_store.load()
+        outcome = derived_refresh.refresh(state, previous_derived)
+        if outcome.changed:
+            derived_store.save(outcome.state)
+        _write_rdf(state, outcome.state, rdf_path)
+        _print_summary(state, args.state, len(outcome.state.records))
 
     if args.interval_seconds > 0:
         worker.run_forever(after_refresh=after_refresh)
