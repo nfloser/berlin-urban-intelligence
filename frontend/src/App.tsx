@@ -380,6 +380,11 @@ function App() {
       map.off("load", maybeInstallLayers);
     };
 
+    if (map.getSource("facilities")) {
+      installLayers();
+      return;
+    }
+
     maybeInstallLayers();
     if (!map.isStyleLoaded()) {
       map.on("styledata", maybeInstallLayers);
