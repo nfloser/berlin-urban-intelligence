@@ -43,10 +43,10 @@ class StubAgent(BaseAgent):
 def registry() -> AgentRegistry:
     result = AgentRegistry()
     result.register(StubAgent("heat", "heat_state"))
-    result.register(StubAgent("energy", "energy_state"))
+    result.register(StubAgent("energy", "energy_forecast_contract"))
     result.register(StubAgent("mobility", "mobility_state"))
     result.register(StubAgent("exposure", "exposure_state"))
-    result.register(StubAgent("resilience", "resilience_state", ("mobility",)))
+    result.register(StubAgent("resilience", "accessibility", ("mobility",)))
     return result
 
 
@@ -70,5 +70,5 @@ def test_missing_capability_is_reported_without_synthetic_agent() -> None:
     result = orchestrator.execute(OrchestrationRequest(workflow=WorkflowKind.HEAT_ENERGY))
 
     assert result.status is AvailabilityStatus.DEGRADED
-    assert result.missing_capabilities == ["energy_state"]
+    assert result.missing_capabilities == ["energy_forecast_contract"]
     assert result.agent_health["heat"].status is AvailabilityStatus.AVAILABLE
