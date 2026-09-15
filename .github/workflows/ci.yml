@@ -60,6 +60,14 @@ jobs:
           npx playwright install --with-deps chromium
       - run: docker compose config
       - run: docker build -t berlin-urban-intelligence:ci .
+      - name: Seed deterministic browser acceptance reference state
+        run: |
+          mkdir -p data/runtime
+          docker run --rm --user 0 \
+            -v "$PWD/data:/app/data" \
+            berlin-urban-intelligence:ci \
+            python scripts/write_acceptance_fixtures.py \
+            --reference /app/data/runtime/reference.json
       - run: docker build -t berlin-urban-intelligence-dashboard:ci frontend
       - name: Start composed stack and verify HTTP and browser behavior
         run: |
