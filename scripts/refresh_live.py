@@ -1,7 +1,8 @@
 """Acquire currently available real data and persist canonical state plus RDF.
 
 This command performs network I/O. It has no synthetic fallback. With ``--interval-seconds`` it runs
-as a persistent acquisition worker; otherwise it performs one refresh and exits.
+as a persistent acquisition worker; otherwise it performs one refresh and exits. Derived products
+are rebuilt only from the successfully persisted source-backed runtime snapshot.
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ import argparse
 from pathlib import Path
 
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
+from berlin_urban_intelligence.runtime.derived import DerivedStateStore
+from berlin_urban_intelligence.runtime.derived_products import DerivedProductBuilder
 from berlin_urban_intelligence.runtime.refresh import RefreshCoordinator
 from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
 from berlin_urban_intelligence.runtime.worker import SnapshotRefreshWorker
@@ -23,10 +26,11 @@ def _write_rdf(state: RuntimeState, path: Path) -> None:
     path.write_text(graph.serialize(), encoding="utf-8")
 
 
-def _print_summary(state: RuntimeState, state_path: str) -> None:
+def _print_summary(state: RuntimeState, state_path: str, derived_records: int) -> None:
     print(f"runtime_state={state_path}", flush=True)
     print(f"observations={len(state.observations)}", flush=True)
     print(f"mobility_snapshot={'yes' if state.mobility is not None else 'no'}", flush=True)
+    print(f"derived_records={derived_records}", flush=True)
     for source_id, source_state in sorted(state.source_statuses.items()):
         print(
             f"source={source_id} availability={source_state.availability.value} "
@@ -38,6 +42,7 @@ def _print_summary(state: RuntimeState, state_path: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state", default="data/runtime/state.json")
+    parser.add_argument("--derived", default="data/runtime/derived.json")
     parser.add_argument("--rdf", default="data/generated/latest.ttl")
     parser.add_argument(
         "--interval-seconds",
@@ -50,6 +55,8 @@ def main() -> int:
         parser.error("--interval-seconds must be non-negative")
 
     store = RuntimeStateStore(Path(args.state))
+    derived_store = DerivedStateStore(Path(args.derived))
+    product_builder = DerivedProductBuilder()
     worker = SnapshotRefreshWorker(
         coordinator=RefreshCoordinator(),
         store=store,
@@ -58,8 +65,10 @@ def main() -> int:
     rdf_path = Path(args.rdf)
 
     def after_refresh(state: RuntimeState) -> None:
+        derived = product_builder.build(state)
+        derived_store.save(derived)
         _write_rdf(state, rdf_path)
-        _print_summary(state, args.state)
+        _print_summary(state, args.state, len(derived.records))
 
     if args.interval_seconds > 0:
         worker.run_forever(after_refresh=after_refresh)
