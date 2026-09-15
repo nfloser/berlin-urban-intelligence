@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from numbers import Real
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from berlin_urban_intelligence.runtime.reference import ReferenceState
 from berlin_urban_intelligence.shared.contracts import (
@@ -21,6 +21,7 @@ from berlin_urban_intelligence.shared.contracts import (
 
 MapLayer = Literal["facilities", "stops", "climate"]
 MAP_LAYERS: tuple[MapLayer, ...] = ("facilities", "stops", "climate")
+MapItem = CriticalFacility | UrbanEntity | OfficialModelFeature
 
 
 @dataclass(frozen=True)
@@ -53,7 +54,8 @@ def parse_layers(value: str) -> tuple[MapLayer, ...]:
     unknown = [layer for layer in requested if layer not in MAP_LAYERS]
     if unknown:
         raise ValueError(f"unknown map layer: {', '.join(unknown)}")
-    return tuple(dict.fromkeys(requested))  # type: ignore[return-value]
+    deduplicated = tuple(dict.fromkeys(requested))
+    return cast(tuple[MapLayer, ...], deduplicated)
 
 
 def _coordinate_pairs(value: Any) -> Iterable[tuple[float, float]]:
@@ -106,36 +108,33 @@ def _mappable(item: object, bounds: MapBounds) -> bool:
     return item_bounds is not None and bounds.intersects(item_bounds)
 
 
-def _feature(item: CriticalFacility | UrbanEntity | OfficialModelFeature, layer: MapLayer) -> dict[str, Any]:
+def _feature(item: MapItem, layer: MapLayer) -> dict[str, Any]:
     spatial = item.spatial
     assert spatial is not None and spatial.geometry is not None
     properties: dict[str, Any] = {"id": item.id, "layer": layer}
     if layer == "facilities":
-        facility = item
-        assert isinstance(facility, CriticalFacility)
+        assert isinstance(item, CriticalFacility)
         properties.update(
-            name=facility.name,
-            category=facility.category,
-            quality=facility.quality.value,
-            source_identifier=facility.source_identifier,
+            name=item.name,
+            category=item.category,
+            quality=item.quality.value,
+            source_identifier=item.source_identifier,
         )
     elif layer == "stops":
-        stop = item
-        assert isinstance(stop, UrbanEntity)
+        assert isinstance(item, UrbanEntity)
         properties.update(
-            name=stop.name,
-            entity_type=stop.entity_type,
-            source_identifier=stop.source_identifier,
+            name=item.name,
+            entity_type=item.entity_type,
+            source_identifier=item.source_identifier,
         )
     else:
-        climate = item
-        assert isinstance(climate, OfficialModelFeature)
+        assert isinstance(item, OfficialModelFeature)
         properties.update(
-            entity_id=climate.entity_id,
-            model_name=climate.model_name,
-            feature_type=climate.feature_type,
-            quality=climate.quality.value,
-            state=climate.state.value,
+            entity_id=item.entity_id,
+            model_name=item.model_name,
+            feature_type=item.feature_type,
+            quality=item.quality.value,
+            state=item.state.value,
         )
     return {
         "type": "Feature",
@@ -145,9 +144,9 @@ def _feature(item: CriticalFacility | UrbanEntity | OfficialModelFeature, layer:
     }
 
 
-def _layer_items(
-    state: ReferenceState, layer: MapLayer
-) -> Sequence[CriticalFacility | UrbanEntity | OfficialModelFeature]:
+def _layer_items(state: ReferenceState | None, layer: MapLayer) -> Sequence[MapItem]:
+    if state is None:
+        return ()
     if layer == "facilities":
         return state.critical_facilities
     if layer == "stops":
@@ -156,7 +155,7 @@ def _layer_items(
 
 
 def reference_feature_collection(
-    state: ReferenceState,
+    state: ReferenceState | None,
     *,
     bounds: MapBounds,
     layers: tuple[MapLayer, ...] = MAP_LAYERS,
