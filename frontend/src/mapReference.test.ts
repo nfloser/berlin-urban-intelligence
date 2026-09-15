@@ -1,10 +1,39 @@
 import { describe, expect, it } from "vitest";
 import {
   ReferenceMapRequestTracker,
+  buildReferenceDetailPath,
   buildReferenceMapPath,
+  featureCollectionForLayer,
   referenceLayerSummaries,
   type ReferenceMapResponse,
 } from "./mapReference";
+
+function fixtureResponse(): ReferenceMapResponse {
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        id: "facility:inside",
+        geometry: { type: "Point", coordinates: [13.405, 52.52] },
+        properties: { id: "facility:inside", layer: "facilities" },
+      },
+      {
+        type: "Feature",
+        id: "stop:inside",
+        geometry: { type: "Point", coordinates: [13.41, 52.521] },
+        properties: { id: "stop:inside", layer: "stops" },
+      },
+    ],
+    metadata: {
+      bounds: { west: 13.3, south: 52.4, east: 13.6, north: 52.7 },
+      totals: { facilities: 213, stops: 42133, climate: 8963 },
+      matched: { facilities: 12, stops: 4200, climate: 120 },
+      returned: { facilities: 12, stops: 2500, climate: 120 },
+      truncated: { facilities: false, stops: true, climate: false },
+    },
+  };
+}
 
 describe("viewport reference map semantics", () => {
   it("builds a deterministic bbox request for the active viewport", () => {
@@ -29,19 +58,7 @@ describe("viewport reference map semantics", () => {
   });
 
   it("reports matched, returned and truncation per visible layer", () => {
-    const response: ReferenceMapResponse = {
-      type: "FeatureCollection",
-      features: [],
-      metadata: {
-        bounds: { west: 13.3, south: 52.4, east: 13.6, north: 52.7 },
-        totals: { facilities: 213, stops: 42133, climate: 8963 },
-        matched: { facilities: 12, stops: 4200, climate: 120 },
-        returned: { facilities: 12, stops: 2500, climate: 120 },
-        truncated: { facilities: false, stops: true, climate: false },
-      },
-    };
-
-    expect(referenceLayerSummaries(response.metadata)).toEqual([
+    expect(referenceLayerSummaries(fixtureResponse().metadata)).toEqual([
       {
         key: "facilities",
         label: "Critical facilities",
@@ -67,6 +84,22 @@ describe("viewport reference map semantics", () => {
         truncated: false,
       },
     ]);
+  });
+
+  it("projects a mixed viewport response into one map source per layer", () => {
+    const facilities = featureCollectionForLayer(fixtureResponse(), "facilities");
+    const stops = featureCollectionForLayer(fixtureResponse(), "stops");
+    const climate = featureCollectionForLayer(fixtureResponse(), "climate");
+
+    expect(facilities.features.map((feature) => feature.id)).toEqual(["facility:inside"]);
+    expect(stops.features.map((feature) => feature.id)).toEqual(["stop:inside"]);
+    expect(climate.features).toEqual([]);
+  });
+
+  it("builds an encoded canonical detail path from rendered layer identity", () => {
+    expect(buildReferenceDetailPath("facilities", "facility:inside/ward a")).toBe(
+      "/api/v1/map/reference/facilities/facility%3Ainside%2Fward%20a",
+    );
   });
 
   it("marks an older viewport request stale as soon as a newer request starts", () => {
