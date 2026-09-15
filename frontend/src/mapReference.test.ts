@@ -176,6 +176,19 @@ describe("viewport reference map semantics", () => {
     expect(hit).toEqual({ layer: "facilities", id: "facility:inside" });
   });
 
+  it("does not select point objects from hidden layers", () => {
+    const response = fixtureResponse();
+    const hit = referencePointHit(
+      response,
+      { x: 10, y: 10 },
+      () => ({ x: 10, y: 10 }),
+      8,
+      ["stops"],
+    );
+
+    expect(hit).toEqual({ layer: "stops", id: "stop:inside" });
+  });
+
   it("returns no point hit outside the tolerance", () => {
     const hit = referencePointHit(fixtureResponse(), { x: 0, y: 0 }, () => ({ x: 50, y: 50 }));
     expect(hit).toBeNull();
