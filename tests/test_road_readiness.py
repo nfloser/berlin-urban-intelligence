@@ -40,12 +40,8 @@ def _snapshot(*, imputed: bool = True) -> RoadNetworkSnapshot:
         retrieved_at=NOW,
         source_query="Mitte, Berlin, Germany",
         nodes=(
-            NetworkNode(
-                id="osm-node:1", longitude=13.4, latitude=52.5, provenance=provenance
-            ),
-            NetworkNode(
-                id="osm-node:2", longitude=13.41, latitude=52.51, provenance=provenance
-            ),
+            NetworkNode(id="osm-node:1", longitude=13.4, latitude=52.5, provenance=provenance),
+            NetworkNode(id="osm-node:2", longitude=13.41, latitude=52.51, provenance=provenance),
         ),
         edges=(
             NetworkEdge(
@@ -62,9 +58,7 @@ def _snapshot(*, imputed: bool = True) -> RoadNetworkSnapshot:
 
 
 def test_readiness_report_proves_real_osm_contract_and_baseline_route() -> None:
-    report = verify_road_network_snapshot(
-        _snapshot(), require_speed_imputation_visible=True
-    )
+    report = verify_road_network_snapshot(_snapshot(), require_speed_imputation_visible=True)
 
     assert report.source_query == "Mitte, Berlin, Germany"
     assert report.node_count == 2
@@ -95,11 +89,7 @@ def test_readiness_rejects_dangling_edge_endpoint() -> None:
     snapshot = RoadNetworkSnapshot(
         retrieved_at=NOW,
         source_query="Mitte, Berlin, Germany",
-        nodes=(
-            NetworkNode(
-                id="osm-node:1", longitude=13.4, latitude=52.5, provenance=provenance
-            ),
-        ),
+        nodes=(NetworkNode(id="osm-node:1", longitude=13.4, latitude=52.5, provenance=provenance),),
         edges=(
             NetworkEdge(
                 id="osm:1:2:0:10",
@@ -158,9 +148,7 @@ class _FakeOsmnx:
         self.routing = _FakeRouting()
 
     @staticmethod
-    def graph_from_place(
-        place: str, *, network_type: str, simplify: bool
-    ) -> nx.MultiDiGraph[str]:
+    def graph_from_place(place: str, *, network_type: str, simplify: bool) -> nx.MultiDiGraph[str]:
         assert place == "Mitte, Berlin, Germany"
         assert network_type == "drive"
         assert simplify is True
