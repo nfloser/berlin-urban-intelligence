@@ -81,7 +81,9 @@ def state() -> DerivedState:
 def test_reexecution_recomputes_only_affected_products_in_dependency_order() -> None:
     calls: list[str] = []
 
-    def heat_handler(definition: DerivationDefinition, previous: DerivationRecord) -> DerivationRecord:
+    def heat_handler(
+        definition: DerivationDefinition, previous: DerivationRecord
+    ) -> DerivationRecord:
         calls.append(definition.id)
         return previous.model_copy(
             update={"value": "new-heat", "computed_at": LATER, "valid_at": LATER}
@@ -146,9 +148,9 @@ def test_failed_derivation_isolated_and_downstream_result_becomes_unavailable() 
 
 
 def test_missing_handler_leaves_product_stale_instead_of_claiming_current_data() -> None:
-    updated, report = DerivationExecutor(
-        state(), handlers={}, now_factory=lambda: LATER
-    ).recompute(("obs:temperature",))
+    updated, report = DerivationExecutor(state(), handlers={}, now_factory=lambda: LATER).recompute(
+        ("obs:temperature",)
+    )
 
     by_id = {item.id: item for item in updated.records}
     assert report.missing_handlers == ("derived:heat",)
