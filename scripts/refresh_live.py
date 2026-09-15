@@ -10,18 +10,20 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from berlin_urban_intelligence.knowledge.derived_graph import project_derived_state
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
-from berlin_urban_intelligence.runtime.derived import DerivedStateStore
+from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedStateStore
 from berlin_urban_intelligence.runtime.derived_products import DerivedProductBuilder
 from berlin_urban_intelligence.runtime.refresh import RefreshCoordinator
 from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
 from berlin_urban_intelligence.runtime.worker import SnapshotRefreshWorker
 
 
-def _write_rdf(state: RuntimeState, path: Path) -> None:
+def _write_rdf(state: RuntimeState, derived: DerivedState, path: Path) -> None:
     graph = KnowledgeGraph()
     for observation in state.observations:
         graph.add_observation(observation)
+    project_derived_state(graph, derived)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(graph.serialize(), encoding="utf-8")
 
@@ -67,7 +69,7 @@ def main() -> int:
     def after_refresh(state: RuntimeState) -> None:
         derived = product_builder.build(state)
         derived_store.save(derived)
-        _write_rdf(state, rdf_path)
+        _write_rdf(state, derived, rdf_path)
         _print_summary(state, args.state, len(derived.records))
 
     if args.interval_seconds > 0:
