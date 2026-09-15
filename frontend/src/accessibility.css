@@ -1,0 +1,42 @@
+:where(button, input, select, [tabindex]):focus-visible {
+  outline: 3px solid #f0c75e;
+  outline-offset: 3px;
+}
+
+.keyboard-routing-card {
+  min-width: 0;
+}
+
+.keyboard-routing-card legend {
+  padding: 0 6px;
+  color: #e7eef7;
+  font-weight: 650;
+}
+
+.keyboard-coordinate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.keyboard-coordinate-grid .field {
+  margin: 0;
+}
+
+.keyboard-node-status {
+  align-self: center;
+  color: #9fb0c2;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.keyboard-routing-card .primary-action + .primary-action {
+  margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  .keyboard-coordinate-grid {
+    grid-template-columns: 1fr;
+  }
+}
