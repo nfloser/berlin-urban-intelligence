@@ -6,6 +6,7 @@ import {
   featureCollectionForLayer,
   referenceHitTestBox,
   referenceLayerSummaries,
+  referencePointHit,
   type ReferenceMapResponse,
 } from "./mapReference";
 
@@ -153,6 +154,31 @@ describe("viewport reference map semantics", () => {
       [96, 196],
       [104, 204],
     ]);
+  });
+
+  it("falls back to viewport point geometry when the rendered feature index lags", () => {
+    const hit = referencePointHit(
+      fixtureResponse(),
+      { x: 400, y: 300 },
+      ([longitude, latitude]) => ({
+        x: 400 + (longitude - 13.405) * 1000,
+        y: 300 - (latitude - 52.52) * 1000,
+      }),
+    );
+
+    expect(hit).toEqual({ layer: "facilities", id: "facility:inside" });
+  });
+
+  it("prefers facilities over stops when point hit areas overlap", () => {
+    const response = fixtureResponse();
+    const hit = referencePointHit(response, { x: 10, y: 10 }, () => ({ x: 10, y: 10 }));
+
+    expect(hit).toEqual({ layer: "facilities", id: "facility:inside" });
+  });
+
+  it("returns no point hit outside the tolerance", () => {
+    const hit = referencePointHit(fixtureResponse(), { x: 0, y: 0 }, () => ({ x: 50, y: 50 }));
+    expect(hit).toBeNull();
   });
 
   it("marks an older viewport request stale as soon as a newer request starts", () => {
