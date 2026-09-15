@@ -188,7 +188,7 @@ def test_assessment_accepts_current_heat_and_energy_baselines() -> None:
     assert assessment.heat is not None
     assert assessment.heat.value == 23.0
     assert assessment.energy is not None
-    assert assessment.energy.value == 110.0
+    assert assessment.energy.value == pytest.approx(110.0)
     assert assessment.unavailable_dimensions == []
 
 
