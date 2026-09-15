@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import App from "./App";
 import { fetchJson, systemSnapshotToken, type SystemResponse } from "./api";
 import DerivedInspector from "./DerivedInspector";
+import PlatformInspector from "./PlatformInspector";
 
 const SNAPSHOT_POLL_INTERVAL_MS = 15_000;
 
@@ -46,6 +47,7 @@ export default function AutoRefreshingApp() {
     <>
       <App key={`dashboard-${revision}`} />
       <DerivedInspector key={`derived-${revision}`} />
+      <PlatformInspector key={`platform-${revision}`} />
     </>
   );
 }
