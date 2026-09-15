@@ -19,10 +19,10 @@ export type Provenance = {
   dataset: string;
   source_url: string;
   original_identifier?: string | null;
-  observed_at?: string | null;
+  observation_time?: string | null;
   retrieved_at: string;
   processed_at: string;
-  processing_method: string;
+  processing_method?: string | null;
   agent: string;
   agent_version: string;
   model_version?: string | null;
@@ -97,8 +97,57 @@ export type SystemResponse = {
   contract_version: string;
   runtime_generated_at: string | null;
   reference_generated_at: string | null;
+  energy_generated_at: string | null;
+  derived_generated_at: string | null;
   snapshot_reload: Record<string, SnapshotReloadDiagnostic>;
   synthetic_production_fallback: boolean;
+};
+
+export type DerivationDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  producer_agent_id: string;
+  producer_version: string;
+  algorithm_version: string;
+  output_kind: string;
+};
+
+export type DerivationInput = {
+  id: string;
+  role: string;
+  required: boolean;
+};
+
+export type DerivationRecord = {
+  id: string;
+  definition_id: string;
+  entity_id: string;
+  phenomenon: string;
+  value: unknown;
+  unit?: string | null;
+  valid_at: string;
+  computed_at: string;
+  quality: string;
+  freshness: string;
+  status: string;
+  inputs: DerivationInput[];
+  provenance: Provenance;
+  context: "baseline" | "scenario";
+  scenario_id?: string | null;
+};
+
+export type DerivedStateResponse = {
+  generated_at: string | null;
+  definitions: DerivationDefinition[];
+  records: DerivationRecord[];
+};
+
+export type DependencyResponse = {
+  resource_id: string;
+  upstream: string[];
+  downstream: string[];
+  status: string | null;
 };
 
 export type WorkflowKind =
@@ -112,6 +161,8 @@ export type OrchestrationResponse = {
   plan: {
     workflow: WorkflowKind;
     agents: string[];
+    required_capabilities: string[];
+    missing_capabilities: string[];
     requires_llm: false;
     note: string;
   };
@@ -121,6 +172,7 @@ export type OrchestrationResponse = {
     status: string;
     agent_health: Record<string, Health>;
     missing_agents: string[];
+    missing_capabilities: string[];
     requires_llm: false;
     note: string;
   };
@@ -276,7 +328,10 @@ export function mapLayerCounts(counts: {
 }
 
 export function systemSnapshotToken(system: SystemResponse): string {
-  return [system.runtime_generated_at ?? "missing", system.reference_generated_at ?? "missing"].join(
-    "|",
-  );
+  return [
+    system.runtime_generated_at ?? "missing",
+    system.reference_generated_at ?? "missing",
+    system.energy_generated_at ?? "missing",
+    system.derived_generated_at ?? "missing",
+  ].join("|");
 }
