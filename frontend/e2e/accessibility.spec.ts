@@ -100,10 +100,10 @@ test("keyboard-only analytical controls expose visible focus and a non-map routi
     keyboardRouting.getByText("Destination node: acceptance-node-b", { exact: true }),
   ).toBeVisible();
 
-  const baseline = page.getByRole("button", { name: "Show baseline route" });
+  const baseline = page.getByRole("button", { name: "Show keyboard baseline route" });
   await baseline.focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByLabel("Disrupted route segment")).toBeVisible();
+  await expect(page.getByLabel("Keyboard disrupted route segment")).toBeVisible();
 
   await expectNoCriticalOrSeriousViolations(page, "keyboard routing result");
 });
