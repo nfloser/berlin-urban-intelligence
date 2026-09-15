@@ -24,13 +24,23 @@ import {
   displayValue,
   fetchJson,
   heatAssessmentRequest,
-  mapLayerCounts,
   networkDisruptionRequest,
   postJson,
   routeRequest,
   toFeatureCollection,
 } from "./api";
 import MapEntityInspector, { type MapSelection } from "./MapEntityInspector";
+import {
+  ReferenceMapRequestTracker,
+  buildReferenceDetailPath,
+  buildReferenceMapPath,
+  featureCollectionForLayer,
+  referenceHitTestBox,
+  referenceLayerSummaries,
+  referencePointHit,
+  type ReferenceMapLayer,
+  type ReferenceMapResponse,
+} from "./mapReference";
 
 const BASE_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const FALLBACK_STYLE: StyleSpecification = {
@@ -51,6 +61,8 @@ const WORKFLOWS: Array<{ value: WorkflowKind; label: string }> = [
   { value: "mobility_resilience", label: "Mobility + resilience" },
   { value: "heat_mobility_resilience", label: "Heat + mobility + resilience" },
 ];
+const REFERENCE_LAYERS: ReferenceMapLayer[] = ["facilities", "stops", "climate"];
+const EMPTY_FEATURE_COLLECTION: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 type LoadState = "loading" | "ready" | "error";
 type ActionState = "idle" | "running" | "error";
@@ -63,16 +75,18 @@ function StatusBadge({ health }: { health?: Health }) {
 function App() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const mapRequestTracker = useRef(new ReferenceMapRequestTracker());
+  const detailRequestTracker = useRef(new ReferenceMapRequestTracker());
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [error, setError] = useState<string | null>(null);
   const [system, setSystem] = useState<SystemResponse | null>(null);
   const [health, setHealth] = useState<Record<string, Health>>({});
   const [mobility, setMobility] = useState<MobilityResponse | null>(null);
   const [energy, setEnergy] = useState<EnergyResponse | null>(null);
-  const [facilities, setFacilities] = useState<CriticalFacility[]>([]);
-  const [stops, setStops] = useState<UrbanEntity[]>([]);
-  const [climate, setClimate] = useState<OfficialModelFeature[]>([]);
+  const [referenceMap, setReferenceMap] = useState<ReferenceMapResponse | null>(null);
+  const [mapDataError, setMapDataError] = useState<string | null>(null);
   const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
+  const [mapSelectionError, setMapSelectionError] = useState<string | null>(null);
   const [mapLayersReady, setMapLayersReady] = useState(false);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [selectedObservationId, setSelectedObservationId] = useState<string | null>(null);
@@ -100,6 +114,8 @@ function App() {
 
   const selectedObservation =
     observations.find((item) => item.id === selectedObservationId) ?? null;
+  const layerSummaries = referenceMap ? referenceLayerSummaries(referenceMap.metadata) : [];
+  const referenceMapTruncated = layerSummaries.some((layer) => layer.truncated);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,35 +124,18 @@ function App() {
       fetchJson<Record<string, Health>>("/api/v1/agents/health"),
       fetchJson<MobilityResponse>("/api/v1/mobility"),
       fetchJson<EnergyResponse>("/api/v1/energy"),
-      fetchJson<CriticalFacility[]>("/api/v1/facilities?limit=1000"),
-      fetchJson<UrbanEntity[]>("/api/v1/transport-stops?limit=1000"),
-      fetchJson<OfficialModelFeature[]>("/api/v1/climate-features?limit=1000"),
       fetchJson<Observation[]>("/api/v1/observations?limit=250"),
     ])
-      .then(
-        ([
-          systemValue,
-          healthValue,
-          mobilityValue,
-          energyValue,
-          facilityValue,
-          stopValue,
-          climateValue,
-          observationValue,
-        ]) => {
-          if (cancelled) return;
-          setSystem(systemValue);
-          setHealth(healthValue);
-          setMobility(mobilityValue);
-          setEnergy(energyValue);
-          setFacilities(facilityValue);
-          setStops(stopValue);
-          setClimate(climateValue);
-          setObservations(observationValue);
-          setSelectedObservationId(observationValue[0]?.id ?? null);
-          setLoadState("ready");
-        },
-      )
+      .then(([systemValue, healthValue, mobilityValue, energyValue, observationValue]) => {
+        if (cancelled) return;
+        setSystem(systemValue);
+        setHealth(healthValue);
+        setMobility(mobilityValue);
+        setEnergy(energyValue);
+        setObservations(observationValue);
+        setSelectedObservationId(observationValue[0]?.id ?? null);
+        setLoadState("ready");
+      })
       .catch((reason: unknown) => {
         if (cancelled) return;
         setError(reason instanceof Error ? reason.message : "Unknown API error");
@@ -177,18 +176,72 @@ function App() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || loadState !== "ready") return;
+    let disposed = false;
+    const tracker = mapRequestTracker.current;
+
+    const clearReferenceSources = () => {
+      for (const sourceId of REFERENCE_LAYERS) {
+        const source = map.getSource(sourceId) as GeoJSONSource | undefined;
+        source?.setData(EMPTY_FEATURE_COLLECTION);
+      }
+    };
+
+    const loadViewport = async () => {
+      const token = tracker.begin();
+      const bounds = map.getBounds();
+      setMapLayersReady(false);
+      try {
+        const response = await fetchJson<ReferenceMapResponse>(
+          buildReferenceMapPath(
+            {
+              west: bounds.getWest(),
+              south: bounds.getSouth(),
+              east: bounds.getEast(),
+              north: bounds.getNorth(),
+            },
+            REFERENCE_LAYERS,
+          ),
+        );
+        if (disposed || !tracker.isCurrent(token)) return;
+        setReferenceMap(response);
+        setMapDataError(null);
+      } catch (reason) {
+        if (disposed || !tracker.isCurrent(token)) return;
+        clearReferenceSources();
+        setReferenceMap(null);
+        setMapLayersReady(false);
+        setMapDataError(
+          reason instanceof Error ? reason.message : "Could not load reference map data.",
+        );
+      }
+    };
+
+    const onMoveEnd = () => {
+      void loadViewport();
+    };
+    map.on("moveend", onMoveEnd);
+    void loadViewport();
+
+    return () => {
+      disposed = true;
+      tracker.invalidate();
+      map.off("moveend", onMoveEnd);
+    };
+  }, [loadState]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || loadState !== "ready" || referenceMap === null) return;
     setMapLayersReady(false);
-    const facilityData = toFeatureCollection(facilities);
-    const stopData = toFeatureCollection(stops);
-    const climateData = toFeatureCollection(climate);
+    const facilityData = featureCollectionForLayer(referenceMap, "facilities");
+    const stopData = featureCollectionForLayer(referenceMap, "stops");
+    const climateData = featureCollectionForLayer(referenceMap, "climate");
     const inspectionData: FeatureCollection = mapSelection
       ? toFeatureCollection([mapSelection.item])
-      : { type: "FeatureCollection", features: [] };
+      : EMPTY_FEATURE_COLLECTION;
     const routeData = (geometry: RouteComparisonResponse["baseline_geometry"]): FeatureCollection => ({
       type: "FeatureCollection",
-      features: geometry
-        ? [{ type: "Feature", properties: {}, geometry }]
-        : [],
+      features: geometry ? [{ type: "Feature", properties: {}, geometry }] : [],
     });
     const baselineRouteData = routeData(
       routeComparison?.baseline_geometry ?? routeBaseline?.geometry ?? null,
@@ -229,7 +282,11 @@ function App() {
           id: "climate-fill",
           type: "fill",
           source: "climate",
-          paint: { "fill-color": "#e0a458", "fill-outline-color": "#e0a458", "fill-opacity": 0.24 },
+          paint: {
+            "fill-color": "#e0a458",
+            "fill-outline-color": "#e0a458",
+            "fill-opacity": 0.24,
+          },
         });
       }
       if (!map.getLayer("stops-circle")) {
@@ -325,6 +382,11 @@ function App() {
       map.off("load", maybeInstallLayers);
     };
 
+    if (map.getSource("facilities")) {
+      installLayers();
+      return;
+    }
+
     maybeInstallLayers();
     if (!map.isStyleLoaded()) {
       map.on("styledata", maybeInstallLayers);
@@ -336,9 +398,7 @@ function App() {
     };
   }, [
     loadState,
-    facilities,
-    stops,
-    climate,
+    referenceMap,
     mapSelection,
     visibleLayers,
     routeComparison,
@@ -377,45 +437,93 @@ function App() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || loadState !== "ready" || routeSelectionMode !== null) return;
+    const tracker = detailRequestTracker.current;
+    const visiblePointLayers: Array<"facilities" | "stops"> = [];
+    if (visibleLayers.facilities) visiblePointLayers.push("facilities");
+    if (visibleLayers.stops) visiblePointLayers.push("stops");
 
-    const inspectReferenceObject = (event: maplibregl.MapMouseEvent) => {
+    const inspectReferenceObject = async (event: maplibregl.MapMouseEvent) => {
       const inspectableLayers = ["facilities-circle", "stops-circle", "climate-fill"].filter(
         (layerId) => map.getLayer(layerId) !== undefined,
       );
       if (inspectableLayers.length === 0) return;
-      const hit = map.queryRenderedFeatures(event.point, { layers: inspectableLayers })[0];
-      if (!hit) {
+      const hitBox = referenceHitTestBox(event.point);
+      const renderedHit = inspectableLayers
+        .map((layerId) => map.queryRenderedFeatures(hitBox, { layers: [layerId] })[0])
+        .find((feature) => feature !== undefined);
+
+      let layer: ReferenceMapLayer | null = null;
+      let id: string | null = null;
+      if (renderedHit) {
+        const rawId = renderedHit.properties?.id ?? renderedHit.id;
+        if (rawId !== null && rawId !== undefined) {
+          id = String(rawId);
+          layer =
+            renderedHit.layer.id === "facilities-circle"
+              ? "facilities"
+              : renderedHit.layer.id === "stops-circle"
+                ? "stops"
+                : "climate";
+        }
+      } else if (referenceMap) {
+        const pointHit = referencePointHit(
+          referenceMap,
+          event.point,
+          ([longitude, latitude]) => {
+            const projected = map.project([longitude, latitude]);
+            return { x: projected.x, y: projected.y };
+          },
+          8,
+          visiblePointLayers,
+        );
+        if (pointHit) {
+          layer = pointHit.layer;
+          id = pointHit.id;
+        }
+      }
+
+      if (!layer || !id) {
+        tracker.invalidate();
         setMapSelection(null);
+        setMapSelectionError(null);
         return;
       }
-      const rawId = hit.properties?.id ?? hit.id;
-      if (rawId === null || rawId === undefined) {
+
+      const token = tracker.begin();
+      setMapSelectionError(null);
+      try {
+        if (layer === "facilities") {
+          const item = await fetchJson<CriticalFacility>(buildReferenceDetailPath(layer, id));
+          if (tracker.isCurrent(token)) setMapSelection({ kind: "facility", item });
+          return;
+        }
+        if (layer === "stops") {
+          const item = await fetchJson<UrbanEntity>(buildReferenceDetailPath(layer, id));
+          if (tracker.isCurrent(token)) setMapSelection({ kind: "stop", item });
+          return;
+        }
+        const item = await fetchJson<OfficialModelFeature>(buildReferenceDetailPath(layer, id));
+        if (tracker.isCurrent(token)) setMapSelection({ kind: "climate", item });
+      } catch (reason) {
+        if (!tracker.isCurrent(token)) return;
         setMapSelection(null);
-        return;
+        setMapSelectionError(
+          reason instanceof Error ? reason.message : "Could not load canonical reference detail.",
+        );
       }
-      const id = String(rawId);
-      if (hit.layer.id === "facilities-circle") {
-        const item = facilities.find((candidate) => candidate.id === id);
-        setMapSelection(item ? { kind: "facility", item } : null);
-        return;
-      }
-      if (hit.layer.id === "stops-circle") {
-        const item = stops.find((candidate) => candidate.id === id);
-        setMapSelection(item ? { kind: "stop", item } : null);
-        return;
-      }
-      const item = climate.find((candidate) => candidate.id === id);
-      setMapSelection(item ? { kind: "climate", item } : null);
     };
 
     map.on("click", inspectReferenceObject);
     return () => {
+      tracker.invalidate();
       map.off("click", inspectReferenceObject);
     };
-  }, [loadState, routeSelectionMode, facilities, stops, climate]);
+  }, [loadState, referenceMap, routeSelectionMode, visibleLayers]);
 
   const startRouteSelection = (mode: "origin" | "destination") => {
+    detailRequestTracker.current.invalidate();
     setMapSelection(null);
+    setMapSelectionError(null);
     setRouteSelectionMode(mode);
   };
 
@@ -511,7 +619,9 @@ function App() {
           <span>Platform {system?.version ?? "—"}</span>
           <span>Runtime {system?.runtime_generated_at ?? "unavailable"}</span>
           <span>Reference {system?.reference_generated_at ?? "unavailable"}</span>
-          <span>Synthetic production fallback: {system?.synthetic_production_fallback ? "yes" : "no"}</span>
+          <span>
+            Synthetic production fallback: {system?.synthetic_production_fallback ? "yes" : "no"}
+          </span>
         </div>
       </header>
 
@@ -549,42 +659,43 @@ function App() {
             className="map"
             aria-label="Berlin domain map"
             data-reference-layers-ready={mapLayersReady ? "true" : "false"}
+            data-reference-map-truncated={referenceMapTruncated ? "true" : "false"}
           />
           <div className="legend">
             <strong>Reference layers</strong>
-            <p>These layers are persisted reference data, not simulated changes.</p>
-            {mapLayerCounts({
-              facilities: facilities.length,
-              stops: stops.length,
-              climate: climate.length,
-            }).map(([label, count]) => {
-              const key: keyof typeof visibleLayers = label === "Critical facilities"
-                ? "facilities"
-                : label === "VBB stops"
-                  ? "stops"
-                  : "climate";
-              return (
-                <label className="layer-toggle" key={key}>
-                  <input
-                    checked={visibleLayers[key]}
-                    onChange={(event) =>
-                      setVisibleLayers((current) => ({ ...current, [key]: event.target.checked }))
-                    }
-                    type="checkbox"
-                  />
-                  <span className={`layer-swatch ${key}`} />
-                  <span>{label} · {count}</span>
-                </label>
-              );
-            })}
-            {mapLayerCounts({ facilities: facilities.length, stops: stops.length, climate: climate.length }).length === 0 && (
-              <span>No mappable reference data loaded.</span>
+            <p>Viewport projection of persisted reference data; simulated changes stay separate.</p>
+            {layerSummaries.map((summary) => (
+              <label className="layer-toggle" key={summary.key}>
+                <input
+                  checked={visibleLayers[summary.key]}
+                  onChange={(event) =>
+                    setVisibleLayers((current) => ({
+                      ...current,
+                      [summary.key]: event.target.checked,
+                    }))
+                  }
+                  type="checkbox"
+                />
+                <span className={`layer-swatch ${summary.key}`} />
+                <span>
+                  {summary.label} · {summary.returned} visible / {summary.matched} in viewport ·{" "}
+                  {summary.total} total
+                  {summary.truncated ? " · truncated, zoom in" : ""}
+                </span>
+              </label>
+            ))}
+            {referenceMap === null && <span>No reference viewport has been loaded yet.</span>}
+            {mapDataError && (
+              <p className="inline-error">Reference map data unavailable: {mapDataError}</p>
             )}
           </div>
         </div>
 
         <aside className="sidebar">
           <MapEntityInspector selection={mapSelection} onClear={() => setMapSelection(null)} />
+          {mapSelectionError && (
+            <p className="inline-error">Reference detail unavailable: {mapSelectionError}</p>
+          )}
 
           <section>
             <h2>Mobility</h2>
@@ -597,9 +708,7 @@ function App() {
               <dt>Observed</dt>
               <dd>{displayValue(mobility?.snapshot?.observed_at)}</dd>
             </dl>
-            <p className="method-note">
-              Missing realtime updates are not interpreted as normal operation.
-            </p>
+            <p className="method-note">Missing realtime updates are not interpreted as normal operation.</p>
           </section>
 
           <section>
@@ -636,7 +745,9 @@ function App() {
             <span className="count-pill">{observations.length}</span>
           </div>
           {observations.length === 0 ? (
-            <p className="empty-state">No persisted observations are available. No demo values are substituted.</p>
+            <p className="empty-state">
+              No persisted observations are available. No demo values are substituted.
+            </p>
           ) : (
             <div className="observation-list">
               {observations.map((item) => (
@@ -695,7 +806,10 @@ function App() {
           <h2>Workflow planner</h2>
           <label className="field">
             <span>Workflow</span>
-            <select value={workflow} onChange={(event) => setWorkflow(event.target.value as WorkflowKind)}>
+            <select
+              value={workflow}
+              onChange={(event) => setWorkflow(event.target.value as WorkflowKind)}
+            >
               {WORKFLOWS.map((item) => (
                 <option value={item.value} key={item.value}>
                   {item.label}
@@ -703,7 +817,12 @@ function App() {
               ))}
             </select>
           </label>
-          <button className="primary-action" onClick={runWorkflow} disabled={workflowState === "running"} type="button">
+          <button
+            className="primary-action"
+            onClick={runWorkflow}
+            disabled={workflowState === "running"}
+            type="button"
+          >
             {workflowState === "running" ? "Running…" : "Run deterministic workflow"}
           </button>
           {workflowError && <p className="inline-error">{workflowError}</p>}
@@ -713,7 +832,10 @@ function App() {
               <span>Agents: {workflowResult.plan.agents.join(", ")}</span>
               <span>LLM required: {workflowResult.plan.requires_llm ? "yes" : "no"}</span>
               <span>
-                Missing: {workflowResult.execution.missing_agents.length > 0 ? workflowResult.execution.missing_agents.join(", ") : "none"}
+                Missing:{" "}
+                {workflowResult.execution.missing_agents.length > 0
+                  ? workflowResult.execution.missing_agents.join(", ")
+                  : "none"}
               </span>
             </div>
           )}
@@ -742,8 +864,15 @@ function App() {
               {routeDestination ? "Destination selected" : "Select destination on map"}
             </button>
           </div>
-          {routeSelectionMode && <p className="method-note">Now click the map to set the {routeSelectionMode}.</p>}
-          <button className="primary-action" onClick={runRouteBaseline} disabled={routeState === "running"} type="button">
+          {routeSelectionMode && (
+            <p className="method-note">Now click the map to set the {routeSelectionMode}.</p>
+          )}
+          <button
+            className="primary-action"
+            onClick={runRouteBaseline}
+            disabled={routeState === "running"}
+            type="button"
+          >
             {routeState === "running" ? "Loading route…" : "Show baseline route"}
           </button>
           {routeBaseline && (
@@ -751,7 +880,9 @@ function App() {
               <span>Disrupted route segment</span>
               <select value={closedEdge} onChange={(event) => setClosedEdge(event.target.value)}>
                 {routeBaseline.edge_ids.map((edgeId, index) => (
-                  <option key={edgeId} value={edgeId}>Route segment {index + 1}</option>
+                  <option key={edgeId} value={edgeId}>
+                    Route segment {index + 1}
+                  </option>
                 ))}
               </select>
             </label>
@@ -770,7 +901,10 @@ function App() {
               <strong>{routeComparison.scenario_name}</strong>
               <span>Baseline: {Math.round(routeComparison.baseline_travel_time_s)} s</span>
               <span>Scenario: {Math.round(routeComparison.scenario_travel_time_s)} s</span>
-              <span>Change: {Math.round(routeComparison.absolute_delta_s)} s ({routeComparison.relative_delta_pct.toFixed(1)}%)</span>
+              <span>
+                Change: {Math.round(routeComparison.absolute_delta_s)} s (
+                {routeComparison.relative_delta_pct.toFixed(1)}%)
+              </span>
             </div>
           )}
         </article>
@@ -779,7 +913,8 @@ function App() {
           <p className="eyebrow">Hypothetical scenario</p>
           <h2>Heat assessment</h2>
           <p className="method-note">
-            This control never changes the observed baseline. The result is a counterfactual derived from an explicit delta.
+            This control never changes the observed baseline. The result is a counterfactual derived
+            from an explicit delta.
           </p>
           <label className="field">
             <span>Temperature delta (Cel)</span>
@@ -790,7 +925,12 @@ function App() {
               onChange={(event) => setTemperatureDelta(event.target.value)}
             />
           </label>
-          <button className="primary-action" onClick={runHeatAssessment} disabled={assessmentState === "running"} type="button">
+          <button
+            className="primary-action"
+            onClick={runHeatAssessment}
+            disabled={assessmentState === "running"}
+            type="button"
+          >
             {assessmentState === "running" ? "Assessing…" : "Assess hypothetical scenario"}
           </button>
           {assessmentError && <p className="inline-error">{assessmentError}</p>}
@@ -800,7 +940,10 @@ function App() {
               <span>Hypothetical: yes</span>
               <span>Composite score: none by design</span>
               <span>
-                Unavailable dimensions: {assessment.unavailable_dimensions.length > 0 ? assessment.unavailable_dimensions.join(", ") : "none"}
+                Unavailable dimensions:{" "}
+                {assessment.unavailable_dimensions.length > 0
+                  ? assessment.unavailable_dimensions.join(", ")
+                  : "none"}
               </span>
               {Object.entries(assessment.dimension_errors).map(([dimension, detail]) => (
                 <span key={dimension}>

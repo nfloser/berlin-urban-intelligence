@@ -58,7 +58,7 @@ def parse_layers(value: str) -> tuple[MapLayer, ...]:
 def parse_layer(value: str) -> MapLayer:
     if value not in MAP_LAYERS:
         raise ValueError(f"unknown map layer: {value}")
-    return cast(MapLayer, value)
+    return value
 
 
 def _coordinate_pairs(value: Any) -> Iterable[tuple[float, float]]:
@@ -157,7 +157,9 @@ def _layer_items(state: ReferenceState | None, layer: MapLayer) -> Sequence[MapI
     return state.official_model_features
 
 
-def reference_item(state: ReferenceState | None, *, layer: MapLayer, resource_id: str) -> MapItem | None:
+def reference_item(
+    state: ReferenceState | None, *, layer: MapLayer, resource_id: str
+) -> MapItem | None:
     for item in _layer_items(state, layer):
         if item.id == resource_id:
             return item

@@ -13,7 +13,7 @@ Berlin Urban Intelligence is a modular monorepo for an agent-extensible urban di
 7. **Scenario engine** creates explicitly hypothetical values or network overlays without mutating observed/reference state.
 8. **Deterministic orchestrator** plans and executes typed workflows; an LLM is not required.
 9. **Integrated assessment** combines available heat, energy and resilience dimensions without inventing a composite city score.
-10. **FastAPI and dashboard** expose inspectable state, provenance, source/agent status, reference layers, derived lineage and analysis results.
+10. **FastAPI and dashboard** expose inspectable state, provenance, source/agent status, bounded reference-map projections, derived lineage and analysis results.
 
 ## Invariants
 
@@ -28,6 +28,7 @@ Berlin Urban Intelligence is a modular monorepo for an agent-extensible urban di
 - Invalid replacement snapshots do not overwrite the last valid in-process snapshot.
 - Derived products are emitted only when their required source-backed inputs exist and retain explicit upstream lineage.
 - Energy forecasts are accepted only when evaluation/model metadata and dataset fingerprints match.
+- A bounded map projection is never presented as complete when the API reports per-layer truncation.
 
 ## Runtime topology
 
@@ -46,14 +47,18 @@ The reload boundary deliberately remains behind persisted state. Provider acquis
 
 ## Dashboard interaction boundary
 
-The MapLibre dashboard distinguishes reference inspection from hypothetical analysis:
+The MapLibre dashboard distinguishes compact rendering data, canonical inspection and hypothetical analysis:
 
-- persisted facilities, transport stops and official climate-model features are independent reference layers;
-- clicking a visible reference object opens a canonical metadata/provenance inspector and highlights the selected geometry;
+- `/api/v1/map/reference` is a bounded WGS84 GeoJSON projection of persisted facilities, transport stops and official climate-model features for the active map viewport;
+- viewport requests carry explicit per-layer `total`, `matched`, `returned` and `truncated` metadata, and the UI surfaces truncation rather than implying completeness;
+- map movement triggers a new bbox request; request generations prevent a slower older response from overwriting a newer viewport;
+- clicking a rendered reference object resolves its layer/id and fetches the complete canonical object from `/api/v1/map/reference/{layer}/{resource_id}` before opening the metadata/provenance inspector;
+- the compact map projection therefore does not replace canonical reference state and does not need to duplicate full provenance into every rendered feature;
 - route origin/destination selection is a separate interaction mode that resolves clicks to persisted network nodes through the API;
 - baseline and scenario routes are rendered independently so a hypothetical network disruption cannot visually replace the baseline without an explicit comparison;
+- if the external basemap style cannot load, a local background style keeps project-owned reference and route layers usable;
 - observation provenance, derived lineage, source status, agent capabilities/dependencies and snapshot reload diagnostics remain separately inspectable.
 
 ## Verification boundary
 
-Deterministic unit/integration tests do not depend on external provider availability. CI additionally starts the composed backend/frontend stack and uses a small explicitly synthetic **acceptance-test-only** reference snapshot to exercise the real persistence → FastAPI → nginx → React/MapLibre path. This fixture is not bundled or selected as a production fallback. Current provider compatibility remains the responsibility of separate live-source smoke workflows.
+Deterministic unit/integration tests do not depend on external provider availability. CI additionally starts the composed backend/frontend stack and uses a small explicitly synthetic **acceptance-test-only** reference snapshot to exercise the real persistence → FastAPI → nginx → React/MapLibre path. Browser acceptance verifies viewport-backed reference loading, canonical map-object inspection and baseline-vs-disruption routing. This fixture is not bundled or selected as a production fallback. Current provider compatibility remains the responsibility of separate live-source smoke workflows.
