@@ -1,10 +1,16 @@
-"""HTTP surfaces for derived information, provenance and dependency lineage."""
+"""HTTP surfaces for derived information, provenance, dependencies and map reference views."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
+from berlin_urban_intelligence.api.map_reference import (
+    MapBounds,
+    parse_layers,
+    reference_feature_collection,
+)
 from berlin_urban_intelligence.runtime.derived import DerivedState
+from berlin_urban_intelligence.runtime.reference import ReferenceState
 
 router = APIRouter(prefix="/api/v1")
 
@@ -62,3 +68,27 @@ def dependencies(request: Request, resource_id: str) -> dict[str, object]:
         "downstream": list(graph.downstream(resource_id)),
         "status": status,
     }
+
+
+@router.get("/map/reference")
+def reference_map(
+    request: Request,
+    west: float = Query(ge=-180, le=180),
+    south: float = Query(ge=-90, le=90),
+    east: float = Query(ge=-180, le=180),
+    north: float = Query(ge=-90, le=90),
+    layers: str = Query(default="facilities,stops,climate"),
+    limit_per_layer: int = Query(default=2500, ge=1, le=5000),
+) -> dict[str, object]:
+    try:
+        bounds = MapBounds(west=west, south=south, east=east, north=north)
+        selected_layers = parse_layers(layers)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    reference: ReferenceState | None = request.app.state.reference
+    return reference_feature_collection(
+        reference,
+        bounds=bounds,
+        layers=selected_layers,
+        limit_per_layer=limit_per_layer,
+    )
