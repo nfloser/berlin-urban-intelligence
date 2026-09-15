@@ -2,12 +2,12 @@ from datetime import UTC, datetime
 
 from rdflib.namespace import PROV, RDF
 
-from berlin_urban_intelligence.knowledge.derived_graph import project_derived_state
 from berlin_urban_intelligence.knowledge.derivations import (
     DerivationDefinition,
     DerivationInput,
     DerivationRecord,
 )
+from berlin_urban_intelligence.knowledge.derived_graph import project_derived_state
 from berlin_urban_intelligence.knowledge.graph import BUI, KnowledgeGraph
 from berlin_urban_intelligence.runtime.derived import DerivedState
 from berlin_urban_intelligence.shared.contracts import (
