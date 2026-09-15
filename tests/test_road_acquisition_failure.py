@@ -29,12 +29,8 @@ def _previous() -> ReferenceState:
     return ReferenceState(
         generated_at=NOW,
         network_nodes=(
-            NetworkNode(
-                id="osm-node:1", longitude=13.4, latitude=52.5, provenance=provenance
-            ),
-            NetworkNode(
-                id="osm-node:2", longitude=13.41, latitude=52.51, provenance=provenance
-            ),
+            NetworkNode(id="osm-node:1", longitude=13.4, latitude=52.5, provenance=provenance),
+            NetworkNode(id="osm-node:2", longitude=13.41, latitude=52.51, provenance=provenance),
         ),
         network_edges=(
             NetworkEdge(
