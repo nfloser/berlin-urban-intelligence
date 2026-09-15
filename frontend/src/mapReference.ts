@@ -82,6 +82,20 @@ export function buildReferenceMapPath(
   return `/api/v1/map/reference?${params.toString()}`;
 }
 
+export function buildReferenceDetailPath(layer: ReferenceMapLayer, resourceId: string): string {
+  return `/api/v1/map/reference/${layer}/${encodeURIComponent(resourceId)}`;
+}
+
+export function featureCollectionForLayer(
+  response: ReferenceMapResponse,
+  layer: ReferenceMapLayer,
+): FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: response.features.filter((feature) => feature.properties?.layer === layer),
+  };
+}
+
 export function referenceLayerSummaries(metadata: ReferenceMapMetadata): ReferenceLayerSummary[] {
   const keys: ReferenceMapLayer[] = ["facilities", "stops", "climate"];
   return keys.map((key) => ({
