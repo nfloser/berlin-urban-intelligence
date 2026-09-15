@@ -40,10 +40,7 @@ class MapBounds:
     def intersects(self, geometry_bounds: tuple[float, float, float, float]) -> bool:
         west, south, east, north = geometry_bounds
         return not (
-            east < self.west
-            or west > self.east
-            or north < self.south
-            or south > self.north
+            east < self.west or west > self.east or north < self.south or south > self.north
         )
 
 
