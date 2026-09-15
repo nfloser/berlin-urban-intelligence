@@ -1,5 +1,9 @@
 import type { FeatureCollection } from "geojson";
-import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import type {
+  GeoJSONSource,
+  Map as MapLibreMap,
+  StyleSpecification,
+} from "maplibre-gl";
 import * as maplibregl from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -29,6 +33,17 @@ import {
 import MapEntityInspector, { type MapSelection } from "./MapEntityInspector";
 
 const BASE_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+const FALLBACK_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {},
+  layers: [
+    {
+      id: "fallback-background",
+      type: "background",
+      paint: { "background-color": "#111821" },
+    },
+  ],
+};
 const WORKFLOWS: Array<{ value: WorkflowKind; label: string }> = [
   { value: "urban_snapshot", label: "Urban snapshot" },
   { value: "heat_energy", label: "Heat + energy" },
@@ -58,6 +73,7 @@ function App() {
   const [stops, setStops] = useState<UrbanEntity[]>([]);
   const [climate, setClimate] = useState<OfficialModelFeature[]>([]);
   const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
+  const [mapLayersReady, setMapLayersReady] = useState(false);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [selectedObservationId, setSelectedObservationId] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowKind>("urban_snapshot");
@@ -141,7 +157,18 @@ function App() {
     });
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     mapRef.current = map;
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (!map.isStyleLoaded()) {
+        map.setStyle(FALLBACK_STYLE);
+      }
+    }, 5000);
+    const clearFallbackTimer = () => window.clearTimeout(fallbackTimer);
+    map.once("load", clearFallbackTimer);
+
     return () => {
+      window.clearTimeout(fallbackTimer);
+      map.off("load", clearFallbackTimer);
       map.remove();
       mapRef.current = null;
     };
@@ -150,6 +177,7 @@ function App() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || loadState !== "ready") return;
+    setMapLayersReady(false);
     const facilityData = toFeatureCollection(facilities);
     const stopData = toFeatureCollection(stops);
     const climateData = toFeatureCollection(climate);
@@ -287,10 +315,25 @@ function App() {
       setVisibility("facilities-circle", visibleLayers.facilities);
       setVisibility("stops-circle", visibleLayers.stops);
       setVisibility("climate-fill", visibleLayers.climate);
+      setMapLayersReady(true);
     };
 
-    if (map.isStyleLoaded()) installLayers();
-    else map.once("load", installLayers);
+    const maybeInstallLayers = () => {
+      if (!map.isStyleLoaded()) return;
+      installLayers();
+      map.off("styledata", maybeInstallLayers);
+      map.off("load", maybeInstallLayers);
+    };
+
+    maybeInstallLayers();
+    if (!map.isStyleLoaded()) {
+      map.on("styledata", maybeInstallLayers);
+      map.on("load", maybeInstallLayers);
+    }
+    return () => {
+      map.off("styledata", maybeInstallLayers);
+      map.off("load", maybeInstallLayers);
+    };
   }, [
     loadState,
     facilities,
@@ -501,7 +544,12 @@ function App() {
 
       <section className="workspace">
         <div className="map-panel">
-          <div ref={mapContainer} className="map" aria-label="Berlin domain map" />
+          <div
+            ref={mapContainer}
+            className="map"
+            aria-label="Berlin domain map"
+            data-reference-layers-ready={mapLayersReady ? "true" : "false"}
+          />
           <div className="legend">
             <strong>Reference layers</strong>
             <p>These layers are persisted reference data, not simulated changes.</p>
