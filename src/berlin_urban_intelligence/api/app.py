@@ -565,7 +565,9 @@ def create_app() -> FastAPI:
         )
         result = resource_relations(semantic_graph, resource_id, limit=limit)
         if result is None:
-            raise HTTPException(status_code=404, detail=f"semantic resource not found: {resource_id}")
+            raise HTTPException(
+                status_code=404, detail=f"semantic resource not found: {resource_id}"
+            )
         return result.model_dump(mode="json")
 
     @app.get("/api/v1/graph", response_class=PlainTextResponse)
