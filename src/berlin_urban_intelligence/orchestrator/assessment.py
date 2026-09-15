@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -16,7 +16,11 @@ from berlin_urban_intelligence.scenario_engine.engine import (
     ScenarioTemperatureResult,
 )
 from berlin_urban_intelligence.scenario_engine.models import Scenario, ScenarioKind
-from berlin_urban_intelligence.shared.contracts import CriticalFacility, NetworkNode
+from berlin_urban_intelligence.shared.contracts import (
+    CriticalFacility,
+    NetworkNode,
+    QualityFlag,
+)
 
 
 class AssessmentRequest(BaseModel):
@@ -84,17 +88,27 @@ class IntegratedAssessmentService:
 
         if ScenarioKind.EXTREME_HEAT in request.scenario.kinds:
             candidates = [
-                item for item in self.heat.observations() if item.phenomenon == "air_temperature_2m"
+                item
+                for item in self.heat.observations()
+                if item.phenomenon == "air_temperature_2m"
+                and timedelta(0) <= now - item.observed_at <= timedelta(hours=1)
+                and item.quality not in {QualityFlag.INVALID, QualityFlag.STALE}
             ]
             if not candidates:
                 unavailable.append("heat")
-                errors["heat"] = "INSUFFICIENT_DATA: no measured air_temperature_2m baseline"
+                errors["heat"] = (
+                    "INSUFFICIENT_DATA: no current measured air_temperature_2m baseline"
+                )
             else:
                 baseline = max(candidates, key=lambda item: item.observed_at)
                 heat_result = self.scenarios.apply_temperature_delta(baseline, request.scenario)
 
         if ScenarioKind.ENERGY_DEMAND in request.scenario.kinds:
-            forecasts = self.energy.forecasts()
+            forecasts = [
+                forecast
+                for forecast in self.energy.forecasts()
+                if forecast.issued_at <= now <= forecast.valid_at
+            ]
             if not forecasts:
                 unavailable.append("energy")
                 errors["energy"] = "MODEL_UNAVAILABLE: no validated Berlin forecast baseline"

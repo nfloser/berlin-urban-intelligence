@@ -26,6 +26,10 @@ class Scenario(BaseModel):
 
     @model_validator(mode="after")
     def validate_scenario(self) -> "Scenario":
+        if ScenarioKind.EXTREME_HEAT in self.kinds and self.temperature_delta_c is None:
+            raise ValueError("extreme_heat requires temperature_delta_c")
+        if ScenarioKind.ENERGY_DEMAND in self.kinds and self.energy_demand_delta_pct is None:
+            raise ValueError("energy_demand requires energy_demand_delta_pct")
         if self.temperature_delta_c is not None and ScenarioKind.EXTREME_HEAT not in self.kinds:
             raise ValueError("temperature_delta_c requires extreme_heat scenario kind")
         if (

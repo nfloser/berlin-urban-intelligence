@@ -62,7 +62,7 @@ class DerivationStatus(StrEnum):
 
 
 class CanonicalModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
     contract_version: str = CONTRACT_VERSION
 
 

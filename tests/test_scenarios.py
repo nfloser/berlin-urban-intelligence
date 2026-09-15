@@ -13,11 +13,28 @@ def test_temperature_delta_requires_heat_kind() -> None:
         )
 
 
+def test_heat_kind_requires_temperature_delta() -> None:
+    with pytest.raises(ValidationError, match="temperature_delta_c"):
+        Scenario(
+            name="fixture-scenario",
+            kinds={ScenarioKind.EXTREME_HEAT},
+        )
+
+
+def test_energy_kind_requires_demand_delta() -> None:
+    with pytest.raises(ValidationError, match="energy_demand_delta_pct"):
+        Scenario(
+            name="fixture-scenario",
+            kinds={ScenarioKind.ENERGY_DEMAND},
+        )
+
+
 def test_network_changes_require_disruption_kind() -> None:
     with pytest.raises(ValidationError, match="network_disruption"):
         Scenario(
             name="fixture-scenario",
             kinds={ScenarioKind.EXTREME_HEAT},
+            temperature_delta_c=3.0,
             closed_network_edges=["fixture-edge"],
         )
 
