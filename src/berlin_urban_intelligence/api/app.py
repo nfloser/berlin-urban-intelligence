@@ -27,6 +27,7 @@ from berlin_urban_intelligence.agents.heat import HeatAgent
 from berlin_urban_intelligence.agents.live_state import LiveStateAgent
 from berlin_urban_intelligence.agents.mobility import MobilityAgent
 from berlin_urban_intelligence.agents.resilience import ResilienceAgent, nearest_network_node
+from berlin_urban_intelligence.api.derived import router as derived_router
 from berlin_urban_intelligence.energy.state import EnergyState, EnergyStateStore
 from berlin_urban_intelligence.knowledge.graph import KnowledgeGraph
 from berlin_urban_intelligence.orchestrator.assessment import (
@@ -37,6 +38,7 @@ from berlin_urban_intelligence.orchestrator.engine import (
     OrchestrationRequest,
     Orchestrator,
 )
+from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedStateStore
 from berlin_urban_intelligence.runtime.reference import ReferenceState, ReferenceStateStore
 from berlin_urban_intelligence.runtime.reload import ReloadingSnapshot
 from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
@@ -50,6 +52,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_RUNTIME_STATE = PROJECT_ROOT / "data" / "runtime" / "state.json"
 DEFAULT_REFERENCE_STATE = PROJECT_ROOT / "data" / "runtime" / "reference.json"
 DEFAULT_ENERGY_STATE = PROJECT_ROOT / "data" / "runtime" / "energy.json"
+DEFAULT_DERIVED_STATE = PROJECT_ROOT / "data" / "runtime" / "derived.json"
 DEFAULT_SOURCE_REGISTRY = PROJECT_ROOT / "config" / "sources.yaml"
 MAX_PAGE_SIZE = 1000
 
@@ -139,6 +142,7 @@ class _ApiStateController:
         runtime_path = _path_from_env("BUI_RUNTIME_STATE", DEFAULT_RUNTIME_STATE)
         reference_path = _path_from_env("BUI_REFERENCE_STATE", DEFAULT_REFERENCE_STATE)
         energy_path = _path_from_env("BUI_ENERGY_STATE", DEFAULT_ENERGY_STATE)
+        derived_path = _path_from_env("BUI_DERIVED_STATE", DEFAULT_DERIVED_STATE)
         self._runtime: ReloadingSnapshot[RuntimeState] = ReloadingSnapshot(
             runtime_path, RuntimeStateStore(runtime_path).load
         )
@@ -148,6 +152,9 @@ class _ApiStateController:
         self._energy: ReloadingSnapshot[EnergyState] = ReloadingSnapshot(
             energy_path, EnergyStateStore(energy_path).load
         )
+        self._derived: ReloadingSnapshot[DerivedState] = ReloadingSnapshot(
+            derived_path, DerivedStateStore(derived_path).load
+        )
         self._lock = RLock()
 
     def initialize(self, app: FastAPI) -> None:
@@ -155,6 +162,7 @@ class _ApiStateController:
             self._runtime.refresh(force=True)
             self._reference.refresh(force=True)
             self._energy.refresh(force=True)
+            self._derived.refresh(force=True)
             self._apply(app)
 
     def refresh(self, app: FastAPI) -> None:
@@ -163,6 +171,7 @@ class _ApiStateController:
                 self._runtime.refresh(),
                 self._reference.refresh(),
                 self._energy.refresh(),
+                self._derived.refresh(),
             ]
             if any(changed):
                 self._apply(app)
@@ -173,11 +182,14 @@ class _ApiStateController:
                 "runtime": self._runtime.diagnostic.model_dump(mode="json"),
                 "reference": self._reference.diagnostic.model_dump(mode="json"),
                 "energy": self._energy.diagnostic.model_dump(mode="json"),
+                "derived": self._derived.diagnostic.model_dump(mode="json"),
             }
 
     def _apply(self, app: FastAPI) -> None:
         app.state.runtime = self._runtime.value
         app.state.reference = self._reference.value
+        app.state.energy_state = self._energy.value
+        app.state.derived = self._derived.value
         app.state.agents = _build_agents(
             self._runtime.value,
             self._reference.value,
@@ -204,6 +216,7 @@ def create_app() -> FastAPI:
         ),
         lifespan=lifespan,
     )
+    app.include_router(derived_router)
 
     @app.middleware("http")
     async def operation_context(
@@ -256,6 +269,8 @@ def create_app() -> FastAPI:
     def system(request: Request) -> dict[str, object]:
         runtime: RuntimeState | None = request.app.state.runtime
         reference: ReferenceState | None = request.app.state.reference
+        energy_state: EnergyState | None = request.app.state.energy_state
+        derived: DerivedState | None = request.app.state.derived
         controller: _ApiStateController = request.app.state.snapshot_controller
         return {
             "name": "Berlin Urban Intelligence",
@@ -263,6 +278,8 @@ def create_app() -> FastAPI:
             "contract_version": "1.0.0",
             "runtime_generated_at": runtime.generated_at if runtime else None,
             "reference_generated_at": reference.generated_at if reference else None,
+            "energy_generated_at": energy_state.generated_at if energy_state else None,
+            "derived_generated_at": derived.generated_at if derived else None,
             "snapshot_reload": controller.diagnostics(),
             "synthetic_production_fallback": False,
         }
