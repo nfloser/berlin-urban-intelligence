@@ -94,9 +94,13 @@ def verify_road_network_snapshot(
     imputation_visible = True
     for edge in snapshot.edges:
         if edge.source not in node_ids:
-            raise ValueError(f"road edge {edge.id!r} references unknown source node {edge.source!r}")
+            raise ValueError(
+                f"road edge {edge.id!r} references unknown source node {edge.source!r}"
+            )
         if edge.target not in node_ids:
-            raise ValueError(f"road edge {edge.id!r} references unknown target node {edge.target!r}")
+            raise ValueError(
+                f"road edge {edge.id!r} references unknown target node {edge.target!r}"
+            )
         provenance = _validate_osm_provenance(edge.id, edge.provenance)
         imputation_visible = imputation_visible and _imputation_is_visible(provenance)
 
