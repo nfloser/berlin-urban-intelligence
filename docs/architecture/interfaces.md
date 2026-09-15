@@ -15,6 +15,7 @@ New domain components should exchange canonical models rather than untyped dicti
 | Runtime | `data/runtime/state.json` | Current observations, realtime mobility snapshot, source runtime statuses, refresh errors. |
 | Reference | `data/runtime/reference.json` | Critical facilities, official-model features, transport stops, network nodes and edges, reference-refresh errors. |
 | Energy | `data/runtime/energy.json` | Selected Berlin evaluation metadata and validated forecast artefacts. |
+| Derived | `data/runtime/derived.json` | Derivation definitions, derived records, freshness/status and explicit upstream lineage. |
 
 The store implementations validate data through Pydantic models and use explicit serialization rather than treating files as arbitrary JSON blobs.
 
@@ -48,7 +49,14 @@ The FastAPI application is implemented in `src/berlin_urban_intelligence/api/app
 | GET | `/api/v1/climate-features` | Paginated official model features with `X-Total-Count`. |
 | GET | `/api/v1/transport-stops` | Paginated transport stops with `X-Total-Count`. |
 | GET | `/api/v1/network/nodes` | Paginated network nodes with `X-Total-Count`. |
-| GET | `/api/v1/graph` | Current RDF/Turtle projection. |
+| GET | `/api/v1/derived` | Persisted derivation definitions and derived records. |
+| GET | `/api/v1/derived/{record_id}` | One derived record plus its derivation definition. |
+| GET | `/api/v1/provenance/{record_id}` | Provenance for one persisted derived record. |
+| GET | `/api/v1/dependencies/{resource_id}` | Derived dependency-DAG upstream/downstream inspection. |
+| GET | `/api/v1/graph` | Current RDF/Turtle projection of validated runtime, reference, energy and derived snapshots. |
+| GET | `/api/v1/knowledge/relations/{resource_id}` | Bounded incoming/outgoing RDF relationships for one canonical resource; default limit 100, maximum 500, 404 when absent. |
+
+The semantic relation response reports `total`, `returned` and `truncated` so callers can distinguish a complete relation set from a bounded result. Each relation records direction, predicate URI, related node kind/value and literal datatype/language where applicable. This is a constrained inspection interface, not an unrestricted SPARQL endpoint.
 
 Reference network edges are part of persisted/reference and RDF state but do not currently have a dedicated list endpoint.
 
@@ -90,6 +98,8 @@ This does not change the stored temperature observation. If no measured `air_tem
 ## Error semantics
 
 FastAPI/Pydantic returns validation errors for malformed typed requests. Analysis endpoints additionally expose explicit error classes in response detail or assessment dimension errors, including `INSUFFICIENT_DATA`, `MODEL_UNAVAILABLE` and `DERIVATION_FAILED` in the implemented paths.
+
+Unknown semantic resource identifiers return 404. A missing optional snapshot simply contributes no triples to the semantic projection; it is not replaced with fabricated graph data.
 
 Provider acquisition errors are represented separately in persisted source/reference status rather than converted into HTTP provider calls during request handling.
 
