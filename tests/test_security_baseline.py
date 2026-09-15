@@ -40,3 +40,25 @@ def test_structured_formatter_drops_query_and_body_context() -> None:
     assert "query_string" not in payload
     assert "request_body" not in payload
     assert "do-not-log-this" not in json.dumps(payload)
+
+
+def test_structured_formatter_does_not_serialize_raw_exception_messages() -> None:
+    secret = "token=provider-secret"
+    try:
+        raise RuntimeError(f"provider failed at https://example.invalid/data?{secret}")
+    except RuntimeError as exc:
+        record = logging.LogRecord(
+            name="berlin_urban_intelligence.security-test",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="source_refresh_failed",
+            args=(),
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+
+    payload = json.loads(JsonFormatter().format(record))
+
+    assert payload["exception_type"] == "RuntimeError"
+    assert "exception" not in payload
+    assert secret not in json.dumps(payload)
