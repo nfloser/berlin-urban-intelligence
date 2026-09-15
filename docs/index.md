@@ -11,6 +11,7 @@ Berlin Urban Intelligence is a research-oriented urban intelligence and digital-
 - [Data architecture](data/overview.md) — source acquisition, canonicalization, persistence and provenance.
 - [Installation](usage/installation.md) and [quickstart](usage/quickstart.md) — reproducible local execution.
 - [Testing](development/testing.md) — deterministic CI, live-source checks and current testing gaps.
+- [Accessibility baseline](accessibility.md) — automated keyboard/Axe acceptance, non-pointer routing and the manual release checklist.
 - [v1.0 verification matrix](verification.md) — evidence-backed PASS/PARTIAL/NOT VERIFIED status for completion gates and linked follow-up issues.
 - [Evaluation](evaluation/methodology.md) — what is evaluated scientifically and what is not yet evaluated.
 - [Reproducibility](research/reproducibility.md) — software, data and commands required to reproduce the implemented workflows.
