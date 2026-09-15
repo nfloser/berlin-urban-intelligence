@@ -7,6 +7,8 @@ concerns; this verifier only proves that the resulting state is internally consi
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from berlin_urban_intelligence.adapters.osm_network import RoadNetworkSnapshot
@@ -37,7 +39,7 @@ class RoadNetworkReadinessReport(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     source_query: str = Field(min_length=1)
-    retrieved_at: object
+    retrieved_at: datetime
     node_count: int = Field(gt=0)
     edge_count: int = Field(gt=0)
     provider: str = Field(min_length=1)
