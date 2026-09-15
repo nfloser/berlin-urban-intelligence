@@ -266,10 +266,16 @@ def run_benchmark(
             },
             "results": [result.as_dict() for result in results],
             "limitations": [
-                "Timings use in-process FastAPI TestClient and exclude external network/proxy latency.",
+                (
+                    "Timings use in-process FastAPI TestClient and exclude external "
+                    "network/proxy latency."
+                ),
                 "GitHub-hosted runner timings are noisy observations, not production SLOs.",
                 "Peak memory is tracemalloc Python allocation peak, not process RSS.",
-                "The deterministic fixture is benchmark-only and is never a production data fallback.",
+                (
+                    "The deterministic fixture is benchmark-only and is never a production "
+                    "data fallback."
+                ),
             ],
         }
 
