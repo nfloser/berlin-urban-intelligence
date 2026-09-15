@@ -99,7 +99,7 @@ def _build_agents(
     mobility = MobilityAgent(runtime.mobility if runtime else None)
     energy = _build_energy_agent(energy_state)
     resilience = ResilienceAgent(list(reference.network_edges if reference else ()))
-    live_state = LiveStateAgent([mobility, exposure, heat, energy, resilience])
+    live_state = LiveStateAgent()
     return {
         "live_state": live_state,
         "mobility": mobility,
@@ -299,9 +299,15 @@ def create_app() -> FastAPI:
 
     @app.get("/api/v1/agents/health")
     def agent_health(request: Request) -> dict[str, object]:
+        agents_by_id: dict[str, BaseAgent] = request.app.state.agents
+        domain_health = {
+            name: agent.health() for name, agent in agents_by_id.items() if name != "live_state"
+        }
+        live_state: LiveStateAgent = agents_by_id["live_state"]  # type: ignore[assignment]
+        live_state.snapshot(domain_health)
         return {
-            name: agent.health().model_dump(mode="json")
-            for name, agent in request.app.state.agents.items()
+            "live_state": live_state.health().model_dump(mode="json"),
+            **{name: health.model_dump(mode="json") for name, health in domain_health.items()},
         }
 
     @app.get("/api/v1/sources")
