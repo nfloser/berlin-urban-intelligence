@@ -51,7 +51,8 @@ class LiveStateAgent(BaseAgent):
         for agent_id, item in health.items():
             if item.agent_id != agent_id:
                 raise ValueError(
-                    f"agent health key {agent_id!r} does not match payload agent_id {item.agent_id!r}"
+                    f"agent health key {agent_id!r} does not match payload agent_id "
+                    f"{item.agent_id!r}"
                 )
 
         statuses = [item.status for item in health.values()]
