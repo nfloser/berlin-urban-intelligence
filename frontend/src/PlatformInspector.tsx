@@ -94,14 +94,21 @@ export default function PlatformInspector() {
         {state === "loading" && <p className="empty-state">Loading source registry…</p>}
         {state === "error" && <p className="inline-error">{error}</p>}
         {state === "ready" && (
-          <div className="observation-list">
+          <div
+            aria-label="Configured source status list"
+            className="observation-list"
+            role="region"
+            tabIndex={0}
+          >
             {sources.map((source) => {
               const runtime = statuses[source.id];
               return (
                 <div className="observation-row" data-source-id={source.id} key={source.id}>
                   <span>
                     <strong>{source.dataset}</strong>
-                    <small>{source.provider} · {source.domain}</small>
+                    <small>
+                      {source.provider} · {source.domain}
+                    </small>
                     <small>Last attempt: {timeValue(runtime?.last_retrieval_attempt)}</small>
                     <small>Last success: {timeValue(runtime?.last_successful_retrieval)}</small>
                     <small>Latest data: {timeValue(runtime?.latest_observation_time)}</small>
@@ -124,14 +131,21 @@ export default function PlatformInspector() {
         {agents.length === 0 ? (
           <p className="empty-state">No registered agent descriptors are available.</p>
         ) : (
-          <div className="observation-list">
+          <div
+            aria-label="Registered agent capability list"
+            className="observation-list"
+            role="region"
+            tabIndex={0}
+          >
             {agents.map((agent) => {
               const health = agentHealth[agent.id];
               return (
                 <div className="observation-row" data-agent-id={agent.id} key={agent.id}>
                   <span>
                     <strong>{agent.name ?? agent.id}</strong>
-                    <small>{agent.domain ?? "cross-domain"} · v{agent.version}</small>
+                    <small>
+                      {agent.domain ?? "cross-domain"} · v{agent.version}
+                    </small>
                     <small>{agent.description}</small>
                     <small>Checked: {timeValue(health?.checked_at)}</small>
                   </span>
