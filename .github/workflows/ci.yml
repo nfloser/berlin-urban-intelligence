@@ -53,10 +53,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install pinned Playwright acceptance runner
-        working-directory: frontend
+      - name: Install isolated pinned Playwright acceptance runner
         run: |
-          npm install --no-save --no-package-lock @playwright/test@1.55.0
+          set -euo pipefail
+          rm -rf /tmp/bui-playwright
+          mkdir -p /tmp/bui-playwright
+          cd /tmp/bui-playwright
+          npm init -y >/dev/null
+          npm install --save-exact @playwright/test@1.55.0
+          cp -R "$GITHUB_WORKSPACE/frontend/e2e" ./e2e
+          cp "$GITHUB_WORKSPACE/frontend/playwright.config.ts" ./playwright.config.ts
           npx playwright install --with-deps chromium
       - run: docker compose config
       - run: docker build -t berlin-urban-intelligence:ci .
@@ -97,5 +103,5 @@ jobs:
             fi
             sleep 1
           done
-          (cd frontend && BUI_E2E_BASE_URL=http://127.0.0.1:8080 npx playwright test)
+          (cd /tmp/bui-playwright && BUI_E2E_BASE_URL=http://127.0.0.1:8080 npx playwright test)
           docker compose ps
