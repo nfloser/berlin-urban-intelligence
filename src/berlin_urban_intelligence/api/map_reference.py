@@ -58,7 +58,7 @@ def parse_layers(value: str) -> tuple[MapLayer, ...]:
 def parse_layer(value: str) -> MapLayer:
     if value not in MAP_LAYERS:
         raise ValueError(f"unknown map layer: {value}")
-    return cast(MapLayer, value)
+    return value
 
 
 def _coordinate_pairs(value: Any) -> Iterable[tuple[float, float]]:
