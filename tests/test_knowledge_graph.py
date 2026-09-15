@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 
 from rdflib.namespace import PROV, RDF
@@ -133,7 +134,9 @@ def test_derived_projection_exposes_definition_status_and_upstream_lineage() -> 
         predicate == PROV.wasDerivedFrom and str(target).endswith("fixture/observation")
         for _, predicate, target in graph.graph.triples((subject, None, None))
     )
+    value_literal = graph.graph.value(subject, BUI.valueJSON)
+    assert value_literal is not None
+    assert json.loads(str(value_literal)) == {"lqi": 2, "temperature": 20.0}
     serialized = graph.serialize()
     assert "fixture-definition-v1" in serialized
     assert "fixture_context" in serialized
-    assert '"lqi":2' in serialized
