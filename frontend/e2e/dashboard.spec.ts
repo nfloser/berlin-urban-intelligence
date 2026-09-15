@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+function isReferenceViewportResponse(url: string): boolean {
+  const parsed = new URL(url);
+  return parsed.pathname === "/api/v1/map/reference";
+}
+
 test("dashboard renders explicit empty state and completes a hypothetical heat assessment", async ({
   page,
 }) => {
@@ -29,22 +34,47 @@ test("deterministic workflow remains inspectable when source-backed agents are u
   await expect(page.getByText(/Missing:/)).toBeVisible();
 });
 
-test("reference map objects can be selected and inspected with canonical metadata", async ({
+test("reference map loads the viewport, reloads after navigation and inspects canonical detail", async ({
   page,
 }) => {
-  await page.goto("/");
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  const initialViewport = page.waitForResponse(
+    (response) => isReferenceViewportResponse(response.url()) && response.ok(),
+  );
 
-  await expect(page.getByText("Critical facilities · 1")).toBeVisible();
-  await expect(page.getByText("VBB stops · 1")).toBeVisible();
-  await expect(page.getByText("Official climate features · 1")).toBeVisible();
+  await page.goto("/");
+  await initialViewport;
 
   const map = page.getByLabel("Berlin domain map");
   await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
+  await expect(page.getByText(/Critical facilities · 1 visible \/ 1 in viewport · 1 total/)).toBeVisible();
+  await expect(page.getByText(/VBB stops · 1 visible \/ 1 in viewport · 1 total/)).toBeVisible();
+  await expect(
+    page.getByText(/Official climate features · 1 visible \/ 1 in viewport · 1 total/),
+  ).toBeVisible();
+
+  expect(requests.some((url) => url.includes("/api/v1/facilities?limit=1000"))).toBe(false);
+  expect(requests.some((url) => url.includes("/api/v1/transport-stops?limit=1000"))).toBe(false);
+  expect(requests.some((url) => url.includes("/api/v1/climate-features?limit=1000"))).toBe(false);
+
+  const nextViewport = page.waitForResponse(
+    (response) => isReferenceViewportResponse(response.url()) && response.ok(),
+  );
+  await page.locator(".maplibregl-ctrl-zoom-in").click();
+  await nextViewport;
+  await expect(map).toHaveAttribute("data-reference-layers-ready", "true");
+
   const box = await map.boundingBox();
   expect(box).not.toBeNull();
   const center = { x: box!.width / 2, y: box!.height / 2 };
-
+  const detailResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/map/reference/facilities/") && response.ok(),
+  );
   await map.click({ position: center });
+  await detailResponse;
+
   await expect(page.getByText("Acceptance Hospital", { exact: true })).toBeVisible();
   await expect(page.getByText("Critical facility", { exact: true })).toBeVisible();
   await expect(page.getByText("acceptance facilities", { exact: true })).toBeVisible();
@@ -54,9 +84,12 @@ test("reference map objects can be selected and inspected with canonical metadat
 test("map-selected routing compares a baseline with an explicit closed-edge scenario", async ({
   page,
 }) => {
+  const initialViewport = page.waitForResponse(
+    (response) => isReferenceViewportResponse(response.url()) && response.ok(),
+  );
   await page.goto("/");
+  await initialViewport;
 
-  await expect(page.getByText("Critical facilities · 1")).toBeVisible();
   const map = page.getByLabel("Berlin domain map");
   await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
   const box = await map.boundingBox();
