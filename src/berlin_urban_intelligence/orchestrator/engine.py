@@ -92,16 +92,11 @@ class Orchestrator:
         selected_ids: set[str] = set()
         missing: list[str] = []
         for capability in required:
-            candidates = self._registry.agents_with_capability(capability)
-            if not candidates:
+            agent = self._registry.resolve_capability(capability)
+            if agent is None:
                 missing.append(capability)
                 continue
-            if len(candidates) > 1:
-                candidate_ids = ", ".join(sorted(agent.descriptor.id for agent in candidates))
-                raise ValueError(
-                    f"capability {capability!r} is provided by multiple agents: {candidate_ids}"
-                )
-            selected_ids.add(candidates[0].descriptor.id)
+            selected_ids.add(agent.descriptor.id)
 
         ordered = [
             agent

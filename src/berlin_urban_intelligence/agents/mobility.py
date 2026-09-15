@@ -39,7 +39,9 @@ class MobilitySnapshot(BaseModel):
 class MobilityAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="mobility",
+        name="Mobility Agent",
         version="0.1.0",
+        domain="mobility",
         description=(
             "Berlin mobility state from verified VBB sources with explicit "
             "realtime coverage semantics."

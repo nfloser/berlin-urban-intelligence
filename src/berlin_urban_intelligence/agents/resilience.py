@@ -261,7 +261,9 @@ class CriticalInfrastructureRegistry:
 class ResilienceAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="resilience",
+        name="Resilience Agent",
         version="1.0.0",
+        domain="urban_resilience",
         description=(
             "Network accessibility and disruption analysis over explicit network/facility inputs."
         ),

@@ -30,7 +30,9 @@ from berlin_urban_intelligence.shared.temporal import classify_freshness, ensure
 class HeatAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="heat",
+        name="Heat Agent",
         version="0.1.0",
+        domain="urban_heat",
         description=(
             "Measured meteorology and official urban-climate information with "
             "explicit state semantics."

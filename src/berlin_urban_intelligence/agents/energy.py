@@ -75,7 +75,9 @@ class ForecastArtifact(BaseModel):
 class EnergyAgent(BaseAgent):
     descriptor = AgentDescriptor(
         id="energy",
+        name="Energy Agent",
         version="1.0.0",
+        domain="energy",
         description=(
             "Leakage-safe forecasting boundary; Berlin forecasts require a validated Berlin-scoped "
             "evaluation and matching reproducible forecast artefact."

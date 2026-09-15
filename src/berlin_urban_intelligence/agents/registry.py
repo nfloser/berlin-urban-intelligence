@@ -43,6 +43,18 @@ class AgentRegistry:
             agent for agent in self._agents.values() if capability in agent.descriptor.capabilities
         )
 
+    def resolve_capability(self, capability: str) -> BaseAgent | None:
+        """Resolve one capability while rejecting ambiguous provider selection."""
+        candidates = self.agents_with_capability(capability)
+        if not candidates:
+            return None
+        if len(candidates) > 1:
+            candidate_ids = ", ".join(sorted(agent.descriptor.id for agent in candidates))
+            raise ValueError(
+                f"capability {capability!r} is provided by multiple agents: {candidate_ids}"
+            )
+        return candidates[0]
+
     def _dependency_graph(self) -> nx.DiGraph[str]:
         graph: nx.DiGraph[str] = nx.DiGraph()
         graph.add_nodes_from(self._agents)
