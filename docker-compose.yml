@@ -8,6 +8,7 @@ services:
       BUI_REFERENCE_STATE: /app/data/runtime/reference.json
       BUI_ENERGY_STATE: /app/data/runtime/energy.json
       BUI_DERIVED_STATE: /app/data/runtime/derived.json
+      BUI_SOURCE_REGISTRY: /app/config/sources.yaml
     volumes:
       - ./data:/app/data
     ports:
