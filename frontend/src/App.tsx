@@ -37,6 +37,7 @@ import {
   featureCollectionForLayer,
   referenceHitTestBox,
   referenceLayerSummaries,
+  referencePointHit,
   type ReferenceMapLayer,
   type ReferenceMapResponse,
 } from "./mapReference";
@@ -444,28 +445,41 @@ function App() {
       );
       if (inspectableLayers.length === 0) return;
       const hitBox = referenceHitTestBox(event.point);
-      const hit = inspectableLayers
+      const renderedHit = inspectableLayers
         .map((layerId) => map.queryRenderedFeatures(hitBox, { layers: [layerId] })[0])
         .find((feature) => feature !== undefined);
-      if (!hit) {
+
+      let layer: ReferenceMapLayer | null = null;
+      let id: string | null = null;
+      if (renderedHit) {
+        const rawId = renderedHit.properties?.id ?? renderedHit.id;
+        if (rawId !== null && rawId !== undefined) {
+          id = String(rawId);
+          layer =
+            renderedHit.layer.id === "facilities-circle"
+              ? "facilities"
+              : renderedHit.layer.id === "stops-circle"
+                ? "stops"
+                : "climate";
+        }
+      } else if (referenceMap) {
+        const pointHit = referencePointHit(referenceMap, event.point, ([longitude, latitude]) => {
+          const projected = map.project([longitude, latitude]);
+          return { x: projected.x, y: projected.y };
+        });
+        if (pointHit) {
+          layer = pointHit.layer;
+          id = pointHit.id;
+        }
+      }
+
+      if (!layer || !id) {
         tracker.invalidate();
         setMapSelection(null);
         setMapSelectionError(null);
         return;
       }
-      const rawId = hit.properties?.id ?? hit.id;
-      if (rawId === null || rawId === undefined) {
-        tracker.invalidate();
-        setMapSelection(null);
-        return;
-      }
-      const id = String(rawId);
-      const layer: ReferenceMapLayer =
-        hit.layer.id === "facilities-circle"
-          ? "facilities"
-          : hit.layer.id === "stops-circle"
-            ? "stops"
-            : "climate";
+
       const token = tracker.begin();
       setMapSelectionError(null);
       try {
@@ -495,7 +509,7 @@ function App() {
       tracker.invalidate();
       map.off("click", inspectReferenceObject);
     };
-  }, [loadState, routeSelectionMode]);
+  }, [loadState, referenceMap, routeSelectionMode]);
 
   const startRouteSelection = (mode: "origin" | "destination") => {
     detailRequestTracker.current.invalidate();
