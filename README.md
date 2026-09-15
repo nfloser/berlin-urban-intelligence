@@ -23,7 +23,7 @@ Berlin Urban Intelligence makes those distinctions part of the executable data c
 | Area | Current implementation |
 |---|---|
 | Canonical contracts | Frozen Pydantic models with explicit data state, quality, UTC time, units, CRS and provenance. |
-| Live acquisition | Independent Berlin air-quality, DWD and VBB GTFS-Realtime refresh with source status and last-known-good semantics. |
+| Live acquisition | Independent Berlin air-quality, DWD and VBB GTFS-Realtime refresh with source status, last-known-good semantics and a configurable persisted-state worker. |
 | Reference acquisition | Official facility/climate WFS data, VBB static GTFS and optional OSM road topology. |
 | Domain agents | Live State, Mobility, Exposure, Heat, Energy and Resilience agents with machine-readable descriptors/health. |
 | Energy | Chronological holdout evaluation against persistence/seasonal baselines plus Ridge/gradient boosting; fingerprint-bound one-step forecast artefacts. |
@@ -33,6 +33,7 @@ Berlin Urban Intelligence makes those distinctions part of the executable data c
 | Cross-domain assessment | Independent Heat/Energy/Resilience dimensions with explicit unavailable/error state and no composite score. |
 | Semantic layer | RDF projection with project ontology, PROV-O/SOSA usage, SHACL artefacts and version-controlled SPARQL query. |
 | Interfaces | FastAPI backend and React/TypeScript/MapLibre research dashboard. |
+| Runtime refresh | Changed validated snapshots are detected without backend restart; invalid replacements retain last-known-good process state and surface reload diagnostics. |
 | Verification | Strict type/lint/format gates, backend/frontend tests, semantic/data/secret guards and running Compose HTTP smoke test. |
 
 Capabilities can be conditional on data. Energy remains unavailable until a Berlin-scoped evaluation/forecast artefact is created; Resilience routing requires a persisted network snapshot.
@@ -54,7 +55,7 @@ flowchart LR
     API --> UI[React / MapLibre]
 ```
 
-Provider acquisition is explicit and separate from HTTP request handling. The API loads persisted snapshots at process startup. See [Architecture](docs/architecture/overview.md), [components](docs/architecture/components.md) and [data flow](docs/architecture/data-flow.md).
+Provider acquisition is explicit and separate from HTTP request handling. The refresh worker validates and atomically replaces persisted runtime state; the API checks snapshot identity cheaply on requests and reloads only changed files. Invalid replacements do not displace the last-known-good in-process state. The dashboard watches active runtime/reference snapshot timestamps and reloads its data when they change. See [Architecture](docs/architecture/overview.md), [components](docs/architecture/components.md) and [data flow](docs/architecture/data-flow.md).
 
 ## Repository structure
 
@@ -76,8 +77,13 @@ See [Project structure](docs/implementation/project-structure.md).
 ### Docker Compose
 
 ```bash
-docker compose run --rm refresh
-docker compose up --build backend frontend
+docker compose up --build
+```
+
+The default composition starts the backend, dashboard and live refresh worker. The worker refreshes persisted live state every 300 seconds by default. Override the cadence, for example:
+
+```bash
+BUI_REFRESH_INTERVAL_SECONDS=60 docker compose up --build
 ```
 
 Then open:
@@ -85,20 +91,22 @@ Then open:
 - dashboard: `http://localhost:8080`
 - OpenAPI: `http://localhost:8000/docs`
 
-If you generate `reference.json` or another state file **after** the backend has started, restart the backend because state is loaded at startup:
-
-```bash
-docker compose restart backend
-```
+When `state.json`, `reference.json` or `energy.json` is replaced while the backend is running, the validated replacement becomes visible without restarting the API. A malformed replacement is reported through `/api/v1/system` and the last-known-good state remains active.
 
 For local Python/Node installation, reference layers and optional OSM, see [Installation](docs/usage/installation.md) and [Quickstart](docs/usage/quickstart.md).
 
 ## Example workflow
 
-Acquire current state:
+Acquire current state once:
 
 ```bash
 python scripts/refresh_live.py
+```
+
+Run a persistent local refresh worker:
+
+```bash
+python scripts/refresh_live.py --interval-seconds 300
 ```
 
 Acquire official reference layers and VBB static GTFS:
@@ -113,11 +121,12 @@ Run the API:
 uvicorn berlin_urban_intelligence.api.app:app --host 0.0.0.0 --port 8000
 ```
 
-Inspect domain/source health:
+Inspect domain/source health and snapshot reload state:
 
 ```bash
 curl http://localhost:8000/api/v1/agents/health
 curl http://localhost:8000/api/v1/source-status
+curl http://localhost:8000/api/v1/system
 ```
 
 More examples, including scenarios and resilience requests: [Usage examples](docs/usage/examples.md).
@@ -146,11 +155,11 @@ The documentation is organized for external engineering/research use:
 
 ## Current status
 
-**Implemented:** typed cross-domain contracts; configured data adapters; live/reference acquisition; domain agents; scenario/resilience calculations; energy evaluation/forecast pipeline; deterministic orchestration; RDF projection; persisted snapshots; API/dashboard; CI/container verification.
+**Implemented:** typed cross-domain contracts; configured data adapters; live/reference acquisition; configurable persisted live refresh; change-aware API snapshot reload; domain agents; scenario/resilience calculations; energy evaluation/forecast pipeline; deterministic orchestration; RDF projection; persisted snapshots; API/dashboard; CI/container verification.
 
 **Experimental/conditional:** live provider compatibility, OSM-backed routing, Berlin energy forecasting for explicitly supplied source publications, cross-domain scenario assessment.
 
-**Not currently implemented/claimed:** continuous streaming state, municipal operations/control, universal Berlin score, causal cross-domain inference, calibrated energy prediction intervals, persistent SPARQL service, distributed remote-agent protocol, API authentication/authorization, production-scale performance validation.
+**Not currently implemented/claimed:** continuous event streaming, municipal operations/control, universal Berlin score, causal cross-domain inference, calibrated energy prediction intervals, persistent SPARQL service, distributed remote-agent protocol, API authentication/authorization, production-scale performance validation.
 
 Quantitative scientific evaluation is currently strongest in the energy workflow. Broader architecture/scenario/scalability evaluation remains future research. See [Evaluation results](docs/evaluation/results.md) and [limitations](docs/evaluation/limitations.md).
 
