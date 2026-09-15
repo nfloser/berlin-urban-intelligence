@@ -51,3 +51,20 @@ def test_registered_product_cannot_be_silently_redefined() -> None:
     graph.add_derivation("heat:condition", ("weather:temperature",))
     with pytest.raises(ValueError, match="already registered"):
         graph.add_derivation("heat:condition", ("weather:humidity",))
+
+
+def test_lineage_exposes_direct_and_transitive_relationships() -> None:
+    graph = build_graph()
+    assert graph.upstream("resilience:impact") == (
+        "weather:temperature",
+        "heat:condition",
+        "population:grid",
+        "exposure:population",
+        "facilities:critical",
+    )
+    assert graph.downstream("weather:temperature") == (
+        "heat:condition",
+        "exposure:population",
+        "resilience:impact",
+    )
+    assert graph.direct_downstream("heat:condition") == ("exposure:population",)
