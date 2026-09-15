@@ -24,7 +24,7 @@ These are semantic constraints rather than labels for display only. For example,
 
 ## Units, time and space
 
-Numeric observations/derived values require an explicit unit. Cross-agent datetimes must be timezone-aware and are normalized to UTC. `SpatialReference` validates CRS identifiers and GeoJSON geometry; WGS84 coordinates are bounded.
+Numeric observations/derived values require an explicit unit. Canonical models reject non-finite floating-point values (`NaN`, positive infinity and negative infinity) so invalid numerical states cannot cross agent or persistence boundaries as if they were measurements, forecasts or scenario values. Cross-agent datetimes must be timezone-aware and are normalized to UTC. `SpatialReference` validates CRS identifiers and GeoJSON geometry; WGS84 coordinates are bounded.
 
 Metric distance/snapping calculations project into EPSG:25833 for Berlin by default. This avoids treating angular longitude/latitude differences as metres.
 
