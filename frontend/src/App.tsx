@@ -8,9 +8,9 @@ import {
   type EnergyResponse,
   type Health,
   type MobilityResponse,
+  type NetworkNodePick,
   type Observation,
   type OfficialModelFeature,
-  type NetworkNodePick,
   type OrchestrationResponse,
   type RouteComparisonResponse,
   type RouteResponse,
@@ -26,6 +26,7 @@ import {
   routeRequest,
   toFeatureCollection,
 } from "./api";
+import MapEntityInspector, { type MapSelection } from "./MapEntityInspector";
 
 const BASE_STYLE = "https://tiles.openfreemap.org/styles/liberty";
 const WORKFLOWS: Array<{ value: WorkflowKind; label: string }> = [
@@ -56,6 +57,7 @@ function App() {
   const [facilities, setFacilities] = useState<CriticalFacility[]>([]);
   const [stops, setStops] = useState<UrbanEntity[]>([]);
   const [climate, setClimate] = useState<OfficialModelFeature[]>([]);
+  const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [selectedObservationId, setSelectedObservationId] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowKind>("urban_snapshot");
@@ -151,6 +153,9 @@ function App() {
     const facilityData = toFeatureCollection(facilities);
     const stopData = toFeatureCollection(stops);
     const climateData = toFeatureCollection(climate);
+    const inspectionData: FeatureCollection = mapSelection
+      ? toFeatureCollection([mapSelection.item])
+      : { type: "FeatureCollection", features: [] };
     const routeData = (geometry: RouteComparisonResponse["baseline_geometry"]): FeatureCollection => ({
       type: "FeatureCollection",
       features: geometry
@@ -186,6 +191,7 @@ function App() {
       upsert("facilities", facilityData);
       upsert("stops", stopData);
       upsert("climate", climateData);
+      upsert("map-inspection", inspectionData);
       upsert("route-baseline", baselineRouteData);
       upsert("route-scenario", scenarioRouteData);
       upsert("route-selection", selectionData);
@@ -216,6 +222,36 @@ function App() {
             "circle-color": "#e36d6d",
             "circle-stroke-color": "#ffffff",
             "circle-stroke-width": 1.5,
+          },
+        });
+      }
+      if (!map.getLayer("map-inspection-fill")) {
+        map.addLayer({
+          id: "map-inspection-fill",
+          type: "fill",
+          source: "map-inspection",
+          paint: { "fill-color": "#f0c75e", "fill-opacity": 0.16 },
+        });
+      }
+      if (!map.getLayer("map-inspection-line")) {
+        map.addLayer({
+          id: "map-inspection-line",
+          type: "line",
+          source: "map-inspection",
+          paint: { "line-color": "#f0c75e", "line-width": 4, "line-opacity": 0.95 },
+        });
+      }
+      if (!map.getLayer("map-inspection-circle")) {
+        map.addLayer({
+          id: "map-inspection-circle",
+          type: "circle",
+          source: "map-inspection",
+          paint: {
+            "circle-radius": 10,
+            "circle-color": "#f0c75e",
+            "circle-opacity": 0.3,
+            "circle-stroke-color": "#f0c75e",
+            "circle-stroke-width": 3,
           },
         });
       }
@@ -260,6 +296,7 @@ function App() {
     facilities,
     stops,
     climate,
+    mapSelection,
     visibleLayers,
     routeComparison,
     routeBaseline,
@@ -293,6 +330,51 @@ function App() {
       map.off("click", selectNearestNode);
     };
   }, [routeSelectionMode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || loadState !== "ready" || routeSelectionMode !== null) return;
+
+    const inspectReferenceObject = (event: maplibregl.MapMouseEvent) => {
+      const inspectableLayers = ["facilities-circle", "stops-circle", "climate-fill"].filter(
+        (layerId) => map.getLayer(layerId) !== undefined,
+      );
+      if (inspectableLayers.length === 0) return;
+      const hit = map.queryRenderedFeatures(event.point, { layers: inspectableLayers })[0];
+      if (!hit) {
+        setMapSelection(null);
+        return;
+      }
+      const rawId = hit.properties?.id ?? hit.id;
+      if (rawId === null || rawId === undefined) {
+        setMapSelection(null);
+        return;
+      }
+      const id = String(rawId);
+      if (hit.layer.id === "facilities-circle") {
+        const item = facilities.find((candidate) => candidate.id === id);
+        setMapSelection(item ? { kind: "facility", item } : null);
+        return;
+      }
+      if (hit.layer.id === "stops-circle") {
+        const item = stops.find((candidate) => candidate.id === id);
+        setMapSelection(item ? { kind: "stop", item } : null);
+        return;
+      }
+      const item = climate.find((candidate) => candidate.id === id);
+      setMapSelection(item ? { kind: "climate", item } : null);
+    };
+
+    map.on("click", inspectReferenceObject);
+    return () => {
+      map.off("click", inspectReferenceObject);
+    };
+  }, [loadState, routeSelectionMode, facilities, stops, climate]);
+
+  const startRouteSelection = (mode: "origin" | "destination") => {
+    setMapSelection(null);
+    setRouteSelectionMode(mode);
+  };
 
   const runWorkflow = async () => {
     setWorkflowState("running");
@@ -454,6 +536,8 @@ function App() {
         </div>
 
         <aside className="sidebar">
+          <MapEntityInspector selection={mapSelection} onClear={() => setMapSelection(null)} />
+
           <section>
             <h2>Mobility</h2>
             <StatusBadge health={mobility?.health} />
@@ -597,14 +681,14 @@ function App() {
           <div className="route-selection-actions">
             <button
               className={`secondary-action${routeSelectionMode === "origin" ? " active" : ""}`}
-              onClick={() => setRouteSelectionMode("origin")}
+              onClick={() => startRouteSelection("origin")}
               type="button"
             >
               {routeOrigin ? "Origin selected" : "Select origin on map"}
             </button>
             <button
               className={`secondary-action${routeSelectionMode === "destination" ? " active" : ""}`}
-              onClick={() => setRouteSelectionMode("destination")}
+              onClick={() => startRouteSelection("destination")}
               type="button"
             >
               {routeDestination ? "Destination selected" : "Select destination on map"}
