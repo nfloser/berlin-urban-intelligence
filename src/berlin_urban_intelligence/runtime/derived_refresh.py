@@ -76,7 +76,9 @@ class DerivedRefreshCoordinator:
                 for input_item in previous_records[record_id].inputs
             )
         )
-        narrowed = tuple(input_id for input_id in all_changed_inputs if input_id not in unchanged_inputs)
+        narrowed = tuple(
+            input_id for input_id in all_changed_inputs if input_id not in unchanged_inputs
+        )
         return narrowed or all_changed_inputs
 
     def refresh(
