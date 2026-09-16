@@ -143,9 +143,7 @@ class StromnetzBerlinCsvAdapter:
                 raise ValueError(f"published data row {index + 1} does not contain three fields")
             date_label, time_label, value_label = fields[:3]
             try:
-                wall_time = datetime.strptime(
-                    f"{date_label} {time_label}", "%d.%m.%Y %H:%M"
-                )
+                wall_time = datetime.strptime(f"{date_label} {time_label}", "%d.%m.%Y %H:%M")
             except ValueError as exc:
                 raise ValueError(
                     f"invalid upstream timestamp in published data row {index + 1}"
@@ -165,9 +163,7 @@ class StromnetzBerlinCsvAdapter:
         numeric_values = [int(value) for value in values]
         computed_maximum = max(numeric_values)
         if computed_maximum != declared_maximum:
-            raise ValueError(
-                "published maximum is inconsistent with the quarter-hour load values"
-            )
+            raise ValueError("published maximum is inconsistent with the quarter-hour load values")
         summed_load = sum(numeric_values)
         if summed_load % 4 != 0 or summed_load // 4 != declared_work:
             raise ValueError(
