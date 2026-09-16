@@ -2,9 +2,9 @@
 
 ## Current phase
 
-Phase 22 — final evidence closure for the v1.0 candidate. Security (#18), structured observability (#19), reproducible real Berlin energy evidence (#20) and multiple source-backed cross-domain workflows (#21) are merged and verified. Issue #14's previously external-blocked real OSM road-network gate now has successful point-in-time live evidence on PR #35.
+Phase 22 — v1.0 evidence closure complete. Security (#18), structured observability (#19), reproducible real Berlin energy evidence (#20), multiple source-backed cross-domain workflows (#21) and real Berlin road-network readiness (#14) are all verified against the repository's documented acceptance contracts.
 
-The only remaining completion step is procedural rather than a missing domain capability: the final PR #35 documentation head must pass the protected `backend`, `frontend` and `containers` checks, followed by the final independent review and merge.
+The aggregate v1.0 evidence gate is now **PASS**. PR #35 remains to be merged after the protected checks complete on the final status head; publishing an actual `v1.0.0` tag/release is a separate versioning decision and is not implied by this status alone.
 
 ## Current development work
 
@@ -18,7 +18,7 @@ The accepted snapshot contained **740 canonical nodes** and **1,800 canonical ed
 
 The readiness verifier then routed through the existing resilience implementation from `osm-node:10087214573` to `osm-node:13043292535` using edge `osm:10087214573:13043292535:1:1419417017` with an observed route travel time of approximately **2.139 seconds**. Artifact `10445300085` contains all endpoint attempts plus the successful readiness payload.
 
-Protected PR run `35091630767` already passed backend, frontend and containers/Compose/Playwright on implementation head `51a6f28954ee16bb238fc33c8ad349e1cec8663c`. The current documentation commits deliberately trigger one final protected run before merge.
+Protected PR run `35091630767` passed backend, frontend and containers/Compose/Playwright on implementation head `51a6f28954ee16bb238fc33c8ad349e1cec8663c`. Evidence-documentation head `9298108055f486e61c9979da302d451df24313e9` then passed protected run `35092998554`, and the independent real-energy workflow `35092998560` also passed on the same head. The final PASS-status commit is intentionally subjected to one last protected run before merge.
 
 ## Recently completed work
 
@@ -29,7 +29,7 @@ Protected PR run `35091630767` already passed backend, frontend and containers/C
 - Issue #17 / PR #30 established reproducible performance/scaling evidence with a deterministic 10,000-stop/250-facility/750-node benchmark, bounded map response selection and raw latency/allocation evidence.
 - Issue #16 / PR #29 completed the practical dashboard accessibility and keyboard baseline with composed Playwright/Axe acceptance.
 - Issue #15 / PR #28 completed populated dashboard-inspector acceptance through the composed application stack.
-- Issue #14 / PR #27 originally merged strict real-road verification/degradation infrastructure without fabricating provider success; PR #35 now supplies the missing successful live-provider evidence needed to complete that gate.
+- Issue #14 / PR #27 originally merged strict real-road verification/degradation infrastructure without fabricating provider success; PR #35 now supplies the successful live-provider evidence that closes that verification gap.
 - Issues #12 and #13 completed semantic API parity plus real-agent metadata/composition boundaries; issue #11 established [`verification.md`](verification.md) as the repository-wide evidence gate.
 
 ## Current architectural state
@@ -48,7 +48,7 @@ Protected PR run `35091630767` already passed backend, frontend and containers/C
 - Structured operation logging covers request, source-refresh, reload, derivation-refresh and scenario boundaries with safe low-cardinality fields.
 - The security baseline and dependency-audit workflow are separate from application-domain logic.
 - The real-energy evidence workflow downloads provider data only during CI and never converts official files into a committed production fallback.
-- Optional real road-network acquisition remains separate from deterministic CI, preserves explicit provider failure semantics and now has successful point-in-time live readiness/routing evidence.
+- Optional real road-network acquisition remains separate from deterministic CI, preserves explicit provider failure semantics and has successful point-in-time live readiness/routing evidence.
 
 ## Evidence baselines
 
@@ -94,7 +94,7 @@ The authoritative detail is in [`verification.md`](verification.md).
 
 There is now **no unresolved critical domain/evidence gap** in the current v1.0 matrix. The previously external-blocked #14 road-network requirement is satisfied by real run `35091544852` and artifact `10445300085`, while retaining explicit failure evidence for the endpoints that timed out.
 
-The aggregate v1.0 gate remains **NOT READY** only until the final PR #35 documentation head passes the protected required checks and the final review confirms that no critical defect, misleading evidence statement or unresolved review thread remains.
+The aggregate v1.0 evidence gate is **PASS**. This means the documented v1.0 acceptance/evidence criteria are satisfied; it does not claim permanent provider availability, production-scale capacity, municipal-authority status, formal WCAG conformance or that a semantic version release has already been published.
 
 ## Known external and scope constraints
 
@@ -130,10 +130,10 @@ Separate scoped evidence workflows additionally cover dependency security audits
 
 ## Next concrete tasks
 
-1. Wait for the protected backend/frontend/container checks on the final PR #35 evidence-documentation head.
-2. Perform the final independent review of PR #35, including workflow failover safety, evidence accuracy, failure visibility and documentation consistency.
-3. If the final head is green and review-clean, update the aggregate verification gate to PASS, run the resulting final checks, merge PR #35 and close issue #14.
-4. Only then consider a semantic v1.0 release/tag and release notes; do not create a release merely because an issue was closed.
+1. Let the protected backend/frontend/container checks complete on the final PASS-status head.
+2. Record the final review result in PR #35, mark the PR ready for review and squash-merge only if the final head is green and review-clean.
+3. Close issue #14 with links/run IDs for the successful live road evidence and final protected CI.
+4. Consider a semantic `v1.0.0` release only as a separate product/versioning task with explicit release notes and the documented scientific/operational limitations.
 
 ## Important migration notes
 
