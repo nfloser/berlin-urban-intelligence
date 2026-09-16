@@ -22,42 +22,75 @@ The verifier does not repair or fabricate a network. Provider, schema and routin
 
 The implementation is covered by deterministic tests for readiness validation, explicit imputation, provider/schema failure handling and last-known-good retention. The regular protected CI remains independent of OSM availability.
 
-On branch head `f9c63349c821164f79a6d74c910730e955823c30`, GitHub Actions run `34980869733` completed all required jobs successfully:
+PR #27 implementation head `f9c63349c821164f79a6d74c910730e955823c30` passed protected GitHub Actions run `34980869733` for backend, frontend and containers/Compose/Playwright. PR #35 then hardened only the external live-smoke delivery strategy; protected run `35091630767` passed backend, frontend and containers on head `51a6f28954ee16bb238fc33c8ad349e1cec8663c`.
 
-- `backend`: PASS — Ruff formatting/lint, strict mypy, complete pytest suite, knowledge validation, production-data guard, secret guard and OpenAPI generation;
-- `frontend`: PASS — unit tests and production build; and
-- `containers`: PASS — Compose validation, backend/frontend image builds, deterministic acceptance state, composed health checks and Playwright browser acceptance.
+These deterministic runs prove repository behavior but do not substitute for successful real OSM acquisition.
 
-This proves repository behavior but does **not** substitute for a successful real OSM acquisition.
+## Earlier blocked evidence — 2026-09-15 and 2026-09-16
 
-## Point-in-time live evidence — 2026-09-15
-
-### Attempt 1 — default public Overpass endpoint
+### Default public Overpass endpoint
 
 GitHub Actions run `34979600413` executed a real `drive` acquisition for `Mitte, Berlin, Germany` with explicit OSMnx speed/travel-time imputation enabled.
 
 Result: **EXTERNAL/BLOCKED**.
 
-The request to `overpass-api.de` failed before canonical normalization with a `ConnectTimeout` after the configured 180-second connection timeout. The smoke wrote failure evidence with `synthetic_fallback=false` and uploaded artifact `10401630471`.
+The request to `overpass-api.de` failed before canonical normalization with a `ConnectTimeout` after the configured 180-second connection timeout. The smoke wrote failure evidence with `synthetic_fallback=false`.
 
 No nodes, edges or route were claimed from this failed attempt.
 
-### Attempt 2 — explicit alternative public Overpass endpoint
+### Explicit Private.coffee endpoint
 
-The acquisition path was extended so a caller can explicitly select an OSMnx `overpass_url` for one fetch. The previous OSMnx setting is restored afterward, and the selected delivery endpoint is recorded in smoke/provenance evidence. This is an explicit configuration mechanism, not silent automatic failover.
+GitHub Actions run `34980820676` executed the same real Berlin `drive` smoke against `https://overpass.private.coffee/api`.
 
-GitHub Actions run `34980820676` then executed the same real Berlin `drive` smoke against `https://overpass.private.coffee/api`.
+The original attempt and its 2026-09-16 rerun both ended with provider-side `ReadTimeout` before a usable snapshot was returned. The rerun uploaded failure artifact `10444471723`. In every failure payload, `synthetic_fallback=false` remained explicit.
 
-Result: **EXTERNAL/BLOCKED**.
+No nodes, edges or route were claimed from these failed attempts.
 
-The endpoint accepted the connection but the Overpass response exceeded the configured 180-second read timeout, producing `ReadTimeout`. The smoke again wrote failure evidence with `synthetic_fallback=false` and uploaded artifact `10401234247`.
+## Successful point-in-time live evidence — 2026-09-16
 
-No nodes, edges or route were claimed from this failed attempt.
+PR #35 changed only the verification infrastructure so a live run can try multiple real public Overpass delivery endpoints with a hard 300-second budget per endpoint. Endpoint failover does not change the underlying data source, does not cache or generate road topology and cannot make the job pass unless the existing strict readiness verifier accepts a real OSM snapshot and the existing `ResilienceAgent` completes its baseline route.
+
+GitHub Actions run `35091544852` executed the real smoke for:
+
+- place: `Mitte, Berlin, Germany`;
+- network type: `drive`;
+- speed/travel-time derivation: explicit OSMnx `add_edge_speeds` / `add_edge_travel_times` opt-in;
+- synthetic production fallback: `false`.
+
+The first endpoint (`https://maps.mail.ru/osm/tools/overpass/api`) exceeded the workflow's 300-second endpoint budget. The second endpoint (`https://overpass.private.coffee/api`) also exceeded its 300-second budget. Both failures were retained as JSON attempt evidence instead of being hidden.
+
+The third endpoint, `https://overpass-api.de/api`, returned a real OSM network and the full readiness contract passed.
+
+### Verified network
+
+The accepted readiness report recorded:
+
+- provider: `OpenStreetMap contributors`;
+- source licence: `ODbL 1.0`;
+- retrieval timestamp: `2026-09-16T11:50:57.392711Z`;
+- canonical node count: **740**;
+- canonical edge count: **1,800**;
+- speed/travel-time imputation provenance visible on the validated network: **true**;
+- `synthetic_fallback=false`.
+
+### Verified real baseline route
+
+The existing resilience shortest-path implementation completed the deterministic route selected by the readiness verifier:
+
+- origin: `osm-node:10087214573`;
+- destination: `osm-node:13043292535`;
+- node path: `osm-node:10087214573` → `osm-node:13043292535`;
+- selected edge: `osm:10087214573:13043292535:1:1419417017`;
+- travel time: approximately **2.139 seconds**.
+
+This is not a fixture route. It was calculated from the real OSM snapshot acquired during run `35091544852`.
+
+### Evidence artifact
+
+Run `35091544852` uploaded artifact `10445300085` (`road-network-smoke-evidence`, SHA-256 `8672bb1325b80c76d54a5722d78cbc7135ad3d9626432796e1e1bb8b20e1595c`). The artifact contains all endpoint-attempt JSON files, the selected endpoint and the successful canonical readiness payload.
 
 ## Current conclusion
 
-The repository-side road-network verification path is implemented and all deterministic/protected CI gates pass. However, the acceptance requirement for a **successful real Berlin network snapshot and real baseline route is not yet satisfied** because both point-in-time public Overpass attempts timed out from GitHub-hosted runners.
+The acceptance requirement that previously blocked issue #14 is now satisfied by point-in-time real-provider evidence. The repository has demonstrated non-empty real Berlin road-network acquisition, required canonical routing attributes and provenance, explicit OSMnx imputation semantics, no synthetic fallback, and a successful baseline route through the production resilience routing implementation.
 
-Issue #14 therefore remains **EXTERNAL/BLOCKED** and must not be described as completed. A later live smoke may close the issue only after it produces non-empty real Berlin nodes/edges, validates their routing/provenance contract, and completes a baseline route.
-
-The failure state is intentional: external provider unavailability must remain visible rather than being replaced by generated road topology or by a deterministic CI fixture.
+This evidence is deliberately point-in-time rather than a claim that public Overpass infrastructure is permanently available. Future provider outages must continue to degrade visibly. The multi-endpoint smoke is an operational verification mechanism, not a production data substitution mechanism.
