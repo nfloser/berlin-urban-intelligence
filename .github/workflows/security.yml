@@ -1,0 +1,79 @@
+name: Security audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/security.yml"
+      - "pyproject.toml"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  python-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Build isolated runtime dependency environment
+        run: |
+          python -m venv /tmp/bui-runtime-audit
+          /tmp/bui-runtime-audit/bin/python -m pip install --upgrade pip
+          /tmp/bui-runtime-audit/bin/pip install ".[live,osm]"
+      - name: Freeze auditable third-party runtime dependencies
+        run: |
+          /tmp/bui-runtime-audit/bin/pip freeze \
+            | grep -vi '^berlin-urban-intelligence' \
+            > /tmp/bui-runtime-requirements.txt
+          test -s /tmp/bui-runtime-requirements.txt
+          cat /tmp/bui-runtime-requirements.txt
+      - name: Install pinned audit tool outside runtime environment
+        run: python -m pip install "pip-audit==2.10.1"
+      - name: Audit installed Python runtime dependencies
+        run: |
+          pip-audit \
+            --strict \
+            --progress-spinner off \
+            --requirement /tmp/bui-runtime-requirements.txt
+
+  frontend-lockfile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit frontend production and build dependencies
+        run: npm audit --audit-level=high
+
+  browser-acceptance-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Audit isolated Playwright and Axe acceptance dependencies
+        run: |
+          set -euo pipefail
+          mkdir /tmp/bui-playwright-audit
+          cd /tmp/bui-playwright-audit
+          npm init -y >/dev/null
+          npm install --save-exact --ignore-scripts --no-audit --no-fund \
+            @playwright/test@1.63.0 \
+            @axe-core/playwright@4.13.0
+          npm audit --audit-level=high

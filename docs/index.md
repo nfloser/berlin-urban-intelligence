@@ -11,6 +11,7 @@ Berlin Urban Intelligence is a research-oriented urban intelligence and digital-
 - [Data architecture](data/overview.md) — source acquisition, canonicalization, persistence and provenance.
 - [Installation](usage/installation.md) and [quickstart](usage/quickstart.md) — reproducible local execution.
 - [Testing](development/testing.md) — deterministic CI, live-source checks and current testing gaps.
+- [Security baseline](security.md) — deployment trust boundary, container/HTTP controls, logging redaction and dependency auditing.
 - [Performance baseline](performance.md) — reproducible latency/memory evidence, bounded map behavior and scaling limits.
 - [Accessibility baseline](accessibility.md) — automated keyboard/Axe acceptance, non-pointer routing and the manual release checklist.
 - [v1.0 verification matrix](verification.md) — evidence-backed PASS/PARTIAL/NOT VERIFIED status for completion gates and linked follow-up issues.
@@ -34,7 +35,7 @@ The data section covers [source boundaries](data/data-sources.md), the [canonica
 
 ### Implementation and operation
 
-Implementation documentation covers [project structure](implementation/project-structure.md), [modules](implementation/modules.md), [configuration](implementation/configuration.md), [dependencies](implementation/dependencies.md) and [extension points](implementation/extension-points.md). Operational instructions are under [`usage/`](usage/). The concise current development state is maintained in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), while [verification.md](verification.md) is the authoritative completion-evidence matrix.
+Implementation documentation covers [project structure](implementation/project-structure.md), [modules](implementation/modules.md), [configuration](implementation/configuration.md), [dependencies](implementation/dependencies.md) and [extension points](implementation/extension-points.md). Operational instructions are under [`usage/`](usage/). The concise current development state is maintained in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), while [verification.md](verification.md) is the authoritative completion-evidence matrix. Repository-level vulnerability reporting instructions are in [`../SECURITY.md`](../SECURITY.md).
 
 ### Development and research
 
@@ -48,7 +49,7 @@ Some capabilities are conditional on data availability. In particular, the Energ
 
 The current aggregate v1.0 verification status is **NOT READY**. This does not mean the implemented application is unusable; it means critical evidence gaps remain and are explicitly tracked rather than being converted into completion claims. See [verification.md](verification.md) for the exact gates and issues.
 
-The repository does not implement a municipal control system, a universal Berlin score, causal inference across domains, calibrated forecast intervals, an authoritative real-time facility-capacity system, or an LLM-dependent execution core.
+The repository does not implement a municipal control system, a universal Berlin score, causal inference across domains, calibrated forecast intervals, an authoritative real-time facility-capacity system, an authenticated multi-tenant service, or an LLM-dependent execution core.
 
 ## Documentation authority
 

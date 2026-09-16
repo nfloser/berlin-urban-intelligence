@@ -17,7 +17,7 @@ COPY data/README.md ./data/README.md
 RUN pip install --upgrade pip && pip install ".[live,osm]" \
     && useradd --create-home --uid 10001 appuser \
     && mkdir -p /app/data/runtime /app/data/generated \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appuser /app/data /home/appuser
 
 USER appuser
 EXPOSE 8000
