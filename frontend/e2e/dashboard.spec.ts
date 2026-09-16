@@ -38,6 +38,29 @@ test("populated derived and platform inspectors expose persisted lineage and run
   ).toBeVisible();
   await expect(derived.getByText("acceptance derived lineage", { exact: true })).toBeVisible();
 
+  const product = derived.getByLabel("Derived product");
+  await product.selectOption("derived:context:heat-air-quality:current");
+  await expect(
+    derived.getByText("Latest measured heat and air-quality context", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    derived.getByText(/Values remain separate; no combined risk score or causal claim is produced/),
+  ).toBeVisible();
+  await expect(
+    derived.getByText(/measured_air_temperature_2m: observation:acceptance:temperature/),
+  ).toBeVisible();
+  await expect(derived.getByText(/measured_berlin_lqi_grade: observation:acceptance:lqi/)).toBeVisible();
+
+  await product.selectOption("derived:context:mobility-air-quality:current");
+  await expect(
+    derived.getByText("Latest mobility and air-quality context", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    derived.getByText(/no causal relationship, exposure attribution or combined score is inferred/),
+  ).toBeVisible();
+  await expect(derived.getByText(/vbb_gtfs_realtime_snapshot: vbb-gtfs-rt:/)).toBeVisible();
+  await expect(derived.getByText(/measured_berlin_lqi_grade: observation:acceptance:lqi/)).toBeVisible();
+
   const platform = page.getByLabel("Platform registry and source inspector");
   const sourceRow = platform.locator('[data-source-id="berlin_air_quality"]');
   await expect(sourceRow).toBeVisible();
