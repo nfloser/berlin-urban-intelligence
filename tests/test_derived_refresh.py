@@ -102,9 +102,10 @@ def test_only_changed_derived_branches_are_recomputed() -> None:
     records = {record.id: record for record in outcome.state.records}
     assert records["derived:mobility:delay-share:current"].value == 0.5
     assert records["derived:mobility:delay-share:current"].computed_at == LATER
-    assert records["derived:context:mobility-air-quality:current"].value[
-        "delayed_trip_update_share"
-    ] == 0.5
+    assert (
+        records["derived:context:mobility-air-quality:current"].value["delayed_trip_update_share"]
+        == 0.5
+    )
     assert records["derived:context:mobility-air-quality:current"].computed_at == LATER
     assert records["derived:context:heat-air-quality:current"].computed_at == NOW
 
