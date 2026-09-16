@@ -78,6 +78,18 @@ jobs:
           print(f'outside_2025_dates={outside_year!r}')
           print(f'missing_2025_dates={missing_dates!r}')
 
+          invalid_indexes = [index for index, row in enumerate(data_rows) if row.startswith('#BEZUG!;')]
+          print(f'invalid_row_count={len(invalid_indexes)}')
+          if invalid_indexes:
+              first_invalid = invalid_indexes[0]
+              last_invalid = invalid_indexes[-1]
+              print(f'first_invalid_index={first_invalid}')
+              print(f'last_invalid_index={last_invalid}')
+              print(f'invalid_first_rows={data_rows[first_invalid:first_invalid + 4]!r}')
+              print(f'invalid_last_rows={data_rows[max(0, last_invalid - 3):last_invalid + 1]!r}')
+              print(f'invalid_preceding_rows={data_rows[max(0, first_invalid - 4):first_invalid]!r}')
+              print(f'invalid_following_rows={data_rows[last_invalid + 1:last_invalid + 5]!r}')
+
           for day in ('01.01.2025', '02.01.2025', '30.03.2025', '26.10.2025', '31.12.2025'):
               rows = [line for line in data_rows if line.startswith(day + ';')]
               print(f'{day}_row_count={len(rows)}')
