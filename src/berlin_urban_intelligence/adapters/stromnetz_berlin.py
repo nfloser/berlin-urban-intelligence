@@ -164,8 +164,8 @@ class StromnetzBerlinCsvAdapter:
         computed_maximum = max(numeric_values)
         if computed_maximum != declared_maximum:
             raise ValueError("published maximum is inconsistent with the quarter-hour load values")
-        summed_load = sum(numeric_values)
-        if summed_load % 4 != 0 or summed_load // 4 != declared_work:
+        computed_work = round(sum(numeric_values) * 0.25)
+        if computed_work != declared_work:
             raise ValueError(
                 "published annual work is inconsistent with the quarter-hour load values"
             )
