@@ -84,7 +84,7 @@ def _runtime(*, generated_at: datetime, delayed: int) -> RuntimeState:
     )
 
 
-def test_only_changed_derived_branch_is_recomputed() -> None:
+def test_only_changed_derived_branches_are_recomputed() -> None:
     builder = DerivedProductBuilder()
     previous = builder.build(_runtime(generated_at=NOW, delayed=25))
 
@@ -94,10 +94,18 @@ def test_only_changed_derived_branch_is_recomputed() -> None:
 
     assert outcome.changed is True
     assert outcome.execution is not None
-    assert outcome.execution.recomputed == ("derived:mobility:delay-share:current",)
+    assert outcome.execution.changed_inputs == (f"vbb-gtfs-rt:{NOW.isoformat()}",)
+    assert outcome.execution.recomputed == (
+        "derived:mobility:delay-share:current",
+        "derived:context:mobility-air-quality:current",
+    )
     records = {record.id: record for record in outcome.state.records}
     assert records["derived:mobility:delay-share:current"].value == 0.5
     assert records["derived:mobility:delay-share:current"].computed_at == LATER
+    assert records["derived:context:mobility-air-quality:current"].value[
+        "delayed_trip_update_share"
+    ] == 0.5
+    assert records["derived:context:mobility-air-quality:current"].computed_at == LATER
     assert records["derived:context:heat-air-quality:current"].computed_at == NOW
 
 
