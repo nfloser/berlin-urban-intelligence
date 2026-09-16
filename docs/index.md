@@ -12,6 +12,7 @@ Berlin Urban Intelligence is a research-oriented urban intelligence and digital-
 - [Installation](usage/installation.md) and [quickstart](usage/quickstart.md) — reproducible local execution.
 - [Testing](development/testing.md) — deterministic CI, live-source checks and current testing gaps.
 - [Security baseline](security.md) — deployment trust boundary, container/HTTP controls, logging redaction and dependency auditing.
+- [Structured observability](observability.md) — operation event names, safe fields, correlation semantics and noise policy.
 - [Performance baseline](performance.md) — reproducible latency/memory evidence, bounded map behavior and scaling limits.
 - [Accessibility baseline](accessibility.md) — automated keyboard/Axe acceptance, non-pointer routing and the manual release checklist.
 - [v1.0 verification matrix](verification.md) — evidence-backed PASS/PARTIAL/NOT VERIFIED status for completion gates and linked follow-up issues.
