@@ -2,26 +2,34 @@
 
 The roadmap separates implemented capabilities from planned work. It is not a promise of dates or release order.
 
-## Current capabilities — implemented
+## Current capabilities — implemented in v1.0.0
 
 - versioned canonical Pydantic contracts with epistemic state, quality, units, UTC time, CRS and provenance;
 - registered public-source metadata and provider-specific adapters;
 - independent live acquisition for Berlin air quality, DWD meteorology and VBB GTFS-Realtime;
 - slow-changing reference acquisition for official facilities, selected Climate Analysis 2022 layers and VBB static GTFS;
-- optional OpenStreetMap road-network acquisition with explicit speed-imputation opt-in;
+- optional OpenStreetMap road-network acquisition with explicit speed/travel-time imputation provenance and strict readiness validation;
 - last-known-good retention and separate availability/freshness/source-error semantics;
 - Live State, Mobility, Exposure, Heat, Energy and Resilience agents;
+- registry-driven deterministic capability resolution and dependency ordering;
+- first-class persisted derivations, dependency DAGs, lineage, quality/freshness propagation and incremental recomputation;
+- two verified source-backed descriptive cross-domain products: Heat + Air Quality and Mobility + Air Quality;
 - chronological energy forecasting evaluation against persistence and seasonal-naive baselines plus Ridge/gradient-boosting candidates;
-- dataset-fingerprint/model binding for persisted energy forecasts;
-- shortest-path, route-comparison and accessibility analysis over explicit network/facility inputs;
+- dataset-fingerprint/model binding for persisted energy forecasts and reproducible real Berlin energy evidence;
+- shortest-path, route-comparison and accessibility analysis over explicit network/facility inputs, including point-in-time real Berlin OSM readiness/routing evidence;
 - explicit immutable scenario contracts and deterministic scenario transforms;
-- deterministic fixed workflow orchestration;
 - independent multi-domain scenario assessment with no composite score;
-- RDF projection, ontology/SHACL artefacts and semantic validation;
-- FastAPI state/analysis interface and React/MapLibre dashboard;
-- structured request-operation logging;
-- backend/frontend/container CI and separate source smoke workflows;
-- research-grade documentation structure and reproducibility guidance.
+- RDF projection, ontology/SHACL artefacts, derived lineage and bounded semantic relationship inspection;
+- FastAPI state/analysis interfaces and a React/MapLibre analytical dashboard;
+- snapshot-aware hot reload for validated runtime/reference/energy/derived state;
+- structured privacy-conscious request/source/reload/derivation/scenario observability;
+- security baseline with loopback-default exposure, container hardening, browser headers, error redaction and dependency audits;
+- practical accessibility baseline with keyboard-accessible principal workflows, non-pointer routing and automated Axe regression coverage;
+- reproducible performance/scaling evidence with bounded map responses and explicit capacity limitations;
+- protected backend/frontend/container CI plus separate scoped source, security, real-data and performance evidence workflows;
+- research-grade documentation, verification matrix and reproducibility guidance;
+- Semantic Versioning release metadata, changelog and versioned release-note contract enforced by regression test;
+- MIT project-source licence.
 
 ## Short term — planned improvements
 
@@ -30,19 +38,19 @@ The roadmap separates implemented capabilities from planned work. It is not a pr
 - improve generated snapshot metadata/version migration handling;
 - add stronger documentation-link validation and documentation-site configuration when a publishing target is chosen;
 - extend deterministic tests around persistence/reload, source-status edge cases and larger reference collections;
-- formalize version/release/changelog process;
-- add broader operational observability while preserving privacy-safe logging.
+- add broader operational observability while preserving privacy-safe logging;
+- define a repeatable publication/archive path for reproducible experiment and release artefacts.
 
 ## Medium term — planned research/development
 
 - rolling-origin and multi-horizon energy evaluation with calibrated uncertainty where methodologically justified;
 - richer mobility/resilience costs from verified dynamic data;
 - explicit facility access/entrance modelling and stronger network-quality validation;
-- capability-based deterministic orchestration while preserving typed contracts;
 - persistent semantic-store option with defined synchronization semantics;
 - additional Berlin urban-domain agents/data sources through documented extension contracts;
 - automated reproducible experiment artefact packaging;
-- benchmark suites for cross-domain integration/failure isolation and representative Berlin-scale performance.
+- benchmark suites for cross-domain integration/failure isolation and representative Berlin-scale performance;
+- systematic API/authentication design if deployment expands beyond the current trusted single-host research boundary.
 
 ## Long term — research directions
 
@@ -63,8 +71,9 @@ The project should not add the following merely for apparent completeness:
 - causal claims from simple cross-domain association;
 - non-Berlin data presented as Berlin operational state;
 - forecast-performance claims without reproducible evaluation;
-- hidden model/imputation choices that erase provenance.
+- hidden model/imputation choices that erase provenance;
+- permanent-provider, formal-accessibility or production-capacity claims unsupported by evidence.
 
 ## Roadmap maintenance
 
-When a planned item becomes implemented, move it into current capabilities only after code, tests and documentation are present. If an item changes architecture or research assumptions, add/update the relevant ADR/evaluation documentation at the same time.
+When a planned item becomes implemented, move it into current capabilities only after code, tests and documentation are present. If an item changes architecture, public stable contracts or research assumptions, update the relevant ADR/evaluation/release documentation at the same time and apply Semantic Versioning to published releases.

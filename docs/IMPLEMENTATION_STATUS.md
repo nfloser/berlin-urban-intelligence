@@ -2,83 +2,82 @@
 
 ## Current phase
 
-Phase 22 — v1.0 evidence closure complete. Security (#18), structured observability (#19), reproducible real Berlin energy evidence (#20), multiple source-backed cross-domain workflows (#21) and real Berlin road-network readiness (#14) are all verified against the repository's documented acceptance contracts.
+Phase 23 — **v1.0.0 release candidate**.
 
-The aggregate v1.0 evidence gate is now **PASS**. PR #35 remains to be merged after the protected checks complete on the final status head; publishing an actual `v1.0.0` tag/release is a separate versioning decision and is not implied by this status alone.
+The repository-wide v1 evidence closure is complete. Security (#18), structured observability (#19), reproducible real Berlin energy evidence (#20), multiple source-backed cross-domain workflows (#21) and real Berlin road-network readiness (#14) are verified against the documented acceptance contracts.
 
-## Current development work
+The aggregate v1.0 evidence gate is **PASS**. PR #35 was squash-merged to `main` as `bc3c63521895be019b91e322b679f62e0f34be5f` after final protected backend/frontend/container CI and independent real-energy evidence passed. Issue #14 is closed with the successful live OSM evidence and retained failed-provider attempts.
 
-PR #35 hardens only the optional road-network smoke verification infrastructure. It does not change the production road-data semantics or weaken the readiness contract.
+Issue #36 / PR #37 now prepares the first stable Semantic Versioning release. The release work is intentionally separated from feature/evidence closure: version metadata, public release documentation and the eventual GitHub tag/release are reviewed and verified on a dedicated `release/1.0.0` branch before any tag is created.
 
-The workflow now tries multiple real public Overpass delivery endpoints with a hard 300-second budget per endpoint. Every failed attempt is retained as JSON evidence, and the job can succeed only when the existing OSM adapter, canonical normalizer, strict road-readiness verifier and `ResilienceAgent` baseline route all succeed. No generated, cached or synthetic road topology is accepted as replacement data.
+## Current release work
 
-Live run `35091544852` exercised this path for `Mitte, Berlin, Germany`, network type `drive`, with explicit OSMnx speed/travel-time derivation. The first endpoint (`maps.mail.ru`) exceeded its 300-second budget and the second endpoint (`overpass.private.coffee`) also exceeded its budget. The third endpoint (`overpass-api.de`) returned a real OSM network that passed the full contract.
+PR #37 introduces a permanent stable-release metadata contract and prepares version `1.0.0`.
 
-The accepted snapshot contained **740 canonical nodes** and **1,800 canonical edges**, retained `OpenStreetMap contributors` / ODbL 1.0 provenance, exposed OSMnx speed/travel-time imputation in provenance and recorded `synthetic_fallback=false`.
+TDD evidence for the release contract is explicit:
 
-The readiness verifier then routed through the existing resilience implementation from `osm-node:10087214573` to `osm-node:13043292535` using edge `osm:10087214573:13043292535:1:1419417017` with an observed route travel time of approximately **2.139 seconds**. Artifact `10445300085` contains all endpoint attempts plus the successful readiness payload.
+- the initial test-only CI exposed repository-style issues that were corrected without changing release metadata;
+- run `35094619615` then passed Ruff and strict mypy and reached the intended RED state in Pytest: **145 existing tests passed and exactly one new release-metadata test failed** because the repository still declared major version `0`;
+- implementation then updated `VERSION`, `pyproject.toml`, public README release claims, changelog and versioned release notes;
+- the remaining central documentation is being aligned before the final protected release-candidate run.
 
-Protected PR run `35091630767` passed backend, frontend and containers/Compose/Playwright on implementation head `51a6f28954ee16bb238fc33c8ad349e1cec8663c`. Evidence-documentation head `9298108055f486e61c9979da302d451df24313e9` then passed protected run `35092998554`, and the independent real-energy workflow `35092998560` also passed on the same head. The final PASS-status commit is intentionally subjected to one last protected run before merge.
+The release metadata regression test requires the stable version to be consistent across `VERSION`, Python project metadata and README, verifies the MIT licence disclosure, requires a dated changelog entry and requires versioned release notes with explicit limitations.
 
-## Recently completed work
+No release tag is created from the branch head. `v1.0.0` will be published only from the reviewed, CI-verified merged release commit.
 
-- Issue #21 / PR #34 completed the second source-backed cross-domain workflow and squash-merged as `e562835a1cb60b7c9cbc7b38ad9c801fef66e814`. Final protected run `35090333735` and real-energy run `35090333758` were green.
-- Issue #20 / PR #33 completed reproducible real Berlin energy verification and squash-merged as `42dfb85da6f80b46c2786c0ff108ec250bac8811`. Final protected CI run `35083089572` and real-energy run `35083089585` were green. The accepted source is the clean official 2024 Stromnetz Berlin high-voltage annual curve; the five inspected 2025 files remain rejected for chronological forecasting because each contains a 96-row upstream `#BEZUG!` timestamp block.
-- Issue #19 / PR #32 completed structured operation observability. Source refreshes, snapshot reloads, derivation refreshes and explicit scenario calculations expose allow-listed correlation IDs, durations and safe error-state classifications without per-record noise or raw-provider exception leakage.
-- Issue #18 / PR #31 completed the repository/deployment security baseline with loopback-only default exposure, container hardening, browser security headers, exception-message redaction, vulnerability-reporting documentation and dependency-audit workflows.
-- Issue #17 / PR #30 established reproducible performance/scaling evidence with a deterministic 10,000-stop/250-facility/750-node benchmark, bounded map response selection and raw latency/allocation evidence.
-- Issue #16 / PR #29 completed the practical dashboard accessibility and keyboard baseline with composed Playwright/Axe acceptance.
-- Issue #15 / PR #28 completed populated dashboard-inspector acceptance through the composed application stack.
-- Issue #14 / PR #27 originally merged strict real-road verification/degradation infrastructure without fabricating provider success; PR #35 now supplies the successful live-provider evidence that closes that verification gap.
-- Issues #12 and #13 completed semantic API parity plus real-agent metadata/composition boundaries; issue #11 established [`verification.md`](verification.md) as the repository-wide evidence gate.
+## Verified v1 evidence baseline
+
+### Protected application CI
+
+PR #35 final head `342d57c71886ac65686c8dcd35d8553b4507a962` passed protected CI run `35093468008`:
+
+- `backend` — PASS;
+- `frontend` — PASS;
+- `containers` — PASS, including Docker/Compose and the nginx → FastAPI → persisted state → React/Playwright path.
+
+### Real Berlin energy
+
+Independent run `35093467950` passed the official-source probes and the real 2024 evaluation, persistence, Energy Agent and API exposure path.
+
+`docs/energy-real-evidence.md` remains authoritative for source semantics and measured results. The accepted reproducible source is the clean official 2024 Stromnetz Berlin high-voltage annual curve. The inspected 2025 publications with a 96-row upstream `#BEZUG!` timestamp block remain deliberately rejected rather than silently repaired.
+
+### Real Berlin road network
+
+Live run `35091544852` exercised the strict road-network path for `Mitte, Berlin, Germany`, network type `drive`, with explicit OSMnx speed/travel-time derivation.
+
+Two public Overpass endpoints exceeded the configured attempt budget and their failure evidence was retained. `https://overpass-api.de/api` then returned a real graph that passed the readiness contract:
+
+- 740 canonical nodes;
+- 1,800 canonical edges;
+- `OpenStreetMap contributors` / ODbL 1.0 provenance;
+- provenance-visible speed/travel-time imputation;
+- `synthetic_fallback=false`.
+
+The existing `ResilienceAgent` completed the baseline route `osm-node:10087214573` → `osm-node:13043292535` at approximately **2.139 seconds**. Evidence artifact `10445300085` has SHA-256 `8672bb1325b80c76d54a5722d78cbc7135ad3d9626432796e1e1bb8b20e1595c`.
+
+This is point-in-time provider compatibility/readiness evidence, not a guarantee of permanent public Overpass availability.
 
 ## Current architectural state
 
 - Runtime, reference, energy and derived state are persisted separately and loaded through validated stores.
-- API snapshot control hot-reloads validated replacements; invalid replacements retain last-known-good state and expose reload diagnostics.
-- Six real agents expose explicit names/domains/capabilities/contracts and executable source/agent dependencies; cross-agent composition remains outside individual agents.
-- Registry-driven deterministic workflows resolve unique capabilities and enforce dependency ordering.
-- Derived information retains definitions, upstream lineage, provenance, freshness/quality and dependency status with incremental recomputation.
-- Source-backed derived products are omitted when required inputs are absent; current source failure is propagated through freshness rather than hidden by fabricated replacement state.
+- Snapshot control hot-reloads validated replacements; invalid replacements retain last-known-good state and expose diagnostics.
+- Six real agents expose explicit domains, capabilities, contracts, dependencies and health.
+- Cross-agent coordination remains at registry/orchestration/composition boundaries rather than hidden inside domain agents.
+- Registry-driven deterministic workflows resolve capabilities and enforce dependency ordering without requiring an LLM.
+- Derived information retains definitions, upstream lineage, provenance, producer/algorithm version, freshness/quality and dependency status with incremental recomputation.
+- Source-backed cross-domain products are omitted when required inputs are absent; no synthetic replacement score is generated.
 - RDF projection and bounded semantic relationship inspection use validated persisted state.
-- FastAPI exposes system/source/agent/domain/reference/scenario/derived/dependency/semantic/map surfaces and resilience routing/scenario operations.
-- The React/MapLibre dashboard exposes map/reference inspection, observation provenance, platform/derived inspection, deterministic workflows, explicit derivation interpretation, heat scenarios and baseline-vs-disruption routing.
-- Critical resilience routing has an equivalent coordinate-driven keyboard path over the same nearest-node and routing APIs.
-- Browser acceptance runs against the composed nginx → FastAPI → persisted-state → React/MapLibre stack and includes pinned Axe accessibility scanning.
-- Structured operation logging covers request, source-refresh, reload, derivation-refresh and scenario boundaries with safe low-cardinality fields.
-- The security baseline and dependency-audit workflow are separate from application-domain logic.
-- The real-energy evidence workflow downloads provider data only during CI and never converts official files into a committed production fallback.
-- Optional real road-network acquisition remains separate from deterministic CI, preserves explicit provider failure semantics and has successful point-in-time live readiness/routing evidence.
-
-## Evidence baselines
-
-### Cross-domain products
-
-`docs/evaluation/cross-domain-workflows.md` defines the current Heat + Air Quality and Mobility + Air Quality products, input/freshness/quality behavior, unavailable-input semantics and the scientific claims they explicitly do not support. `tests/test_derived_products.py` provides deterministic contract coverage, while composed Playwright acceptance proves the persisted API/dashboard inspection path.
-
-### Real Berlin energy
-
-`docs/energy-real-evidence.md` is authoritative for the point-in-time official-source validation, 2025 timestamp defect, clean 2024 source contract, chronological evaluation metrics, persisted/API verification and scientific limitations.
-
-### Real Berlin road network
-
-`docs/road-network-verification.md` is authoritative for the road-network live contract, earlier failed provider attempts and the successful 2026-09-16 run `35091544852`. The accepted graph contains 740 nodes and 1,800 edges and completed a baseline route through the real resilience implementation. This is point-in-time provider evidence, not a permanent Overpass availability guarantee.
-
-### Performance
-
-Protected correctness CI enforces stable structural properties rather than runner-dependent millisecond thresholds. The 10,000-stop evidence run is documented in `docs/performance.md`; complete RDF graph serialization remains a bulk/research scaling boundary rather than a high-QPS dashboard endpoint.
-
-### Accessibility
-
-The automated baseline covers representative principal dashboard states and asserts no configured critical/serious Axe findings for the tested WCAG A/AA tags, visible keyboard focus, keyboard operation of analytical controls, named focusable diagnostic regions and a non-map resilience route-selection path. No formal WCAG conformance claim is made.
-
-### Security and observability
-
-`SECURITY.md` and `docs/security.md` define the current single-host research trust boundary. `docs/observability.md` defines operation event names, safe fields, correlation/failure semantics and the no-per-record-noise policy.
+- FastAPI exposes system/source/agent/domain/reference/scenario/derived/dependency/semantic/map and resilience surfaces.
+- The React/MapLibre dashboard exposes reference/provenance inspection, platform/derived inspection, deterministic workflows, explicit cross-domain interpretation, scenarios and baseline-versus-disruption routing.
+- Critical resilience routing has an equivalent coordinate-driven keyboard path over the same routing APIs.
+- Browser acceptance runs against the composed application stack and includes pinned Axe accessibility scanning for representative states.
+- Structured observability covers request, source-refresh, reload, derivation-refresh and scenario boundaries with safe low-cardinality fields.
+- Security and dependency-audit workflows remain separate from application-domain logic.
+- Real-source evidence workflows download provider data during the run and do not convert those publications into committed production fallbacks.
 
 ## Repository governance state
 
-The `Protect main` repository ruleset is active on the default branch, has no bypass actors, blocks destructive branch changes, requires pull requests/review-thread resolution and uses strict required-status-check semantics.
+The `Protect main` ruleset is active on the default branch, has no bypass actors, blocks destructive branch changes, requires pull-request/review-thread resolution and uses strict required-status-check semantics.
 
 The three merge-critical correctness checks remain:
 
@@ -86,25 +85,32 @@ The three merge-critical correctness checks remain:
 - `frontend`
 - `containers`
 
-Security, real-source, performance and other evidence workflows remain additional scoped evidence rather than weakening or replacing those protected correctness checks.
+Security, real-source, performance and other evidence workflows are additional scoped evidence; they do not weaken or replace protected correctness checks.
 
-## Current v1.0 evidence gaps
+## v1.0.0 release contract
 
-The authoritative detail is in [`verification.md`](verification.md).
+The release candidate must satisfy all of the following before merge/tagging:
 
-There is now **no unresolved critical domain/evidence gap** in the current v1.0 matrix. The previously external-blocked #14 road-network requirement is satisfied by real run `35091544852` and artifact `10445300085`, while retaining explicit failure evidence for the endpoints that timed out.
-
-The aggregate v1.0 evidence gate is **PASS**. This means the documented v1.0 acceptance/evidence criteria are satisfied; it does not claim permanent provider availability, production-scale capacity, municipal-authority status, formal WCAG conformance or that a semantic version release has already been published.
+- `VERSION`, `pyproject.toml` and README all declare `1.0.0`;
+- README states the MIT project-source licence and separates external dataset terms;
+- `CHANGELOG.md` contains a dated `1.0.0` entry;
+- `docs/releases/v1.0.0.md` records capabilities, verification evidence, operating notes and limitations;
+- central docs do not retain stale `0.1.0`, `NOT READY` or pre-merge PR #35 status claims;
+- protected backend/frontend/container checks pass on the final release-candidate head;
+- review finds no unresolved correctness, documentation, compatibility, security or release-process findings;
+- the release PR is squash-merged before the `v1.0.0` tag/GitHub release is created;
+- the published release must point to the verified merged commit and use the reviewed versioned release notes.
 
 ## Known external and scope constraints
 
-- Provider availability is external to deterministic CI and is checked through separate smoke/evaluation workflows.
-- OSM-backed routing remains source-dependent and must degrade explicitly when acquisition is unavailable; the successful run proves compatibility at one timestamp rather than permanent service availability.
-- Cross-domain contexts are descriptive co-reporting only; different source timestamps and spatial footprints remain visible and are not interpreted as causal, correlated or co-located evidence.
-- The currently reproducible energy evidence is historical 2024 high-voltage network load, not current total Berlin demand.
-- Automated accessibility tooling cannot prove full assistive-technology usability or formal standards conformance.
-- GitHub-hosted runner benchmark timings are not production capacity guarantees.
-- Complete RDF serialization is a bulk/research operation in the current in-memory topology, not a high-QPS dashboard endpoint.
+- Public-provider availability is external to deterministic CI and can regress after release.
+- OSM-backed routing must degrade explicitly when acquisition is unavailable; no generated production topology substitutes for a provider failure.
+- Cross-domain contexts are descriptive co-reporting only and do not establish causality, correlation or exposure.
+- Current reproducible energy evidence is historical 2024 high-voltage network load, not current total Berlin demand.
+- Automated accessibility tooling does not prove full assistive-technology usability or formal WCAG conformance.
+- GitHub-hosted benchmark timings are not production-capacity guarantees.
+- Complete RDF serialization is a bulk/research operation in the current in-memory topology, not a high-QPS production endpoint.
+- Municipal operational authority, safety-critical use, authenticated multi-tenant deployment and distributed/federated runtime operation are outside the v1.0.0 claim boundary.
 
 ## Verification commands enforced by protected CI
 
@@ -123,17 +129,19 @@ docker compose config
 docker build (backend + frontend)
 docker compose health/proxy checks
 Playwright browser acceptance against the composed stack
-Axe critical/serious WCAG A/AA regression scan in principal dashboard states
+Axe critical/serious configured WCAG A/AA regression scan in principal dashboard states
 ```
 
-Separate scoped evidence workflows additionally cover dependency security audits, live/reference providers, real Berlin energy, real Berlin road-network readiness and performance measurements.
+Separate scoped workflows cover dependency security audits, live/reference providers, real Berlin energy, real Berlin road-network readiness and performance measurements.
 
 ## Next concrete tasks
 
-1. Let the protected backend/frontend/container checks complete on the final PASS-status head.
-2. Record the final review result in PR #35, mark the PR ready for review and squash-merge only if the final head is green and review-clean.
-3. Close issue #14 with links/run IDs for the successful live road evidence and final protected CI.
-4. Consider a semantic `v1.0.0` release only as a separate product/versioning task with explicit release notes and the documented scientific/operational limitations.
+1. Complete the v1.0.0 release-documentation alignment on PR #37.
+2. Run the complete protected CI on the final release-candidate head.
+3. Perform an independent PR review, correct any findings and re-run affected checks.
+4. Mark PR #37 review-ready and squash-merge only when the final head is green and review-clean.
+5. Publish GitHub release/tag `v1.0.0` from the verified merged commit using the reviewed `docs/releases/v1.0.0.md` content.
+6. Verify the published release target, release notes and issue #36 closure evidence.
 
 ## Important migration notes
 
