@@ -154,6 +154,23 @@ def test_mobility_air_quality_context_is_descriptive_and_traceable() -> None:
     assert "score" not in context.phenomenon
 
 
+def test_cross_domain_context_propagates_stale_source_freshness() -> None:
+    state = runtime_state()
+    source_statuses = dict(state.source_statuses)
+    source_statuses["vbb_gtfs_rt"] = status(
+        "vbb_gtfs_rt",
+        freshness=FreshnessStatus.STALE,
+    )
+    stale = state.model_copy(update={"source_statuses": source_statuses})
+
+    derived = DerivedProductBuilder().build(stale)
+    records = {record.definition_id: record for record in derived.records}
+
+    assert records["mobility-air-quality-context-v1"].freshness is FreshnessStatus.STALE
+    assert records["mobility-delay-share-v1"].freshness is FreshnessStatus.STALE
+    assert records["heat-air-quality-context-v1"].freshness is FreshnessStatus.VALID
+
+
 def test_cross_domain_context_exposes_last_known_data_during_source_failure() -> None:
     state = runtime_state()
     source_statuses = dict(state.source_statuses)
@@ -180,6 +197,24 @@ def test_missing_mobility_input_omits_only_the_mobility_cross_domain_context() -
     assert "heat-air-quality-context-v1" in definition_ids
     assert "mobility-air-quality-context-v1" not in definition_ids
     assert "mobility-delay-share-v1" not in definition_ids
+
+
+def test_missing_lqi_omits_cross_domain_contexts_without_hiding_mobility() -> None:
+    state = runtime_state()
+    without_lqi = state.model_copy(
+        update={
+            "observations": tuple(
+                item for item in state.observations if item.phenomenon != "berlin_lqi_grade"
+            )
+        }
+    )
+
+    derived = DerivedProductBuilder().build(without_lqi)
+    definition_ids = {record.definition_id for record in derived.records}
+
+    assert "mobility-delay-share-v1" in definition_ids
+    assert "heat-air-quality-context-v1" not in definition_ids
+    assert "mobility-air-quality-context-v1" not in definition_ids
 
 
 def test_missing_domain_data_produces_no_fabricated_record() -> None:
