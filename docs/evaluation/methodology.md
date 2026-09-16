@@ -11,6 +11,12 @@ The repository does not yet contain a comparative system-level experiment demons
 
 Software tests establish that implemented invariants behave as expected under tested conditions. Live-source smoke runs establish point-in-time provider compatibility. Neither is a scientific measure of urban-model accuracy, decision quality or architectural superiority.
 
+## Cross-domain descriptive workflows
+
+The platform implements source-backed descriptive cross-domain products, currently Heat + Air Quality and Mobility + Air Quality. These are verified as software/data-integration workflows, not evaluated as causal or predictive models. Their outputs keep source values and timestamps separate, propagate provenance, quality and freshness, and disappear rather than fabricate values when required inputs are absent.
+
+The allowed interpretations and explicit scientific non-claims for each product are defined in [Cross-domain workflow semantics](cross-domain-workflows.md). In particular, these workflows do not calculate correlations, causal effects, passenger exposure, a universal city score or hidden weighted composites.
+
 ## Energy forecasting experiment
 
 The implemented formal model experiment operates on an explicitly supplied, timestamp-ordered energy series.
