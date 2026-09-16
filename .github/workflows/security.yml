@@ -28,7 +28,7 @@ jobs:
         run: |
           python -m venv /tmp/bui-runtime-audit
           /tmp/bui-runtime-audit/bin/python -m pip install --upgrade pip
-          /tmp/bui-runtime-audit/bin/pip install -e ".[live,osm]"
+          /tmp/bui-runtime-audit/bin/pip install ".[live,osm]"
       - name: Install pinned audit tool outside runtime environment
         run: python -m pip install "pip-audit==2.10.1"
       - name: Audit installed Python runtime dependencies
@@ -36,7 +36,6 @@ jobs:
           pip-audit \
             --strict \
             --progress-spinner off \
-            --skip-editable \
             --path /tmp/bui-runtime-audit/lib/python3.12/site-packages
 
   frontend-lockfile:
