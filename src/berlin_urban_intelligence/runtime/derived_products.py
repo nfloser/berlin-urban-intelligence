@@ -242,7 +242,8 @@ class DerivedProductBuilder:
                 quality_note=(
                     "Descriptive cross-domain context only. The VBB value is a share of trip "
                     "updates present in the realtime feed and the LQI value is station-based; no "
-                    "causal relationship, passenger exposure estimate or combined score is inferred."
+                    "causal relationship, passenger exposure estimate or combined "
+                    "score is inferred."
                 ),
                 upstream_ids=input_ids,
             ),
