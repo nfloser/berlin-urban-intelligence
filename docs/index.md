@@ -1,6 +1,6 @@
 # Documentation
 
-Berlin Urban Intelligence is a research-oriented urban intelligence and digital-twin integration platform for Berlin. This documentation describes the system as implemented in version 0.1.0 and separates operational facts from research ambitions and future extensions.
+Berlin Urban Intelligence is a research-oriented urban intelligence and digital-twin integration platform for Berlin. This documentation describes the system as implemented in version **1.0.0** and separates verified operational facts from research ambitions, external-provider conditions and future extensions.
 
 ## Start here
 
@@ -10,23 +10,26 @@ Berlin Urban Intelligence is a research-oriented urban intelligence and digital-
 - [Architecture](architecture/overview.md) — system layers, runtime topology and architectural invariants.
 - [Data architecture](data/overview.md) — source acquisition, canonicalization, persistence and provenance.
 - [Installation](usage/installation.md) and [quickstart](usage/quickstart.md) — reproducible local execution.
-- [Testing](development/testing.md) — deterministic CI, live-source checks and current testing gaps.
+- [Testing](development/testing.md) — deterministic CI, browser acceptance and scoped external evidence workflows.
 - [Security baseline](security.md) — deployment trust boundary, container/HTTP controls, logging redaction and dependency auditing.
 - [Structured observability](observability.md) — operation event names, safe fields, correlation semantics and noise policy.
 - [Real Berlin energy evidence](energy-real-evidence.md) — official source validation, chronological evaluation, measured metrics and claim boundaries.
+- [Real Berlin road-network evidence](road-network-verification.md) — strict live OSM readiness/routing evidence and provider-failure semantics.
 - [Cross-domain workflows](evaluation/cross-domain-workflows.md) — verified descriptive multi-domain products, provenance/freshness semantics and scientific claim boundaries.
 - [Performance baseline](performance.md) — reproducible latency/memory evidence, bounded map behavior and scaling limits.
 - [Accessibility baseline](accessibility.md) — automated keyboard/Axe acceptance, non-pointer routing and the manual release checklist.
-- [v1.0 verification matrix](verification.md) — evidence-backed PASS/PARTIAL/NOT VERIFIED status for completion gates and linked follow-up issues.
+- [v1.0 verification matrix](verification.md) — authoritative evidence-backed completion gate for the declared v1 scope.
+- [v1.0.0 release notes](releases/v1.0.0.md) — reviewed release scope, evidence and limitations.
+- [Changelog](../CHANGELOG.md) — versioned notable project changes.
 - [Evaluation](evaluation/methodology.md) — what is evaluated scientifically and what is not yet evaluated.
-- [Reproducibility](research/reproducibility.md) — software, data and commands required to reproduce the implemented workflows.
+- [Reproducibility](research/reproducibility.md) — software, data and commands required to reproduce implemented workflows.
 - [Roadmap](roadmap.md) — implemented capabilities and planned development, clearly separated.
 
 ## Documentation map
 
 ### Concepts
 
-The [domain model](concepts/domain-model.md), [terminology](concepts/terminology.md) and [system concepts](concepts/system-concepts.md) define the vocabulary used throughout the repository. In particular, observed, official-modelled, forecast, derived and scenario state are intentionally not interchangeable.
+The [domain model](concepts/domain-model.md), [terminology](concepts/terminology.md) and [system concepts](concepts/system-concepts.md) define the vocabulary used throughout the repository. Observed, official-modelled, forecast, derived and scenario state are intentionally not interchangeable.
 
 ### Architecture
 
@@ -34,26 +37,26 @@ Architecture documentation is split into [overview](architecture/overview.md), [
 
 ### Data
 
-The data section covers [source boundaries](data/data-sources.md), the [canonical data model](data/data-model.md), [processing](data/data-processing.md), [quality](data/data-quality.md) and [provenance](data/provenance.md). The machine-readable source registry remains `config/sources.yaml` and is authoritative for configured provider boundaries. Point-in-time real energy source/evaluation evidence is recorded separately in [energy-real-evidence.md](energy-real-evidence.md) so measured results are not confused with permanent implementation constants.
+The data section covers [source boundaries](data/data-sources.md), the [canonical data model](data/data-model.md), [processing](data/data-processing.md), [quality](data/data-quality.md) and [provenance](data/provenance.md). The machine-readable source registry remains `config/sources.yaml` and is authoritative for configured provider boundaries. Point-in-time energy and road-network evidence is documented separately so live-provider success is never confused with a permanent implementation constant.
 
 ### Implementation and operation
 
 Implementation documentation covers [project structure](implementation/project-structure.md), [modules](implementation/modules.md), [configuration](implementation/configuration.md), [dependencies](implementation/dependencies.md) and [extension points](implementation/extension-points.md). Operational instructions are under [`usage/`](usage/). The concise current development state is maintained in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md), while [verification.md](verification.md) is the authoritative completion-evidence matrix. Repository-level vulnerability reporting instructions are in [`../SECURITY.md`](../SECURITY.md).
 
-### Development and research
+### Development, releases and research
 
-Development guidance covers environment setup, tests, code-quality gates, repository governance and contribution workflow. Research documentation records assumptions, reproducibility boundaries, current evaluation methodology and future research directions without treating planned functionality as implemented. The [cross-domain workflow semantics](evaluation/cross-domain-workflows.md) document defines how multi-domain results may be interpreted and which causal or scoring claims are explicitly unsupported.
+Development guidance covers environment setup, tests, code-quality gates, repository governance and contribution workflow. Stable release metadata is mechanically checked by `tests/test_release_metadata.py`; published release scope is recorded in versioned files under [`docs/releases/`](releases/) and in the repository [changelog](../CHANGELOG.md).
+
+Research documentation records assumptions, reproducibility boundaries, current evaluation methodology and future research directions without treating planned functionality as implemented. The [cross-domain workflow semantics](evaluation/cross-domain-workflows.md) document defines how multi-domain results may be interpreted and which causal or scoring claims are explicitly unsupported.
 
 ## Current implementation status
 
-The repository currently implements canonical Pydantic contracts, source adapters, six domain/aggregation agents, live and reference acquisition workflows, a leakage-safe energy evaluation and one-step forecasting workflow, network resilience calculations, explicit hypothetical scenarios, registry/capability-driven deterministic orchestration, first-class derived information/dependencies, RDF projection, a FastAPI API, a React/MapLibre dashboard and protected deterministic CI/container/browser acceptance.
+Version 1.0.0 includes canonical Pydantic contracts, configured source adapters, six domain/aggregation agents, live/reference acquisition, persisted runtime/reference/energy/derived state, leakage-safe energy evaluation and forecasting, resilience calculations, explicit scenarios, registry/capability-driven deterministic orchestration, first-class derivations/dependencies, RDF/semantic relationship projection, a FastAPI API, a React/MapLibre dashboard, structured observability and protected CI/container/browser acceptance.
 
-Some capabilities are conditional on data availability. The Energy Agent requires a successfully evaluated Berlin-scoped input dataset before it exposes forecasts; the repository now includes a reproducible point-in-time workflow against the clean official 2024 Stromnetz Berlin high-voltage load curve, while correctly treating the resulting historical forecast as stale rather than live state. Cross-domain derived products are emitted only when their required persisted source-backed inputs exist and retain source-specific timestamps/freshness rather than replacing missing values. Resilience routing requires a persisted network snapshot. Optional OpenStreetMap acquisition is not part of the default reference refresh.
+Some capabilities remain conditional on source data. Energy forecasts require an evaluated matching Berlin-scoped dataset artefact; the reproducible v1 evidence uses the clean official 2024 Stromnetz Berlin high-voltage curve and correctly treats the result as historical. Cross-domain derived products are emitted only when their required persisted source-backed inputs exist and retain source-specific timestamps/freshness. Resilience routing requires a persisted network snapshot; optional OSM acquisition has successful point-in-time real Berlin readiness evidence but remains provider-dependent.
 
-The current aggregate v1.0 verification status is **NOT READY**. This does not mean the implemented application is unusable; it means critical evidence gaps remain and are explicitly tracked rather than being converted into completion claims. See [verification.md](verification.md) for the exact gates and issues.
-
-The repository does not implement a municipal control system, a universal Berlin score, causal inference across domains, calibrated forecast intervals, an authoritative real-time facility-capacity system, an authenticated multi-tenant service, or an LLM-dependent execution core.
+The aggregate v1.0 verification status is **PASS** for the declared scope. This means the documented v1 acceptance/evidence criteria are satisfied. It does **not** claim permanent public-provider availability, municipal operational authority, safety-critical suitability, formal WCAG conformance, causal cross-domain inference, authenticated multi-tenant deployment or production-scale capacity guarantees. See [verification.md](verification.md) and the [v1.0.0 release notes](releases/v1.0.0.md).
 
 ## Documentation authority
 
-Documentation is subordinate to executable contracts, configuration, tests and source code when a discrepancy is discovered. Such discrepancies are documentation defects and should be corrected together with the relevant implementation change. Point-in-time provider smoke-test results are operational evidence only; they are not guarantees of future source availability and are not scientific performance results.
+Documentation is subordinate to executable contracts, configuration, tests and source code when a discrepancy is discovered. Such discrepancies are documentation defects and should be corrected with the relevant implementation change. Point-in-time provider smoke-test results are operational evidence only; they are not guarantees of future source availability or scientific performance beyond their documented scope.
