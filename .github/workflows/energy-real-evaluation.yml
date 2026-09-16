@@ -22,18 +22,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: high-voltage
-            file: jahreshoechstlast-2025-hochspannung.csv
-          - label: high-medium-voltage
-            file: jahreshoechstlast-2025-hochspannung-mittelspannung.csv
-          - label: medium-voltage
-            file: jahreshoechstlast-2025-mittelspannung.csv
-          - label: medium-low-voltage
-            file: jahreshoechstlast-2025-mittelspannung-niederspannung.csv
-          - label: low-voltage
-            file: jahreshoechstlast-2025-niederspannung.csv
-    env:
-      BASE_URL: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2025
+          - label: 2025-high-voltage
+            url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2025/jahreshoechstlast-2025-hochspannung.csv
+          - label: 2025-high-medium-voltage
+            url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2025/jahreshoechstlast-2025-hochspannung-mittelspannung.csv
+          - label: 2025-medium-voltage
+            url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2025/jahreshoechstlast-2025-mittelspannung.csv
+          - label: 2025-medium-low-voltage
+            url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2025/jahreshoechstlast-2025-mittelspannung-niederspannung.csv
+          - label: 2025-low-voltage
+            url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2025/jahreshoechstlast-2025-niederspannung.csv
+          - label: 2024-high-voltage
+            url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2024/Jahreshoechstlast-2024-Hochspannung.csv
     steps:
       - name: Fetch official CSV without committing provider data
         run: |
@@ -41,7 +41,7 @@ jobs:
           curl --fail --location --retry 3 --retry-all-errors \
             --connect-timeout 20 --max-time 120 \
             --output /tmp/source.csv \
-            "$BASE_URL/${{ matrix.file }}"
+            "${{ matrix.url }}"
           test -s /tmp/source.csv
       - name: Report source identity, schema and integrity signals
         run: |
