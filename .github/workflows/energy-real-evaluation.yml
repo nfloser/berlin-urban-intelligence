@@ -5,6 +5,11 @@ on:
   pull_request:
     paths:
       - ".github/workflows/energy-real-evaluation.yml"
+      - "config/sources.yaml"
+      - "docs/energy-real-evidence.md"
+      - "docs/data/data-sources.md"
+      - "docs/index.md"
+      - "docs/verification.md"
       - "scripts/evaluate_energy.py"
       - "src/berlin_urban_intelligence/adapters/stromnetz_berlin.py"
       - "src/berlin_urban_intelligence/agents/energy.py"
