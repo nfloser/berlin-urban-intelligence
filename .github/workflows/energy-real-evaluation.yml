@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/energy-real-evaluation.yml"
       - "config/sources.yaml"
+      - "docs/IMPLEMENTATION_STATUS.md"
       - "docs/energy-real-evidence.md"
       - "docs/data/data-sources.md"
       - "docs/index.md"
