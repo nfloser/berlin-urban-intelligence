@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,6 +17,9 @@ from berlin_urban_intelligence.knowledge.execution import (
 from berlin_urban_intelligence.runtime.derived import DerivedState
 from berlin_urban_intelligence.runtime.derived_products import DerivedProductBuilder
 from berlin_urban_intelligence.runtime.state import RuntimeState
+from berlin_urban_intelligence.shared.observability import observe_operation
+
+LOGGER = logging.getLogger("berlin_urban_intelligence.runtime.derived_refresh")
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,19 @@ class DerivedRefreshCoordinator:
         return payload
 
     def refresh(
+        self,
+        runtime: RuntimeState,
+        previous: DerivedState | None,
+    ) -> DerivedRefreshOutcome:
+        with observe_operation(
+            LOGGER,
+            "derivation_refresh",
+            agent="derived",
+            source="runtime_state",
+        ):
+            return self._refresh(runtime, previous)
+
+    def _refresh(
         self,
         runtime: RuntimeState,
         previous: DerivedState | None,
