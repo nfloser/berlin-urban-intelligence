@@ -52,7 +52,12 @@ def test_acceptance_fixture_cli_persists_all_expected_state_files(tmp_path: Path
     assert len(reference.network_nodes) == 3
     assert len(reference.network_edges) == 3
     assert len(runtime.source_statuses) == 1
-    assert len(derived.records) == 1
+    assert len(derived.records) == 3
+    assert {record.id for record in derived.records} == {
+        "derived:acceptance:mobility-delay-share",
+        "derived:context:heat-air-quality:current",
+        "derived:context:mobility-air-quality:current",
+    }
 
 
 def test_runtime_acceptance_fixture_exposes_explicit_source_failure_semantics(
@@ -78,14 +83,18 @@ def test_derived_acceptance_fixture_exposes_lineage_without_production_fallback(
     derived = DerivedStateStore(derived_path).load()
     assert derived is not None
 
-    assert len(derived.definitions) == 1
-    definition = derived.definitions[0]
-    assert definition.name == "Acceptance mobility delay share"
-    assert definition.producer_agent_id == "mobility"
+    assert len(derived.definitions) == 3
+    definitions = {definition.id: definition for definition in derived.definitions}
+    acceptance_definition = definitions["derivation:acceptance:mobility-delay-share"]
+    assert acceptance_definition.name == "Acceptance mobility delay share"
+    assert acceptance_definition.producer_agent_id == "mobility"
+    assert definitions["heat-air-quality-context-v1"].producer_agent_id == "live_state"
+    assert definitions["mobility-air-quality-context-v1"].producer_agent_id == "live_state"
 
-    assert len(derived.records) == 1
-    record = derived.records[0]
-    assert record.definition_id == definition.id
+    assert len(derived.records) == 3
+    records = {record.id: record for record in derived.records}
+    record = records["derived:acceptance:mobility-delay-share"]
+    assert record.definition_id == acceptance_definition.id
     assert record.freshness is FreshnessStatus.STALE
     assert record.status is DerivationStatus.VALID
     assert [item.id for item in record.inputs] == ["observation:acceptance:mobility-input"]
@@ -93,3 +102,19 @@ def test_derived_acceptance_fixture_exposes_lineage_without_production_fallback(
     assert record.provenance.provider == "Berlin Urban Intelligence acceptance fixture"
     assert record.provenance.dataset == "acceptance derived lineage"
     assert "Synthetic test fixture" in (record.provenance.quality_note or "")
+
+    heat_air = records["derived:context:heat-air-quality:current"]
+    assert heat_air.definition_id == "heat-air-quality-context-v1"
+    assert {item.id for item in heat_air.inputs} == {
+        "observation:acceptance:temperature",
+        "observation:acceptance:lqi",
+    }
+    assert heat_air.provenance.dataset == "acceptance heat-air cross-domain lineage"
+
+    mobility_air = records["derived:context:mobility-air-quality:current"]
+    assert mobility_air.definition_id == "mobility-air-quality-context-v1"
+    assert {item.id for item in mobility_air.inputs} == {
+        "vbb-gtfs-rt:2026-09-15T08:00:00+00:00",
+        "observation:acceptance:lqi",
+    }
+    assert mobility_air.provenance.dataset == "acceptance mobility-air cross-domain lineage"
