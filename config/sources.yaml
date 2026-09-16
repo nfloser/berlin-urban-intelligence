@@ -33,7 +33,7 @@ sources:
   - id: vbb_gtfs_static
     provider: Verkehrsverbund Berlin-Brandenburg (VBB)
     dataset: GTFS schedule data
-    domain: mobility
+    domain: mobility/reference
     reference_url: https://unternehmen.vbb.de/digitale-services/datensaetze/
     api_url: https://unternehmen.vbb.de/gtfs
     authoritative: true
@@ -69,7 +69,6 @@ sources:
     limitations:
       - Individual products use different station sets, variables and publication delays.
       - Source-specific timestamps and missing-value conventions require explicit parsing.
-
 
   - id: berlin_hospitals
     provider: Senatsverwaltung für Wissenschaft, Gesundheit und Pflege Berlin
@@ -116,14 +115,16 @@ sources:
     dataset: Jahreshöchstlast und Lastverlauf des Berliner Verteilungsnetzes
     domain: energy
     reference_url: https://www.stromnetz.berlin/uber-uns/veroffentlichungspflichten/energiewirtschaftsgesetz-enwg/
-    api_url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2025/jahreshoechstlast-2025-hochspannung.csv
+    api_url: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2024/Jahreshoechstlast-2024-Hochspannung.csv
     authoritative: true
     expected_update_frequency: annual publication with quarter-hourly values
-    temporal_coverage: annual load curves published by year
+    temporal_coverage: annual load curves published by year; reproducible chronological evidence uses the clean 2024 high-voltage curve
     spatial_coverage: Berlin distribution grid, separated by voltage/network level
     limitations:
       - The published high-voltage load curve represents one network level and must not be labelled total Berlin electricity demand.
-      - File schemas must be inspected explicitly before parsing; the production parser never guesses column names or units.
+      - The five inspected 2025 load-curve files each contain a 96-row upstream #BEZUG! timestamp block; their values reconcile with the published annual summaries but those rows are not assigned inferred timestamps.
+      - The clean 2024 high-voltage publication is therefore the current reproducible chronological evaluation source until a later clean publication is verified.
+      - File schemas, annual point counts, DST semantics, maximum and annual work are validated explicitly before forecasting.
       - Historical publication cadence does not make the resulting forecast a live grid-control forecast.
 
   - id: energy_reference_uci
