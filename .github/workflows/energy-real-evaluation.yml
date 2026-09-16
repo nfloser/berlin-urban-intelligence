@@ -30,6 +30,7 @@ jobs:
       - name: Report source identity and inspected schema
         run: |
           python - <<'PY'
+          from collections import Counter
           from hashlib import sha256
           from pathlib import Path
 
@@ -56,8 +57,12 @@ jobs:
           for index, line in enumerate(lines[:12], start=1):
               print(f'line_{index:02d}={line}')
           print(f'last_data_row={lines[-1]}')
+          data_rows = lines[9:]
+          date_counts = Counter(row.split(';', 1)[0] for row in data_rows)
+          print(f'unique_dates={len(date_counts)}')
+          print('non_96_date_counts=' + repr(sorted((day, count) for day, count in date_counts.items() if count != 96)))
           for day in ('01.01.2025', '02.01.2025', '30.03.2025', '26.10.2025', '31.12.2025'):
-              rows = [line for line in lines if line.startswith(day + ';')]
+              rows = [line for line in data_rows if line.startswith(day + ';')]
               print(f'{day}_row_count={len(rows)}')
               print(f'{day}_first_rows={rows[:4]}')
               print(f'{day}_last_rows={rows[-4:]}')
