@@ -33,9 +33,9 @@ class DerivedRefreshCoordinator:
     """Refresh only derived branches whose source-backed semantics changed.
 
     A topology change (newly available or disappeared product) is applied as a validated full
-    snapshot replacement. With stable topology, the dependency executor receives only the old
-    upstream identifiers of products whose semantic payload changed, which gives deterministic
-    cascading re-execution in dependency order.
+    snapshot replacement. With stable topology, the dependency executor receives a minimal set of
+    upstream identifiers that explains changed records without invalidating branches whose desired
+    semantic payload is unchanged.
     """
 
     def __init__(self, *, builder: DerivedProductBuilder | None = None) -> None:
@@ -48,6 +48,36 @@ class DerivedRefreshCoordinator:
             exclude={"retrieved_at", "processed_at"}
         )
         return payload
+
+    @staticmethod
+    def _changed_input_ids(
+        *,
+        changed_record_ids: list[str],
+        previous_records: dict[str, DerivationRecord],
+    ) -> tuple[str, ...]:
+        """Infer the narrowest external-input seed consistent with the desired snapshot.
+
+        An input shared with a semantically unchanged record is not used to invalidate that branch:
+        the freshly built desired snapshot already demonstrates that branch remained equivalent.
+        If every input is shared, fall back to all inputs of changed records so a real change is
+        never silently suppressed.
+        """
+        changed = set(changed_record_ids)
+        unchanged_inputs = {
+            input_item.id
+            for record_id, record in previous_records.items()
+            if record_id not in changed
+            for input_item in record.inputs
+        }
+        all_changed_inputs = tuple(
+            dict.fromkeys(
+                input_item.id
+                for record_id in changed_record_ids
+                for input_item in previous_records[record_id].inputs
+            )
+        )
+        narrowed = tuple(input_id for input_id in all_changed_inputs if input_id not in unchanged_inputs)
+        return narrowed or all_changed_inputs
 
     def refresh(
         self,
@@ -89,12 +119,9 @@ class DerivedRefreshCoordinator:
         if not changed_record_ids:
             return DerivedRefreshOutcome(state=previous, changed=False)
 
-        changed_inputs = tuple(
-            dict.fromkeys(
-                input_item.id
-                for record_id in changed_record_ids
-                for input_item in previous_records[record_id].inputs
-            )
+        changed_inputs = self._changed_input_ids(
+            changed_record_ids=changed_record_ids,
+            previous_records=previous_records,
         )
 
         def handler(
