@@ -2,29 +2,34 @@
 
 ## Current phase
 
-Phase 21 — evidence-driven v1.0 completion. Security (#18), structured observability (#19) and reproducible real Berlin energy evidence (#20) are merged and verified. PR #34 / issue #21 verifies two source-backed descriptive cross-domain workflows end to end. After this candidate is merged, the only remaining critical release-level evidence gap is the separately external-blocked real OSM road-network verification (#14).
+Phase 22 — final evidence closure for the v1.0 candidate. Security (#18), structured observability (#19), reproducible real Berlin energy evidence (#20) and multiple source-backed cross-domain workflows (#21) are merged and verified. Issue #14's previously external-blocked real OSM road-network gate now has successful point-in-time live evidence on PR #35.
+
+The only remaining completion step is procedural rather than a missing domain capability: the final PR #35 documentation head must pass the protected `backend`, `frontend` and `containers` checks, followed by the final independent review and merge.
 
 ## Current development work
 
-Issue #21 / PR #34 extends the existing derived-information path without adding a universal score, hidden weighting or unsupported causal inference.
+PR #35 hardens only the optional road-network smoke verification infrastructure. It does not change the production road-data semantics or weaken the readiness contract.
 
-The first workflow, `heat-air-quality-context-v1`, retains the latest persisted DWD 2 m air-temperature observation and Berlin LQI observation as separate values with separate entity identifiers and observation timestamps. The second workflow, `mobility-air-quality-context-v1`, co-reports the VBB GTFS-Realtime delayed trip-update share and latest Berlin LQI observation, again preserving the numerator/denominator, independent timestamps, source semantics and provenance.
+The workflow now tries multiple real public Overpass delivery endpoints with a hard 300-second budget per endpoint. Every failed attempt is retained as JSON evidence, and the job can succeed only when the existing OSM adapter, canonical normalizer, strict road-readiness verifier and `ResilienceAgent` baseline route all succeed. No generated, cached or synthetic road topology is accepted as replacement data.
 
-The second workflow was developed test-first. RED run `35083736052` passed format, lint and strict mypy, then failed exactly three new Pytest contracts because `mobility-air-quality-context-v1` did not yet exist. The implementation now provides the requested definition/record, quality/freshness propagation, last-known-good source-unavailable semantics and missing-input omission without synthetic replacement values.
+Live run `35091544852` exercised this path for `Mitte, Berlin, Germany`, network type `drive`, with explicit OSMnx speed/travel-time derivation. The first endpoint (`maps.mail.ru`) exceeded its 300-second budget and the second endpoint (`overpass.private.coffee`) also exceeded its budget. The third endpoint (`overpass-api.de`) returned a real OSM network that passed the full contract.
 
-The dashboard Derived Information inspector now exposes each derivation definition's scientific interpretation next to producer/algorithm version, inputs, lineage and provenance. Deterministic browser-acceptance fixtures persist both cross-domain records through the normal `DerivedStateStore`; Playwright switches between both results and verifies their input lineage and explicit non-causal/no-score caveats through the composed nginx → FastAPI → persisted-state → React path.
+The accepted snapshot contained **740 canonical nodes** and **1,800 canonical edges**, retained `OpenStreetMap contributors` / ODbL 1.0 provenance, exposed OSMnx speed/travel-time imputation in provenance and recorded `synthetic_fallback=false`.
 
-`docs/evaluation/cross-domain-workflows.md` is authoritative for the scientific interpretation boundaries. These products are descriptive context only. They do not establish correlation or causality, estimate passenger/person exposure, spatially co-locate observations that originate from different source footprints, or calculate a combined city/risk score.
+The readiness verifier then routed through the existing resilience implementation from `osm-node:10087214573` to `osm-node:13043292535` using edge `osm:10087214573:13043292535:1:1419417017` with an observed route travel time of approximately **2.139 seconds**. Artifact `10445300085` contains all endpoint attempts plus the successful readiness payload.
+
+Protected PR run `35091630767` already passed backend, frontend and containers/Compose/Playwright on implementation head `51a6f28954ee16bb238fc33c8ad349e1cec8663c`. The current documentation commits deliberately trigger one final protected run before merge.
 
 ## Recently completed work
 
+- Issue #21 / PR #34 completed the second source-backed cross-domain workflow and squash-merged as `e562835a1cb60b7c9cbc7b38ad9c801fef66e814`. Final protected run `35090333735` and real-energy run `35090333758` were green.
 - Issue #20 / PR #33 completed reproducible real Berlin energy verification and squash-merged as `42dfb85da6f80b46c2786c0ff108ec250bac8811`. Final protected CI run `35083089572` and real-energy run `35083089585` were green. The accepted source is the clean official 2024 Stromnetz Berlin high-voltage annual curve; the five inspected 2025 files remain rejected for chronological forecasting because each contains a 96-row upstream `#BEZUG!` timestamp block.
 - Issue #19 / PR #32 completed structured operation observability. Source refreshes, snapshot reloads, derivation refreshes and explicit scenario calculations expose allow-listed correlation IDs, durations and safe error-state classifications without per-record noise or raw-provider exception leakage.
 - Issue #18 / PR #31 completed the repository/deployment security baseline with loopback-only default exposure, container hardening, browser security headers, exception-message redaction, vulnerability-reporting documentation and dependency-audit workflows.
 - Issue #17 / PR #30 established reproducible performance/scaling evidence with a deterministic 10,000-stop/250-facility/750-node benchmark, bounded map response selection and raw latency/allocation evidence.
 - Issue #16 / PR #29 completed the practical dashboard accessibility and keyboard baseline with composed Playwright/Axe acceptance.
 - Issue #15 / PR #28 completed populated dashboard-inspector acceptance through the composed application stack.
-- Issue #14 / PR #27 merged real-road verification/degradation infrastructure without fabricating provider success. #14 remains open because captured public Overpass attempts timed out before a usable real Berlin network could be produced.
+- Issue #14 / PR #27 originally merged strict real-road verification/degradation infrastructure without fabricating provider success; PR #35 now supplies the missing successful live-provider evidence needed to complete that gate.
 - Issues #12 and #13 completed semantic API parity plus real-agent metadata/composition boundaries; issue #11 established [`verification.md`](verification.md) as the repository-wide evidence gate.
 
 ## Current architectural state
@@ -43,7 +48,7 @@ The dashboard Derived Information inspector now exposes each derivation definiti
 - Structured operation logging covers request, source-refresh, reload, derivation-refresh and scenario boundaries with safe low-cardinality fields.
 - The security baseline and dependency-audit workflow are separate from application-domain logic.
 - The real-energy evidence workflow downloads provider data only during CI and never converts official files into a committed production fallback.
-- Optional real road-network acquisition remains separate from deterministic CI and never fabricates provider success.
+- Optional real road-network acquisition remains separate from deterministic CI, preserves explicit provider failure semantics and now has successful point-in-time live readiness/routing evidence.
 
 ## Evidence baselines
 
@@ -54,6 +59,10 @@ The dashboard Derived Information inspector now exposes each derivation definiti
 ### Real Berlin energy
 
 `docs/energy-real-evidence.md` is authoritative for the point-in-time official-source validation, 2025 timestamp defect, clean 2024 source contract, chronological evaluation metrics, persisted/API verification and scientific limitations.
+
+### Real Berlin road network
+
+`docs/road-network-verification.md` is authoritative for the road-network live contract, earlier failed provider attempts and the successful 2026-09-16 run `35091544852`. The accepted graph contains 740 nodes and 1,800 edges and completed a baseline route through the real resilience implementation. This is point-in-time provider evidence, not a permanent Overpass availability guarantee.
 
 ### Performance
 
@@ -81,18 +90,16 @@ Security, real-source, performance and other evidence workflows remain additiona
 
 ## Current v1.0 evidence gaps
 
-The authoritative detail is in [`verification.md`](verification.md). On the PR #34 candidate, the #21 cross-domain gate is satisfied by two explicit source-backed descriptive products, deterministic normal/missing/unavailable behavior, persisted API/dashboard inspection and composed browser acceptance.
+The authoritative detail is in [`verification.md`](verification.md).
 
-The remaining critical release-level evidence gap is:
+There is now **no unresolved critical domain/evidence gap** in the current v1.0 matrix. The previously external-blocked #14 road-network requirement is satisfied by real run `35091544852` and artifact `10445300085`, while retaining explicit failure evidence for the endpoints that timed out.
 
-1. #14 — **EXTERNAL/BLOCKED**: a successful real Berlin OSM network plus baseline route is still missing because captured public Overpass attempts timed out.
-
-The overall v1.0 gate therefore remains **NOT READY** unless #14 obtains successful real-provider evidence or the dependency is explicitly accepted as an external release exception for the intended v1 research scope.
+The aggregate v1.0 gate remains **NOT READY** only until the final PR #35 documentation head passes the protected required checks and the final review confirms that no critical defect, misleading evidence statement or unresolved review thread remains.
 
 ## Known external and scope constraints
 
 - Provider availability is external to deterministic CI and is checked through separate smoke/evaluation workflows.
-- OSM-backed routing remains source-dependent and must degrade explicitly when acquisition is unavailable; deterministic routing fixtures are not proof of current Berlin road-network acquisition.
+- OSM-backed routing remains source-dependent and must degrade explicitly when acquisition is unavailable; the successful run proves compatibility at one timestamp rather than permanent service availability.
 - Cross-domain contexts are descriptive co-reporting only; different source timestamps and spatial footprints remain visible and are not interpreted as causal, correlated or co-located evidence.
 - The currently reproducible energy evidence is historical 2024 high-voltage network load, not current total Berlin demand.
 - Automated accessibility tooling cannot prove full assistive-technology usability or formal standards conformance.
@@ -119,14 +126,14 @@ Playwright browser acceptance against the composed stack
 Axe critical/serious WCAG A/AA regression scan in principal dashboard states
 ```
 
-Separate scoped evidence workflows additionally cover dependency security audits, live/reference providers, real Berlin energy and performance measurements.
+Separate scoped evidence workflows additionally cover dependency security audits, live/reference providers, real Berlin energy, real Berlin road-network readiness and performance measurements.
 
 ## Next concrete tasks
 
-1. Complete PR #34 only after its final code/documentation head passes protected backend/frontend/container CI and composed browser acceptance, then independently review and merge it to close #21.
-2. Re-run #14 against viable real Overpass infrastructure without changing its strict no-synthetic-fallback/readiness contract.
-3. If #14 succeeds, verify the produced real Berlin nodes/edges and a real baseline route before changing its evidence gate; if it still fails externally, preserve the blocked status and failure evidence.
-4. Reassess v1.0 release readiness only after the final verification matrix contains no unresolved critical gap other than an explicitly accepted external release exception.
+1. Wait for the protected backend/frontend/container checks on the final PR #35 evidence-documentation head.
+2. Perform the final independent review of PR #35, including workflow failover safety, evidence accuracy, failure visibility and documentation consistency.
+3. If the final head is green and review-clean, update the aggregate verification gate to PASS, run the resulting final checks, merge PR #35 and close issue #14.
+4. Only then consider a semantic v1.0 release/tag and release notes; do not create a release merely because an issue was closed.
 
 ## Important migration notes
 
