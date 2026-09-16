@@ -104,6 +104,8 @@ def main() -> int:
     print(f"rmse={metric.rmse:.6f}")
     print(f"baseline_model={metric.baseline_model_id}")
     print(f"baseline_mae={metric.baseline_mae:.6f}")
+    print(f"evaluation_start={metric.evaluation_start.isoformat()}")
+    print(f"evaluation_end={metric.evaluation_end.isoformat()}")
     print(f"forecast_valid_at={forecast.valid_at.isoformat()}")
     print(f"forecast_value={forecast.value:.6f} {forecast.unit}")
     print(f"dataset_fingerprint={metric.dataset_fingerprint}")
