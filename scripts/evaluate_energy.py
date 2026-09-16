@@ -1,8 +1,8 @@
 """Evaluate Berlin grid-load data chronologically and persist a one-step forecast.
 
-The command deliberately requires explicit timestamp/value column names because upstream CSV
-schemas must be inspected rather than guessed. Input may be a local copy or an HTTPS Stromnetz
-Berlin URL. Generated metrics are calculated from holdout predictions; no metric is embedded.
+The command supports both explicitly configured tabular CSV input and the inspected Stromnetz
+Berlin annual-load-curve publication contract. Generated metrics are calculated from holdout
+predictions; no evaluation result is embedded in the repository.
 """
 
 from __future__ import annotations
@@ -39,8 +39,15 @@ def main() -> int:
     )
     parser.add_argument("--source-url", help="Required provenance URL when --input is a local file")
     parser.add_argument("--dataset", required=True, help="Inspected upstream dataset title")
-    parser.add_argument("--timestamp-column", required=True)
-    parser.add_argument("--value-column", required=True)
+    parser.add_argument(
+        "--published-annual-load-curve",
+        action="store_true",
+        help="Use the strict Stromnetz Berlin annual load-curve publication contract",
+    )
+    parser.add_argument("--expected-title")
+    parser.add_argument("--expected-year", type=int)
+    parser.add_argument("--timestamp-column")
+    parser.add_argument("--value-column")
     parser.add_argument("--unit", default="MW")
     parser.add_argument("--delimiter", default=";")
     parser.add_argument("--source-timezone", default="Europe/Berlin")
@@ -53,15 +60,35 @@ def main() -> int:
     source_url = remote_url or args.source_url
     if not source_url:
         raise ValueError("--source-url is required when evaluating a local source copy")
-    series = StromnetzBerlinCsvAdapter().parse(
-        text,
-        timestamp_column=args.timestamp_column,
-        value_column=args.value_column,
-        unit=args.unit,
-        source_url=source_url,
-        delimiter=args.delimiter,
-        source_timezone=args.source_timezone,
-    )
+
+    adapter = StromnetzBerlinCsvAdapter()
+    if args.published_annual_load_curve:
+        if not args.expected_title or args.expected_year is None:
+            raise ValueError(
+                "--expected-title and --expected-year are required for a published annual curve"
+            )
+        series = adapter.parse_published_annual_load_curve(
+            text,
+            source_url=source_url,
+            expected_title=args.expected_title,
+            expected_year=args.expected_year,
+            source_timezone=args.source_timezone,
+        )
+    else:
+        if not args.timestamp_column or not args.value_column:
+            raise ValueError(
+                "--timestamp-column and --value-column are required for generic CSV input"
+            )
+        series = adapter.parse(
+            text,
+            timestamp_column=args.timestamp_column,
+            value_column=args.value_column,
+            unit=args.unit,
+            source_url=source_url,
+            delimiter=args.delimiter,
+            source_timezone=args.source_timezone,
+        )
+
     state = EnergyForecastWorkflow().run(
         series,
         source_dataset=args.dataset,
