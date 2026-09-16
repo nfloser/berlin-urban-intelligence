@@ -47,13 +47,13 @@ jobs:
           if text is None or encoding is None:
               raise SystemExit('unable to decode source CSV')
           lines = [line for line in text.splitlines() if line.strip()]
-          if len(lines) < 2:
-              raise SystemExit('source CSV does not contain a header and data rows')
+          if len(lines) < 12:
+              raise SystemExit('source CSV does not contain expected metadata/data rows')
           print(f'bytes={len(payload)}')
           print(f'sha256={sha256(payload).hexdigest()}')
           print(f'encoding={encoding}')
           print(f'non_empty_lines={len(lines)}')
-          print(f'header={lines[0]}')
-          print(f'first_data_row={lines[1]}')
+          for index, line in enumerate(lines[:12], start=1):
+              print(f'line_{index:02d}={line}')
           print(f'last_data_row={lines[-1]}')
           PY
