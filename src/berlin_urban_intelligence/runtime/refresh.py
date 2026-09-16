@@ -8,9 +8,11 @@ freshness continues to age explicitly.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from berlin_urban_intelligence.adapters.berlin_air_quality import (
     BerlinAirQualityClient,
@@ -24,7 +26,10 @@ from berlin_urban_intelligence.agents.heat import HeatAgent
 from berlin_urban_intelligence.agents.mobility import MobilityAgent, MobilitySnapshot
 from berlin_urban_intelligence.runtime.state import RuntimeState
 from berlin_urban_intelligence.shared.contracts import Observation
+from berlin_urban_intelligence.shared.observability import observe_operation
 from berlin_urban_intelligence.shared.source_status import SourceRuntimeStatus, SourceStatusStore
+
+LOGGER = logging.getLogger("berlin_urban_intelligence.runtime.refresh")
 
 
 class RefreshCoordinator:
@@ -65,6 +70,7 @@ class RefreshCoordinator:
         if now.tzinfo is None or now.utcoffset() is None:
             raise ValueError("now_factory must produce timezone-aware datetimes")
         now = now.astimezone(UTC)
+        operation_id = str(uuid4())
         status_store = SourceStatusStore(previous_state.source_statuses if previous_state else None)
         exposure = ExposureAgent()
         heat = HeatAgent()
@@ -75,47 +81,68 @@ class RefreshCoordinator:
         errors: dict[str, str] = {}
 
         try:
-            payload = self.air_client.get_lqi_data()
-            records = [parse_lqi_record(item) for item in extract_lqi_records(payload)]
-            if not records:
-                raise ValueError("Berlin LQI response contains no usable records")
-            current = exposure.ingest_lqi_records(records, retrieved_at=now)
-            observations = self._replace_agent_observations(observations, "exposure", current)
-            status_store.record_success(
-                "berlin_air_quality",
-                retrieved_at=now,
-                observation_time=max(record.observed_at for record in records),
-            )
+            with observe_operation(
+                LOGGER,
+                "source_refresh",
+                operation_id=operation_id,
+                agent="exposure",
+                source="berlin_air_quality",
+            ):
+                payload = self.air_client.get_lqi_data()
+                records = [parse_lqi_record(item) for item in extract_lqi_records(payload)]
+                if not records:
+                    raise ValueError("Berlin LQI response contains no usable records")
+                current = exposure.ingest_lqi_records(records, retrieved_at=now)
+                observations = self._replace_agent_observations(observations, "exposure", current)
+                status_store.record_success(
+                    "berlin_air_quality",
+                    retrieved_at=now,
+                    observation_time=max(record.observed_at for record in records),
+                )
         except Exception as exc:
             code = self._error_code(exc)
             status_store.record_failure("berlin_air_quality", checked_at=now, error_code=code)
             errors["berlin_air_quality"] = code
 
         try:
-            record = self.dwd_client.fetch()
-            current = heat.ingest_dwd_record(record, retrieved_at=now)
-            observations = self._replace_agent_observations(observations, "heat", current)
-            status_store.record_success(
-                "dwd_open_data", retrieved_at=now, observation_time=record.observed_at
-            )
+            with observe_operation(
+                LOGGER,
+                "source_refresh",
+                operation_id=operation_id,
+                agent="heat",
+                source="dwd_open_data",
+            ):
+                record = self.dwd_client.fetch()
+                current = heat.ingest_dwd_record(record, retrieved_at=now)
+                observations = self._replace_agent_observations(observations, "heat", current)
+                status_store.record_success(
+                    "dwd_open_data", retrieved_at=now, observation_time=record.observed_at
+                )
         except Exception as exc:
             code = self._error_code(exc)
             status_store.record_failure("dwd_open_data", checked_at=now, error_code=code)
             errors["dwd_open_data"] = code
 
         try:
-            raw = self.vbb_client.fetch()
-            feed_timestamp, decoded = self.vbb_decoder(raw)
-            if feed_timestamp is None:
-                raise ValueError("VBB feed has no source timestamp")
-            mobility = MobilityAgent()
-            updates = mobility.from_decoded_records(decoded)
-            mobility_snapshot = mobility.summarise_updates(
-                updates, feed_timestamp=feed_timestamp, retrieved_at=now
-            )
-            status_store.record_success(
-                "vbb_gtfs_rt", retrieved_at=now, observation_time=feed_timestamp
-            )
+            with observe_operation(
+                LOGGER,
+                "source_refresh",
+                operation_id=operation_id,
+                agent="mobility",
+                source="vbb_gtfs_rt",
+            ):
+                raw = self.vbb_client.fetch()
+                feed_timestamp, decoded = self.vbb_decoder(raw)
+                if feed_timestamp is None:
+                    raise ValueError("VBB feed has no source timestamp")
+                mobility = MobilityAgent()
+                updates = mobility.from_decoded_records(decoded)
+                mobility_snapshot = mobility.summarise_updates(
+                    updates, feed_timestamp=feed_timestamp, retrieved_at=now
+                )
+                status_store.record_success(
+                    "vbb_gtfs_rt", retrieved_at=now, observation_time=feed_timestamp
+                )
         except Exception as exc:
             code = self._error_code(exc)
             status_store.record_failure("vbb_gtfs_rt", checked_at=now, error_code=code)
