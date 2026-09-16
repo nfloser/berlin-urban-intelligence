@@ -33,7 +33,7 @@ sources:
   - id: vbb_gtfs_static
     provider: Verkehrsverbund Berlin-Brandenburg (VBB)
     dataset: GTFS schedule data
-    domain: mobility/reference
+    domain: mobility
     reference_url: https://unternehmen.vbb.de/digitale-services/datensaetze/
     api_url: https://unternehmen.vbb.de/gtfs
     authoritative: true
