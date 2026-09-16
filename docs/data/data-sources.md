@@ -12,7 +12,7 @@ The machine-readable source registry is `config/sources.yaml`. This page explain
 | `berlin_hospitals` | Berlin hospitals WFS | resilience/reference | WFS acquisition | provider-specific | authoritative; DL-DE-Zero-2.0 | Facility identity/location does not establish current availability/capacity. |
 | `berlin_fire_stations` | Berliner Feuerwehr locations WFS | resilience/reference | WFS acquisition | provider-specific | authoritative; DL-DE-Zero-2.0 | Location does not establish current operational availability. |
 | `osm_berlin` | OpenStreetMap | resilience/reference | Optional OSMnx road acquisition | community-updated | non-authoritative; ODbL 1.0 | Completeness and edge attributes vary; speed imputation is modelling, not observation. |
-| `stromnetz_berlin_grid_load` | Stromnetz Berlin network-level load publication | energy | Explicit local CSV or verified HTTPS input | annual publication, quarter-hour values for configured publication | authoritative for documented source scope | A network-level/high-voltage curve must not be relabelled as total Berlin electricity demand. |
+| `stromnetz_berlin_grid_load` | Stromnetz Berlin network-level load publication | energy | Strict official annual-curve parser or explicit generic CSV input | annual publication, quarter-hour values | authoritative for documented source scope | A network-level/high-voltage curve must not be relabelled as total Berlin electricity demand. The inspected 2025 curves contain an upstream timestamp defect. |
 | `energy_reference_uci` | UCI Individual Household Electric Power Consumption | research reference | Methodology reference only | static | non-authoritative for Berlin; CC BY 4.0 | One household in Sceaux, France; never Berlin operational state. |
 
 ## Live-source behavior
@@ -39,9 +39,15 @@ OSM speed/travel-time imputation is not silently enabled. It requires `--allow-o
 
 ## Energy-source behavior
 
-`scripts/evaluate_energy.py` intentionally requires explicit dataset title, timestamp column and value column. Remote input is accepted only from the verified `https://www.stromnetz.berlin/` domain; a local copy requires an explicit `--source-url` for provenance.
+`scripts/evaluate_energy.py` supports two deliberately distinct input contracts. Generic CSV input continues to require explicit dataset title, timestamp column, value column and unit so that an arbitrary upstream schema is never guessed. For the published Stromnetz Berlin annual load curves, `--published-annual-load-curve` selects a stricter provider-specific contract that validates provider/title/year metadata, `Max in kW`, `Arbeit in kWh`, the exact annual quarter-hour point count, the published Europe/Berlin daylight-saving endpoint convention, the observed annual maximum and the rounded quarter-hour energy integral.
 
-The current forecasting pipeline assumes a regular time series for next-step forecasting and defaults to a seasonal lag of 96, corresponding to one day only when the input cadence is 15 minutes. The CLI therefore exposes `--seasonal-lag` rather than embedding a universal meaning.
+Remote input is accepted only from the verified `https://www.stromnetz.berlin/` domain. A local copy requires an explicit `--source-url` for provenance. The repository does not commit the official provider files.
+
+Point-in-time verification on 2026-09-16 found that all five inspected 2025 network-level CSVs contain one contiguous 96-row block whose date and time cells are literally `#BEZUG!`. Their numeric values still reconcile with the files' published maxima and annual work, but the implementation does not manufacture timestamps for those rows. The strict parser rejects them. The official 2024 high-voltage curve is the currently verified clean chronological evidence source: 35,136 quarter-hour values, valid leap-year/DST timing, 2,034,416 kW published/observed maximum and 11,834,389,631 kWh published/reproduced annual work.
+
+The current forecasting pipeline assumes a regular physical time series for next-step forecasting and defaults to a seasonal lag of 96, corresponding to one day for this 15-minute source. Evaluation remains chronological and the forecast artifact is bound to the same dataset fingerprint as its evaluation. Because the verified source is historical, its resulting forecast is correctly considered stale by the current Energy Agent/API; this evidence is a reproducible integration/evaluation check rather than a live grid forecast.
+
+See [Real Berlin energy evidence](../energy-real-evidence.md) for the exact source hash, workflow, measured holdout metrics, API verification and scientific claim boundaries.
 
 ## Licences and redistribution
 
@@ -49,4 +55,4 @@ The project records source licences/attribution where configured and carries lic
 
 ## Verification status
 
-Live-source and reference-source smoke workflows are operational compatibility checks, not permanent provider-availability guarantees and not scientific evaluation. Any dated success record should be interpreted only as evidence that the corresponding adapters were compatible with the providers at that time.
+Live-source and reference-source smoke workflows are operational compatibility checks, not permanent provider-availability guarantees and not scientific evaluation. Any dated success record should be interpreted only as evidence that the corresponding adapters were compatible with the providers at that time. The separate real-energy workflow is likewise point-in-time evidence: it validates a specific downloaded source snapshot and reports its fingerprint rather than treating historical metrics as permanent constants.

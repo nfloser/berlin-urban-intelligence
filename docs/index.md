@@ -13,6 +13,7 @@ Berlin Urban Intelligence is a research-oriented urban intelligence and digital-
 - [Testing](development/testing.md) — deterministic CI, live-source checks and current testing gaps.
 - [Security baseline](security.md) — deployment trust boundary, container/HTTP controls, logging redaction and dependency auditing.
 - [Structured observability](observability.md) — operation event names, safe fields, correlation semantics and noise policy.
+- [Real Berlin energy evidence](energy-real-evidence.md) — official source validation, chronological evaluation, measured metrics and claim boundaries.
 - [Performance baseline](performance.md) — reproducible latency/memory evidence, bounded map behavior and scaling limits.
 - [Accessibility baseline](accessibility.md) — automated keyboard/Axe acceptance, non-pointer routing and the manual release checklist.
 - [v1.0 verification matrix](verification.md) — evidence-backed PASS/PARTIAL/NOT VERIFIED status for completion gates and linked follow-up issues.
@@ -32,7 +33,7 @@ Architecture documentation is split into [overview](architecture/overview.md), [
 
 ### Data
 
-The data section covers [source boundaries](data/data-sources.md), the [canonical data model](data/data-model.md), [processing](data/data-processing.md), [quality](data/data-quality.md) and [provenance](data/provenance.md). The machine-readable source registry remains `config/sources.yaml` and is authoritative for configured provider boundaries.
+The data section covers [source boundaries](data/data-sources.md), the [canonical data model](data/data-model.md), [processing](data/data-processing.md), [quality](data/data-quality.md) and [provenance](data/provenance.md). The machine-readable source registry remains `config/sources.yaml` and is authoritative for configured provider boundaries. Point-in-time real energy source/evaluation evidence is recorded separately in [energy-real-evidence.md](energy-real-evidence.md) so measured results are not confused with permanent implementation constants.
 
 ### Implementation and operation
 
@@ -46,7 +47,7 @@ Development guidance covers environment setup, tests, code-quality gates, reposi
 
 The repository currently implements canonical Pydantic contracts, source adapters, six domain/aggregation agents, live and reference acquisition workflows, a leakage-safe energy evaluation and one-step forecasting workflow, network resilience calculations, explicit hypothetical scenarios, registry/capability-driven deterministic orchestration, first-class derived information/dependencies, RDF projection, a FastAPI API, a React/MapLibre dashboard and protected deterministic CI/container/browser acceptance.
 
-Some capabilities are conditional on data availability. In particular, the Energy Agent requires a successfully evaluated Berlin-scoped input dataset before it exposes forecasts, and Resilience routing requires a persisted network snapshot. Optional OpenStreetMap acquisition is not part of the default reference refresh.
+Some capabilities are conditional on data availability. The Energy Agent requires a successfully evaluated Berlin-scoped input dataset before it exposes forecasts; the repository now includes a reproducible point-in-time workflow against the clean official 2024 Stromnetz Berlin high-voltage load curve, while correctly treating the resulting historical forecast as stale rather than live state. Resilience routing requires a persisted network snapshot. Optional OpenStreetMap acquisition is not part of the default reference refresh.
 
 The current aggregate v1.0 verification status is **NOT READY**. This does not mean the implemented application is unusable; it means critical evidence gaps remain and are explicitly tracked rather than being converted into completion claims. See [verification.md](verification.md) for the exact gates and issues.
 
