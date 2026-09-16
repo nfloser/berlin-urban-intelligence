@@ -52,11 +52,16 @@ def observation(
     )
 
 
-def status(source_id: str) -> SourceRuntimeStatus:
+def status(
+    source_id: str,
+    *,
+    availability: AvailabilityStatus = AvailabilityStatus.AVAILABLE,
+    freshness: FreshnessStatus = FreshnessStatus.VALID,
+) -> SourceRuntimeStatus:
     return SourceRuntimeStatus(
         source_id=source_id,
-        availability=AvailabilityStatus.AVAILABLE,
-        freshness=FreshnessStatus.VALID,
+        availability=availability,
+        freshness=freshness,
         last_retrieval_attempt=NOW,
         last_successful_retrieval=NOW,
         latest_observation_time=NOW,
@@ -126,9 +131,60 @@ def test_runtime_products_preserve_real_inputs_and_avoid_composite_score() -> No
     assert "score" not in context.phenomenon
 
 
+def test_mobility_air_quality_context_is_descriptive_and_traceable() -> None:
+    derived = DerivedProductBuilder().build(runtime_state())
+    records = {record.definition_id: record for record in derived.records}
+
+    context = records["mobility-air-quality-context-v1"]
+    mobility_input = f"vbb-gtfs-rt:{NOW.isoformat()}"
+
+    assert context.value == {
+        "delayed_trip_update_share": 0.25,
+        "mobility_trip_updates": 100,
+        "mobility_delayed_trip_updates": 25,
+        "mobility_observed_at": NOW.isoformat(),
+        "lqi_grade": 3,
+        "lqi_entity_id": "air-quality-station:MC042",
+        "lqi_observed_at": NOW.isoformat(),
+    }
+    assert {item.id for item in context.inputs} == {mobility_input, "obs:lqi"}
+    assert set(context.provenance.upstream_ids) == {mobility_input, "obs:lqi"}
+    assert context.quality is QualityFlag.SUSPECT
+    assert context.freshness is FreshnessStatus.VALID
+    assert "score" not in context.phenomenon
+
+
+def test_cross_domain_context_exposes_last_known_data_during_source_failure() -> None:
+    state = runtime_state()
+    source_statuses = dict(state.source_statuses)
+    source_statuses["berlin_air_quality"] = status(
+        "berlin_air_quality",
+        availability=AvailabilityStatus.UNAVAILABLE,
+        freshness=FreshnessStatus.UNAVAILABLE,
+    )
+    degraded = state.model_copy(update={"source_statuses": source_statuses})
+
+    derived = DerivedProductBuilder().build(degraded)
+    records = {record.definition_id: record for record in derived.records}
+
+    assert records["mobility-air-quality-context-v1"].freshness is FreshnessStatus.UNAVAILABLE
+    assert records["heat-air-quality-context-v1"].freshness is FreshnessStatus.UNAVAILABLE
+
+
+def test_missing_mobility_input_omits_only_the_mobility_cross_domain_context() -> None:
+    state = runtime_state().model_copy(update={"mobility": None})
+
+    derived = DerivedProductBuilder().build(state)
+    definition_ids = {record.definition_id for record in derived.records}
+
+    assert "heat-air-quality-context-v1" in definition_ids
+    assert "mobility-air-quality-context-v1" not in definition_ids
+    assert "mobility-delay-share-v1" not in definition_ids
+
+
 def test_missing_domain_data_produces_no_fabricated_record() -> None:
     state = RuntimeState(generated_at=NOW)
     derived = DerivedProductBuilder().build(state)
 
-    assert len(derived.definitions) == 2
+    assert len(derived.definitions) == 3
     assert derived.records == ()
