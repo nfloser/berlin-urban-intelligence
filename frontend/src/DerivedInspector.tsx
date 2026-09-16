@@ -138,6 +138,8 @@ export default function DerivedInspector() {
           <dl className="provenance-list">
             <dt>Definition</dt>
             <dd>{definition.name}</dd>
+            <dt>Scientific interpretation</dt>
+            <dd>{definition.description}</dd>
             <dt>Producer</dt>
             <dd>{definition.producer_agent_id} {definition.producer_version}</dd>
             <dt>Algorithm</dt>

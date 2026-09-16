@@ -177,8 +177,8 @@ def build_runtime_fixture() -> RuntimeState:
 
 
 def build_derived_fixture() -> DerivedState:
-    input_id = "observation:acceptance:mobility-input"
-    definition = DerivationDefinition(
+    mobility_input = "observation:acceptance:mobility-input"
+    acceptance_definition = DerivationDefinition(
         id="derivation:acceptance:mobility-delay-share",
         name="Acceptance mobility delay share",
         description="Acceptance-only persisted derivation used to verify dashboard lineage UI.",
@@ -187,9 +187,9 @@ def build_derived_fixture() -> DerivedState:
         algorithm_version="acceptance-v1",
         output_kind="ratio",
     )
-    record = DerivationRecord(
+    acceptance_record = DerivationRecord(
         id="derived:acceptance:mobility-delay-share",
-        definition_id=definition.id,
+        definition_id=acceptance_definition.id,
         entity_id="berlin:acceptance",
         phenomenon="acceptance_mobility_delay_share",
         value=0.25,
@@ -199,20 +199,116 @@ def build_derived_fixture() -> DerivedState:
         quality=QualityFlag.PARTIAL,
         freshness=FreshnessStatus.STALE,
         status=DerivationStatus.VALID,
-        inputs=(DerivationInput(id=input_id, role="mobility_observation"),),
+        inputs=(DerivationInput(id=mobility_input, role="mobility_observation"),),
         provenance=fixture_provenance(
             "acceptance derived lineage",
             "mobility-delay-share-1",
             agent="mobility",
             agent_version="0.1.0",
-            upstream_ids=(input_id,),
+            upstream_ids=(mobility_input,),
         ),
         context=DerivationContext.BASELINE,
     )
+
+    temperature_input = "observation:acceptance:temperature"
+    lqi_input = "observation:acceptance:lqi"
+    realtime_input = f"vbb-gtfs-rt:{FIXTURE_TIME.isoformat()}"
+
+    heat_air_definition = DerivationDefinition(
+        id="heat-air-quality-context-v1",
+        name="Latest measured heat and air-quality context",
+        description=(
+            "Descriptive pairing of the latest measured DWD 2 m air temperature and latest "
+            "Berlin LQI grade. Values remain separate; no combined risk score or causal claim "
+            "is produced."
+        ),
+        producer_agent_id="live_state",
+        producer_version="0.1.0",
+        algorithm_version="1.0.0",
+        output_kind="heat_air_quality_context",
+    )
+    heat_air_record = DerivationRecord(
+        id="derived:context:heat-air-quality:current",
+        definition_id=heat_air_definition.id,
+        entity_id="berlin:measured-context",
+        phenomenon="heat_air_quality_context",
+        value={
+            "temperature_c": 29.5,
+            "temperature_entity_id": "weather-station:dwd:acceptance",
+            "temperature_observed_at": FIXTURE_TIME.isoformat(),
+            "lqi_grade": 3,
+            "lqi_entity_id": "air-quality-station:acceptance",
+            "lqi_observed_at": FIXTURE_TIME.isoformat(),
+        },
+        valid_at=FIXTURE_TIME,
+        computed_at=FIXTURE_TIME,
+        quality=QualityFlag.PARTIAL,
+        freshness=FreshnessStatus.STALE,
+        status=DerivationStatus.VALID,
+        inputs=(
+            DerivationInput(id=temperature_input, role="measured_air_temperature_2m"),
+            DerivationInput(id=lqi_input, role="measured_berlin_lqi_grade"),
+        ),
+        provenance=fixture_provenance(
+            "acceptance heat-air cross-domain lineage",
+            "heat-air-context-1",
+            agent="live_state",
+            agent_version="0.1.0",
+            upstream_ids=(temperature_input, lqi_input),
+        ),
+        context=DerivationContext.BASELINE,
+    )
+
+    mobility_air_definition = DerivationDefinition(
+        id="mobility-air-quality-context-v1",
+        name="Latest mobility and air-quality context",
+        description=(
+            "Descriptive co-reporting of the VBB GTFS-Realtime delayed trip-update share and "
+            "latest Berlin LQI grade. The values retain separate timestamps and source semantics; "
+            "no causal relationship, exposure attribution or combined score is inferred."
+        ),
+        producer_agent_id="live_state",
+        producer_version="0.1.0",
+        algorithm_version="1.0.0",
+        output_kind="mobility_air_quality_context",
+    )
+    mobility_air_record = DerivationRecord(
+        id="derived:context:mobility-air-quality:current",
+        definition_id=mobility_air_definition.id,
+        entity_id="berlin:operational-context",
+        phenomenon="mobility_air_quality_context",
+        value={
+            "delayed_trip_update_share": 0.25,
+            "mobility_trip_updates": 100,
+            "mobility_delayed_trip_updates": 25,
+            "mobility_observed_at": FIXTURE_TIME.isoformat(),
+            "lqi_grade": 3,
+            "lqi_entity_id": "air-quality-station:acceptance",
+            "lqi_observed_at": FIXTURE_TIME.isoformat(),
+        },
+        valid_at=FIXTURE_TIME,
+        computed_at=FIXTURE_TIME,
+        quality=QualityFlag.PARTIAL,
+        freshness=FreshnessStatus.STALE,
+        status=DerivationStatus.VALID,
+        inputs=(
+            DerivationInput(id=realtime_input, role="vbb_gtfs_realtime_snapshot"),
+            DerivationInput(id=lqi_input, role="measured_berlin_lqi_grade"),
+        ),
+        provenance=fixture_provenance(
+            "acceptance mobility-air cross-domain lineage",
+            "mobility-air-context-1",
+            agent="live_state",
+            agent_version="0.1.0",
+            upstream_ids=(realtime_input, lqi_input),
+        ),
+        context=DerivationContext.BASELINE,
+    )
+
     return DerivedState(
         generated_at=FIXTURE_TIME,
-        definitions=(definition,),
-        records=(record,),
+        definitions=(acceptance_definition, heat_air_definition, mobility_air_definition),
+        records=(acceptance_record, heat_air_record, mobility_air_record),
     )
 
 
