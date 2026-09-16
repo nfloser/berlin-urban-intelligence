@@ -7,11 +7,18 @@ on:
       - ".github/workflows/energy-real-evaluation.yml"
       - "scripts/evaluate_energy.py"
       - "src/berlin_urban_intelligence/adapters/stromnetz_berlin.py"
+      - "src/berlin_urban_intelligence/agents/energy.py"
+      - "src/berlin_urban_intelligence/api/**"
       - "src/berlin_urban_intelligence/energy/**"
       - "tests/test_stromnetz_berlin_adapter.py"
 
 permissions:
   contents: read
+
+env:
+  EVIDENCE_URL: https://www.stromnetz.berlin/files/globalassets/dokumente/veroffentlichungspflichten/2024/Jahreshoechstlast-2024-Hochspannung.csv
+  EVIDENCE_TITLE: Jahreshöchstlast in der Hochspannung
+  EVIDENCE_YEAR: "2024"
 
 jobs:
   source-schema-probe:
@@ -106,4 +113,82 @@ jobs:
           print(f'integrated_work_kwh={integrated_work}')
           print(f'work_delta_kwh={integrated_work - declared_work}')
           print('non_96_date_counts=' + repr(sorted((day, count) for day, count in date_counts.items() if count != 96)))
+          PY
+
+  real-evaluation:
+    name: real-2024-evaluation-agent-api
+    needs: source-schema-probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[live]"
+      - name: Fetch clean official 2024 high-voltage curve
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 120 \
+            --output /tmp/stromnetz-berlin-2024.csv \
+            "$EVIDENCE_URL"
+          test -s /tmp/stromnetz-berlin-2024.csv
+      - name: Evaluate chronologically and persist matching forecast
+        run: |
+          python scripts/evaluate_energy.py \
+            --input /tmp/stromnetz-berlin-2024.csv \
+            --source-url "$EVIDENCE_URL" \
+            --dataset "Stromnetz Berlin Hochspannungs-Lastkurve 2024" \
+            --published-annual-load-curve \
+            --expected-title "$EVIDENCE_TITLE" \
+            --expected-year "$EVIDENCE_YEAR" \
+            --seasonal-lag 96 \
+            --test-fraction 0.2 \
+            --state /tmp/energy.json | tee /tmp/energy-evaluation.txt
+          test -s /tmp/energy.json
+      - name: Verify persistence, EnergyAgent guards and API exposure
+        env:
+          BUI_RUNTIME_STATE: /tmp/missing-runtime.json
+          BUI_REFERENCE_STATE: /tmp/missing-reference.json
+          BUI_ENERGY_STATE: /tmp/energy.json
+          BUI_DERIVED_STATE: /tmp/missing-derived.json
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+
+          from berlin_urban_intelligence.agents.energy import EnergyAgent
+          from berlin_urban_intelligence.api.app import create_app
+          from berlin_urban_intelligence.energy.state import EnergyStateStore
+
+          state = EnergyStateStore('/tmp/energy.json').load()
+          if state is None:
+              raise SystemExit('persisted energy state was not readable')
+          if not state.forecasts:
+              raise SystemExit('real evaluation did not persist a forecast artifact')
+
+          agent = EnergyAgent()
+          agent.register_berlin_evaluation(state.evaluation)
+          forecast = agent.register_forecast(state.forecasts[0])
+          assert forecast.unit == 'kW'
+          assert forecast.provenance.dataset == 'Stromnetz Berlin Hochspannungs-Lastkurve 2024'
+          assert forecast.provenance.source_url.unicode_string() == '${{ env.EVIDENCE_URL }}'
+          assert state.evaluation.dataset_fingerprint == state.forecasts[0].dataset_fingerprint
+
+          with TestClient(create_app()) as client:
+              response = client.get('/api/v1/energy')
+              assert response.status_code == 200
+              body = response.json()
+              assert body['evaluation']['dataset_fingerprint'] == state.evaluation.dataset_fingerprint
+              assert len(body['forecasts']) == 1
+              assert body['forecasts'][0]['unit'] == 'kW'
+              assert body['forecasts'][0]['provenance']['dataset'] == 'Stromnetz Berlin Hochspannungs-Lastkurve 2024'
+              assert body['health']['freshness'] == 'stale'
+          print('persisted_state=accepted')
+          print('energy_agent=accepted')
+          print('api_energy=visible')
           PY
