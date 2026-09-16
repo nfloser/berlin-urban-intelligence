@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
+from time import perf_counter
 from typing import Any
+from uuid import uuid4
 
 _CONTEXT_FIELDS = (
     "operation_id",
@@ -64,3 +68,40 @@ def structured_log(
     configure_structured_logging()
     safe_context = {key: value for key, value in context.items() if key in _CONTEXT_FIELDS}
     logger.info(message, extra=safe_context)
+
+
+@contextmanager
+def observe_operation(
+    logger: logging.Logger,
+    event: str,
+    *,
+    operation_id: str | None = None,
+    agent: str | None = None,
+    source: str | None = None,
+) -> Iterator[str]:
+    """Emit exactly one duration/error event for an operation boundary.
+
+    ``event`` is a stable low-cardinality event name. Callers may pass an API operation ID to
+    correlate nested work with the request; background work receives an independent UUID. Raw
+    exception messages are never copied into structured context. The exception itself is re-raised
+    unchanged after the event is emitted so normal failure semantics remain intact.
+    """
+
+    correlation_id = operation_id or str(uuid4())
+    started = perf_counter()
+    error_state: str | None = None
+    try:
+        yield correlation_id
+    except Exception as exc:
+        error_state = type(exc).__name__
+        raise
+    finally:
+        structured_log(
+            logger,
+            event,
+            operation_id=correlation_id,
+            agent=agent,
+            source=source,
+            error_state=error_state,
+            duration_ms=round((perf_counter() - started) * 1000.0, 3),
+        )
