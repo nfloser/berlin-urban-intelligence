@@ -6,11 +6,11 @@ column represents time, value, voltage level or unit. Callers must supply the in
 
 from __future__ import annotations
 
+import re
 from calendar import isleap
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from io import StringIO
-import re
 from zoneinfo import ZoneInfo
 
 import pandas as pd
