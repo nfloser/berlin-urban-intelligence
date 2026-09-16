@@ -31,6 +31,7 @@ jobs:
         run: |
           python - <<'PY'
           from collections import Counter
+          from datetime import date, datetime, timedelta
           from hashlib import sha256
           from pathlib import Path
 
@@ -61,6 +62,22 @@ jobs:
           date_counts = Counter(row.split(';', 1)[0] for row in data_rows)
           print(f'unique_dates={len(date_counts)}')
           print('non_96_date_counts=' + repr(sorted((day, count) for day, count in date_counts.items() if count != 96)))
+
+          parsed_dates = {}
+          invalid_dates = []
+          for label in date_counts:
+              try:
+                  parsed_dates[label] = datetime.strptime(label, '%d.%m.%Y').date()
+              except ValueError:
+                  invalid_dates.append(label)
+          expected_dates = {date(2025, 1, 1) + timedelta(days=index) for index in range(365)}
+          actual_2025_dates = {value for value in parsed_dates.values() if value.year == 2025}
+          outside_year = sorted((label, value.isoformat()) for label, value in parsed_dates.items() if value.year != 2025)
+          missing_dates = sorted(value.isoformat() for value in expected_dates - actual_2025_dates)
+          print(f'invalid_date_labels={invalid_dates!r}')
+          print(f'outside_2025_dates={outside_year!r}')
+          print(f'missing_2025_dates={missing_dates!r}')
+
           for day in ('01.01.2025', '02.01.2025', '30.03.2025', '26.10.2025', '31.12.2025'):
               rows = [line for line in data_rows if line.startswith(day + ';')]
               print(f'{day}_row_count={len(rows)}')
