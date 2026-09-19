@@ -1,0 +1,381 @@
+"""Cached, source-backed monitoring routes between Berlin critical facilities."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Literal
+
+import networkx as nx
+from pydantic import BaseModel, ConfigDict, Field
+
+from berlin_urban_intelligence.agents.resilience import snap_facilities_to_network
+from berlin_urban_intelligence.runtime.reference import ReferenceState
+from berlin_urban_intelligence.shared.contracts import (
+    AvailabilityStatus,
+    CriticalFacility,
+    FreshnessStatus,
+    NetworkEdge,
+    NetworkNode,
+    QualityFlag,
+)
+
+
+class CriticalRouteProvenance(BaseModel):
+    """Compact provenance for a derived monitored route."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reference_generated_at: datetime
+    computed_at: datetime
+    source_providers: tuple[str, ...] = ()
+    source_datasets: tuple[str, ...] = ()
+    source_licences: tuple[str, ...] = ()
+    processing_method: str = (
+        "nearest cross-category critical-facility route over persisted weighted road network"
+    )
+    traffic_data_available: Literal[False] = False
+
+
+class CriticalRoute(BaseModel):
+    """One automatically monitored critical-facility connection."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(min_length=1)
+    origin_facility_id: str = Field(min_length=1)
+    origin_name: str = Field(min_length=1)
+    origin_category: str = Field(min_length=1)
+    destination_facility_id: str = Field(min_length=1)
+    destination_name: str = Field(min_length=1)
+    destination_category: str = Field(min_length=1)
+    travel_time_s: float = Field(gt=0)
+    length_m: float = Field(gt=0)
+    node_path: tuple[str, ...]
+    edge_ids: tuple[str, ...]
+    geometry: dict[str, object]
+    quality: QualityFlag
+    freshness: FreshnessStatus = FreshnessStatus.UNKNOWN
+    route_state: Literal["baseline"] = "baseline"
+    provenance: CriticalRouteProvenance
+
+
+class CriticalRouteSnapshot(BaseModel):
+    """Reference-snapshot-bound route monitor result."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    computed_at: datetime
+    reference_generated_at: datetime | None
+    status: AvailabilityStatus
+    freshness: FreshnessStatus = FreshnessStatus.UNKNOWN
+    quality: QualityFlag
+    routes: tuple[CriticalRoute, ...] = ()
+    unsnapped_facility_ids: tuple[str, ...] = ()
+    unreachable_facility_ids: tuple[str, ...] = ()
+    source_errors: dict[str, str] = Field(default_factory=dict)
+    traffic_data_available: Literal[False] = False
+    note: str
+
+
+class CriticalRouteMonitor:
+    """Derive a bounded-query-friendly route snapshot once per reference snapshot.
+
+    Every snapped facility is routed to its nearest facility in another category. A multi-source
+    Dijkstra search per origin category keeps the work bounded by the number of categories rather
+    than running a complete shortest-path search for every possible facility pair.
+    """
+
+    def __init__(
+        self,
+        reference: ReferenceState | None,
+        *,
+        max_snap_distance_m: float = 1000.0,
+        now_factory: Callable[[], datetime] | None = None,
+    ) -> None:
+        if max_snap_distance_m <= 0 or max_snap_distance_m > 50_000:
+            raise ValueError("max_snap_distance_m must be greater than zero and at most 50000")
+        self._reference = reference
+        self._max_snap_distance_m = max_snap_distance_m
+        self._now_factory = now_factory or (lambda: datetime.now(UTC))
+
+    @staticmethod
+    def _build_graph(edges: tuple[NetworkEdge, ...]) -> nx.MultiDiGraph[str]:
+        graph: nx.MultiDiGraph[str] = nx.MultiDiGraph()
+        for item in edges:
+            graph.add_edge(
+                item.source,
+                item.target,
+                key=item.id,
+                id=item.id,
+                travel_time_s=item.travel_time_s,
+                length_m=item.length_m,
+                edge=item,
+            )
+            if item.bidirectional:
+                graph.add_edge(
+                    item.target,
+                    item.source,
+                    key=item.id,
+                    id=item.id,
+                    travel_time_s=item.travel_time_s,
+                    length_m=item.length_m,
+                    edge=item,
+                )
+        return graph
+
+    @staticmethod
+    def _facility_name(facility: CriticalFacility) -> str:
+        return facility.name or facility.id
+
+    @staticmethod
+    def _route_geometry(
+        node_path: tuple[str, ...],
+        nodes: dict[str, NetworkNode],
+    ) -> dict[str, object] | None:
+        coordinates: list[list[float]] = []
+        for node_id in node_path:
+            item = nodes.get(node_id)
+            if item is None or item.longitude is None or item.latitude is None:
+                return None
+            coordinates.append([item.longitude, item.latitude])
+        if len(coordinates) < 2:
+            return None
+        return {"type": "LineString", "coordinates": coordinates}
+
+    @staticmethod
+    def _path_edges(
+        graph: nx.MultiDiGraph[str],
+        node_path: tuple[str, ...],
+    ) -> tuple[tuple[str, ...], float, float, tuple[NetworkEdge, ...]]:
+        edge_ids: list[str] = []
+        travel_time_s = 0.0
+        length_m = 0.0
+        source_edges: list[NetworkEdge] = []
+        for source, target in zip(node_path, node_path[1:], strict=False):
+            candidates = graph.get_edge_data(source, target)
+            if not candidates:
+                raise RuntimeError("critical route references a missing graph edge")
+            _, data = min(
+                candidates.items(),
+                key=lambda item: (float(item[1]["travel_time_s"]), str(item[0])),
+            )
+            edge_ids.append(str(data["id"]))
+            travel_time_s += float(data["travel_time_s"])
+            length_m += float(data["length_m"])
+            source_edge = data.get("edge")
+            if isinstance(source_edge, NetworkEdge):
+                source_edges.append(source_edge)
+        return tuple(edge_ids), travel_time_s, length_m, tuple(source_edges)
+
+    @staticmethod
+    def _route_provenance(
+        *,
+        reference_generated_at: datetime,
+        computed_at: datetime,
+        origin: CriticalFacility,
+        destination: CriticalFacility,
+        edges: tuple[NetworkEdge, ...],
+    ) -> CriticalRouteProvenance:
+        providers: set[str] = set()
+        datasets: set[str] = set()
+        licences: set[str] = set()
+        for provenance in [
+            origin.provenance,
+            destination.provenance,
+            *(item.provenance for item in edges),
+        ]:
+            if provenance is None:
+                continue
+            providers.add(provenance.provider)
+            datasets.add(provenance.dataset)
+            if provenance.source_licence:
+                licences.add(provenance.source_licence)
+        return CriticalRouteProvenance(
+            reference_generated_at=reference_generated_at,
+            computed_at=computed_at,
+            source_providers=tuple(sorted(providers)),
+            source_datasets=tuple(sorted(datasets)),
+            source_licences=tuple(sorted(licences)),
+        )
+
+    def _unavailable(self, *, computed_at: datetime, note: str) -> CriticalRouteSnapshot:
+        reference = self._reference
+        return CriticalRouteSnapshot(
+            computed_at=computed_at,
+            reference_generated_at=reference.generated_at if reference else None,
+            status=AvailabilityStatus.UNAVAILABLE,
+            quality=QualityFlag.UNKNOWN,
+            source_errors=dict(reference.errors) if reference else {},
+            note=note,
+        )
+
+    def build(self) -> CriticalRouteSnapshot:
+        computed_at = self._now_factory().astimezone(UTC)
+        reference = self._reference
+        if reference is None:
+            return self._unavailable(
+                computed_at=computed_at,
+                note=(
+                    "Critical routes are unavailable because no persisted reference snapshot is "
+                    "loaded. No live traffic or synthetic route data is substituted."
+                ),
+            )
+        if not reference.network_nodes or not reference.network_edges:
+            return self._unavailable(
+                computed_at=computed_at,
+                note=(
+                    "Critical routes are unavailable because the persisted road network is missing. "
+                    "No live traffic or synthetic route data is substituted."
+                ),
+            )
+        if len(reference.critical_facilities) < 2:
+            return self._unavailable(
+                computed_at=computed_at,
+                note=(
+                    "Critical routes require at least two persisted critical facilities. "
+                    "No live traffic or synthetic facility data is substituted."
+                ),
+            )
+
+        links = snap_facilities_to_network(
+            reference.critical_facilities,
+            reference.network_nodes,
+            max_distance_m=self._max_snap_distance_m,
+        )
+        links_by_facility = {item.facility_id: item for item in links}
+        facilities = {item.id: item for item in reference.critical_facilities}
+        nodes = {item.id: item for item in reference.network_nodes}
+        unsnapped = tuple(
+            sorted(item.id for item in reference.critical_facilities if item.id not in links_by_facility)
+        )
+        graph = self._build_graph(reference.network_edges)
+        reverse_graph = graph.reverse(copy=False)
+
+        links_by_category: dict[str, list[tuple[CriticalFacility, str]]] = {}
+        facilities_by_node: dict[str, list[CriticalFacility]] = {}
+        for facility_id, link in links_by_facility.items():
+            facility = facilities[facility_id]
+            links_by_category.setdefault(facility.category, []).append((facility, link.node_id))
+            facilities_by_node.setdefault(link.node_id, []).append(facility)
+        for items in facilities_by_node.values():
+            items.sort(key=lambda item: item.id)
+
+        routes: list[CriticalRoute] = []
+        unreachable: set[str] = set()
+        categories = sorted(links_by_category)
+        for origin_category in categories:
+            target_links = [
+                (facility, node_id)
+                for category, items in links_by_category.items()
+                if category != origin_category
+                for facility, node_id in items
+            ]
+            if not target_links:
+                unreachable.update(facility.id for facility, _ in links_by_category[origin_category])
+                continue
+            target_node_ids = sorted({node_id for _, node_id in target_links})
+            _, reverse_paths = nx.multi_source_dijkstra(
+                reverse_graph,
+                sources=target_node_ids,
+                weight="travel_time_s",
+            )
+            allowed_target_ids = {facility.id for facility, _ in target_links}
+            for origin, origin_node_id in sorted(
+                links_by_category[origin_category],
+                key=lambda item: item[0].id,
+            ):
+                reverse_path = reverse_paths.get(origin_node_id)
+                if not reverse_path or len(reverse_path) < 2:
+                    unreachable.add(origin.id)
+                    continue
+                target_node_id = str(reverse_path[0])
+                target_candidates = [
+                    facility
+                    for facility in facilities_by_node.get(target_node_id, [])
+                    if facility.id in allowed_target_ids and facility.category != origin.category
+                ]
+                if not target_candidates:
+                    unreachable.add(origin.id)
+                    continue
+                destination = min(target_candidates, key=lambda item: item.id)
+                node_path = tuple(str(item) for item in reversed(reverse_path))
+                geometry = self._route_geometry(node_path, nodes)
+                if geometry is None:
+                    unreachable.add(origin.id)
+                    continue
+                edge_ids, travel_time_s, length_m, source_edges = self._path_edges(graph, node_path)
+                if travel_time_s <= 0 or length_m <= 0:
+                    unreachable.add(origin.id)
+                    continue
+                quality = (
+                    QualityFlag.PARTIAL
+                    if reference.errors
+                    or origin.quality is not QualityFlag.VALID
+                    or destination.quality is not QualityFlag.VALID
+                    else QualityFlag.VALID
+                )
+                routes.append(
+                    CriticalRoute(
+                        id=f"critical-route:{origin.id}:{destination.id}",
+                        origin_facility_id=origin.id,
+                        origin_name=self._facility_name(origin),
+                        origin_category=origin.category,
+                        destination_facility_id=destination.id,
+                        destination_name=self._facility_name(destination),
+                        destination_category=destination.category,
+                        travel_time_s=travel_time_s,
+                        length_m=length_m,
+                        node_path=node_path,
+                        edge_ids=edge_ids,
+                        geometry=geometry,
+                        quality=quality,
+                        provenance=self._route_provenance(
+                            reference_generated_at=reference.generated_at,
+                            computed_at=computed_at,
+                            origin=origin,
+                            destination=destination,
+                            edges=source_edges,
+                        ),
+                    )
+                )
+
+        routes.sort(
+            key=lambda item: (
+                item.origin_category,
+                item.origin_name.casefold(),
+                item.origin_facility_id,
+                item.destination_facility_id,
+            )
+        )
+        if not routes:
+            return CriticalRouteSnapshot(
+                computed_at=computed_at,
+                reference_generated_at=reference.generated_at,
+                status=AvailabilityStatus.UNAVAILABLE,
+                quality=QualityFlag.UNKNOWN,
+                unsnapped_facility_ids=unsnapped,
+                unreachable_facility_ids=tuple(sorted(unreachable)),
+                source_errors=dict(reference.errors),
+                note=(
+                    "No cross-category critical-facility route can be resolved from the persisted "
+                    "road network. No live traffic or synthetic topology is substituted."
+                ),
+            )
+
+        degraded = bool(reference.errors or unsnapped or unreachable)
+        return CriticalRouteSnapshot(
+            computed_at=computed_at,
+            reference_generated_at=reference.generated_at,
+            status=AvailabilityStatus.DEGRADED if degraded else AvailabilityStatus.AVAILABLE,
+            quality=QualityFlag.PARTIAL if degraded else QualityFlag.VALID,
+            routes=tuple(routes),
+            unsnapped_facility_ids=unsnapped,
+            unreachable_facility_ids=tuple(sorted(unreachable)),
+            source_errors=dict(reference.errors),
+            note=(
+                "Routes are recomputed from the current persisted weighted road/reference snapshot. "
+                "No live traffic telemetry is integrated; traffic_data_available=false prevents "
+                "baseline road weights from being presented as Google-style congestion data."
+            ),
+        )
