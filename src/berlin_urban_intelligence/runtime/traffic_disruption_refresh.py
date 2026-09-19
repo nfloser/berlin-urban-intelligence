@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from berlin_urban_intelligence.adapters.viz_road_disruptions import (
@@ -25,10 +25,14 @@ class TrafficDisruptionRefreshCoordinator:
         client: Any | None = None,
         adapter: VizRoadDisruptionAdapter | None = None,
         now_factory: Callable[[], datetime] | None = None,
+        content_freshness_threshold: timedelta = timedelta(hours=72),
     ) -> None:
+        if content_freshness_threshold <= timedelta(0):
+            raise ValueError("content_freshness_threshold must be positive")
         self.client = client or VizRoadDisruptionClient()
         self.adapter = adapter or VizRoadDisruptionAdapter()
         self.now_factory = now_factory or (lambda: datetime.now(UTC))
+        self.content_freshness_threshold = content_freshness_threshold
 
     @staticmethod
     def _error_code(exc: Exception) -> str:
@@ -62,6 +66,9 @@ class TrafficDisruptionRefreshCoordinator:
                 source_id=SOURCE_ID,
                 disruptions=previous_state.disruptions if previous_state else (),
                 last_success_at=previous_state.last_success_at if previous_state else None,
+                latest_source_update_at=(
+                    previous_state.latest_source_update_at if previous_state else None
+                ),
                 source_error=self._error_code(exc),
                 freshness=(
                     FreshnessStatus.STALE
@@ -70,11 +77,26 @@ class TrafficDisruptionRefreshCoordinator:
                 ),
             )
 
+        latest_source_update_at = max(
+            (item.source_updated_at for item in disruptions),
+            default=None,
+        )
+        if latest_source_update_at is None:
+            freshness = FreshnessStatus.UNKNOWN
+        else:
+            content_age = now - latest_source_update_at
+            freshness = (
+                FreshnessStatus.VALID
+                if -timedelta(minutes=5) <= content_age <= self.content_freshness_threshold
+                else FreshnessStatus.STALE
+            )
+
         return TrafficDisruptionState(
             generated_at=now,
             source_id=SOURCE_ID,
             disruptions=disruptions,
             last_success_at=now,
+            latest_source_update_at=latest_source_update_at,
             source_error=None,
-            freshness=FreshnessStatus.VALID,
+            freshness=freshness,
         )
