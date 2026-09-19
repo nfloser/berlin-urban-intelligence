@@ -225,8 +225,8 @@ class CriticalRouteMonitor:
             return self._unavailable(
                 computed_at=computed_at,
                 note=(
-                    "Critical routes are unavailable because the persisted road network is missing. "
-                    "No live traffic or synthetic route data is substituted."
+                    "Critical routes are unavailable because the persisted road network "
+                    "is missing. No live traffic or synthetic route data is substituted."
                 ),
             )
         if len(reference.critical_facilities) < 2:
@@ -387,8 +387,9 @@ class CriticalRouteMonitor:
             unreachable_facility_ids=tuple(sorted(unreachable)),
             source_errors=dict(reference.errors),
             note=(
-                "Routes are recomputed from the current persisted weighted road/reference snapshot. "
-                "No live traffic telemetry is integrated; traffic_data_available=false prevents "
+                "Routes are recomputed from the current persisted weighted road/reference "
+                "snapshot. No live traffic telemetry is integrated; "
+                "traffic_data_available=false prevents "
                 "baseline road weights from being presented as Google-style congestion data."
             ),
         )
