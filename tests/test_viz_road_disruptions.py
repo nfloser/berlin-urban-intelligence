@@ -13,7 +13,7 @@ from berlin_urban_intelligence.runtime.traffic_disruptions import (
 )
 
 RETRIEVED_AT = datetime(2026, 9, 19, 16, 15, tzinfo=UTC)
-SOURCE_URL = "https://api.viz.berlin.de/daten/baustellen_sperrungen.json"
+SOURCE_URL = "https://api.viz.berlin.de/daten/baustellen_sperrungen_viz.json"
 
 
 def sample_feature_collection() -> dict[str, object]:
@@ -37,8 +37,8 @@ def sample_feature_collection() -> dict[str, object]:
                     "subtype": "Sperrung",
                     "severity": "Vollsperrung",
                     "validity": {
-                        "from": "19.09.2026 16:00",
-                        "to": "20.09.2026 20:00",
+                        "from": "2026-09-19T16:00",
+                        "to": "2026-09-20T20:00",
                     },
                     "tstore": "2026-09-19T14:05:00Z",
                     "street": "Behrenstraße",
@@ -58,8 +58,8 @@ def sample_feature_collection() -> dict[str, object]:
                     "subtype": "Baustelle",
                     "severity": "keine Sperrung",
                     "validity": {
-                        "from": "19.09.2026 17:00",
-                        "to": "21.09.2026 18:00",
+                        "from": "2026-09-19T17:00",
+                        "to": "2026-09-21T18:00",
                     },
                     "tstore": "2026-09-19T15:01:00Z",
                     "street": "Alexanderstraße",
@@ -118,8 +118,8 @@ def test_adapter_rejects_semantic_schema_drift() -> None:
 def test_adapter_rejects_invalid_or_missing_validity() -> None:
     payload = sample_feature_collection()
     payload["features"][0]["properties"]["validity"] = {
-        "from": "20.09.2026 22:00",
-        "to": "19.09.2026 22:00",
+        "from": "2026-09-20T22:00",
+        "to": "2026-09-19T22:00",
     }
 
     with pytest.raises((ValueError, ValidationError)):
@@ -150,3 +150,19 @@ def test_traffic_disruption_state_roundtrips_atomically(tmp_path: Path) -> None:
     assert loaded == state
     assert path.exists()
     assert not path.with_suffix(".json.tmp").exists()
+
+
+def test_adapter_accepts_landesmeldestelle_german_local_time_variant() -> None:
+    payload = sample_feature_collection()
+    payload["features"][0]["properties"]["validity"] = {
+        "from": "19.09.2026 16:00",
+        "to": "20.09.2026 20:00",
+    }
+
+    disruptions = VizRoadDisruptionAdapter().parse(
+        payload,
+        retrieved_at=RETRIEVED_AT,
+        source_url="https://api.viz.berlin.de/tic3/baustellen_sperrungen_tic.json",
+    )
+
+    assert disruptions[0].valid_from == datetime(2026, 9, 19, 14, 0, tzinfo=UTC)
