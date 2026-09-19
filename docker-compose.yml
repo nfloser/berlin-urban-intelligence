@@ -8,6 +8,8 @@ services:
       BUI_REFERENCE_STATE: /app/data/runtime/reference.json
       BUI_ENERGY_STATE: /app/data/runtime/energy.json
       BUI_DERIVED_STATE: /app/data/runtime/derived.json
+      BUI_TRAFFIC_DISRUPTION_STATE: /app/data/runtime/traffic-disruptions.json
+      BUI_TRAFFIC_DISRUPTION_STATE: /app/data/runtime/traffic-disruptions.json
       BUI_SOURCE_REGISTRY: /app/config/sources.yaml
     volumes:
       - ./data:/app/data
@@ -38,6 +40,7 @@ services:
     environment:
       BUI_RUNTIME_STATE: /app/data/runtime/state.json
       BUI_DERIVED_STATE: /app/data/runtime/derived.json
+      BUI_TRAFFIC_DISRUPTION_STATE: /app/data/runtime/traffic-disruptions.json
     volumes:
       - ./data:/app/data
     security_opt:
@@ -51,6 +54,8 @@ services:
         "/app/data/runtime/state.json",
         "--derived",
         "/app/data/runtime/derived.json",
+        "--traffic-disruptions",
+        "/app/data/runtime/traffic-disruptions.json",
         "--rdf",
         "/app/data/generated/latest.ttl",
         "--interval-seconds",
