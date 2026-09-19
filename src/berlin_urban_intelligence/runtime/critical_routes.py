@@ -10,6 +10,7 @@ import networkx as nx
 from pydantic import BaseModel, ConfigDict, Field
 from pyproj import Transformer
 from shapely.geometry import shape
+from shapely.geometry.base import BaseGeometry
 from shapely.ops import transform as shapely_transform
 
 from berlin_urban_intelligence.agents.resilience import snap_facilities_to_network
@@ -231,7 +232,7 @@ class CriticalRouteMonitor:
         )
 
     @staticmethod
-    def _metric_shape(geometry: dict[str, object]):
+    def _metric_shape(geometry: dict[str, object]) -> BaseGeometry:
         return shapely_transform(_TO_METRIC, shape(geometry))
 
     @staticmethod
@@ -276,7 +277,9 @@ class CriticalRouteMonitor:
     ) -> bool:
         route_shape = self._metric_shape(route_geometry)
         disruption_shape = self._metric_shape(disruption.spatial.geometry or {})
-        return route_shape.distance(disruption_shape) <= self._disruption_match_distance_m
+        return bool(
+            route_shape.distance(disruption_shape) <= self._disruption_match_distance_m
+        )
 
     def _closed_edge_ids(
         self,
