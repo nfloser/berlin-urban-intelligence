@@ -280,7 +280,9 @@ class CriticalRouteMonitor:
                     facility.id for facility, _ in links_by_category[origin_category]
                 )
                 continue
-            target_node_ids = sorted({node_id for _, node_id in target_links if node_id in reverse_graph})
+            target_node_ids = sorted(
+                {node_id for _, node_id in target_links if node_id in reverse_graph}
+            )
             if not target_node_ids:
                 unreachable.update(
                     facility.id for facility, _ in links_by_category[origin_category]
