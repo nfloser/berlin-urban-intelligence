@@ -319,6 +319,15 @@ function App() {
       upsert("route-baseline", baselineRouteData);
       upsert("route-scenario", scenarioRouteData);
       upsert("route-selection", selectionData);
+      if (!map.getSource("critical-routes")) {
+        map.addSource("critical-routes", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
+      }
+      if (!map.getSource("critical-route-selected")) {
+        map.addSource("critical-route-selected", {
+          type: "geojson",
+          data: EMPTY_FEATURE_COLLECTION,
+        });
+      }
 
       if (!map.getLayer("climate-fill")) {
         map.addLayer({
@@ -380,6 +389,30 @@ function App() {
             "circle-opacity": 0.3,
             "circle-stroke-color": "#f0c75e",
             "circle-stroke-width": 3,
+          },
+        });
+      }
+      if (!map.getLayer("critical-routes-line")) {
+        map.addLayer({
+          id: "critical-routes-line",
+          type: "line",
+          source: "critical-routes",
+          paint: {
+            "line-color": "#4ea5d9",
+            "line-width": 5,
+            "line-opacity": 0.78,
+          },
+        });
+      }
+      if (!map.getLayer("critical-route-selected-line")) {
+        map.addLayer({
+          id: "critical-route-selected-line",
+          type: "line",
+          source: "critical-route-selected",
+          paint: {
+            "line-color": "#f0c75e",
+            "line-width": 8,
+            "line-opacity": 0.96,
           },
         });
       }
@@ -452,17 +485,23 @@ function App() {
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || loadState !== "ready") return;
+
+    const routeSource = map.getSource("critical-routes") as GeoJSONSource | undefined;
+    const selectedSource = map.getSource("critical-route-selected") as GeoJSONSource | undefined;
     if (
-      !map ||
-      loadState !== "ready" ||
-      criticalRoutes === null ||
-      (!mapLayersReady && mapDataError === null)
-    )
+      !routeSource ||
+      !selectedSource ||
+      !map.getLayer("critical-routes-line") ||
+      !map.getLayer("critical-route-selected-line")
+    ) {
+      setCriticalRouteLayerReady(false);
       return;
+    }
 
     const criticalRouteData: FeatureCollection = {
       type: "FeatureCollection",
-      features: criticalRoutes.routes.map((route) => ({
+      features: (criticalRoutes?.routes ?? []).map((route) => ({
         type: "Feature",
         id: route.id,
         properties: { route_id: route.id },
@@ -482,84 +521,29 @@ function App() {
           ]
         : [],
     };
-    const lineColor = criticalRoutes.status === "degraded" ? "#e3bd71" : "#4ea5d9";
 
-    const installCriticalRouteLayers = () => {
-      if (!map.isStyleLoaded()) return;
-      const upsert = (id: string, data: FeatureCollection) => {
-        const source = map.getSource(id) as GeoJSONSource | undefined;
-        if (source) source.setData(data);
-        else map.addSource(id, { type: "geojson", data });
-      };
-      upsert("critical-routes", criticalRouteData);
-      upsert("critical-route-selected", selectedCriticalRouteData);
-
-      if (!map.getLayer("critical-routes-line")) {
-        map.addLayer({
-          id: "critical-routes-line",
-          type: "line",
-          source: "critical-routes",
-          paint: {
-            "line-color": lineColor,
-            "line-width": 5,
-            "line-opacity": 0.78,
-          },
-        });
-      } else {
-        map.setPaintProperty("critical-routes-line", "line-color", lineColor);
-      }
-      if (!map.getLayer("critical-route-selected-line")) {
-        map.addLayer({
-          id: "critical-route-selected-line",
-          type: "line",
-          source: "critical-route-selected",
-          paint: {
-            "line-color": "#f0c75e",
-            "line-width": 8,
-            "line-opacity": 0.96,
-          },
-        });
-      }
-      map.setLayoutProperty(
-        "critical-routes-line",
-        "visibility",
-        criticalRoutesVisible ? "visible" : "none",
-      );
-      map.setLayoutProperty(
-        "critical-route-selected-line",
-        "visibility",
-        criticalRoutesVisible ? "visible" : "none",
-      );
-      setCriticalRouteLayerReady(true);
-    };
-
-    if (mapLayersReady) {
-      installCriticalRouteLayers();
-      return;
-    }
-
-    const installCriticalRouteLayersWhenReady = () => {
-      if (!map.isStyleLoaded()) return;
-      installCriticalRouteLayers();
-      map.off("styledata", installCriticalRouteLayersWhenReady);
-      map.off("load", installCriticalRouteLayersWhenReady);
-    };
-
-    installCriticalRouteLayersWhenReady();
-    if (!map.isStyleLoaded()) {
-      map.on("styledata", installCriticalRouteLayersWhenReady);
-      map.on("load", installCriticalRouteLayersWhenReady);
-    }
-
-    return () => {
-      map.off("styledata", installCriticalRouteLayersWhenReady);
-      map.off("load", installCriticalRouteLayersWhenReady);
-    };
+    routeSource.setData(criticalRouteData);
+    selectedSource.setData(selectedCriticalRouteData);
+    map.setPaintProperty(
+      "critical-routes-line",
+      "line-color",
+      criticalRoutes?.status === "degraded" ? "#e3bd71" : "#4ea5d9",
+    );
+    map.setLayoutProperty(
+      "critical-routes-line",
+      "visibility",
+      criticalRoutesVisible ? "visible" : "none",
+    );
+    map.setLayoutProperty(
+      "critical-route-selected-line",
+      "visibility",
+      criticalRoutesVisible ? "visible" : "none",
+    );
+    setCriticalRouteLayerReady(true);
   }, [
     criticalRoutes,
     criticalRoutesVisible,
     loadState,
-    mapDataError,
     mapLayersReady,
     selectedCriticalRoute,
   ]);
