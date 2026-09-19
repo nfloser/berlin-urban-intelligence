@@ -12,6 +12,7 @@ def test_registry_has_unique_verified_domain_sources() -> None:
     assert "vbb_gtfs_rt" in ids
     assert "dwd_open_data" in ids
     assert "stromnetz_berlin_grid_load" in ids
+    assert "berlin_viz_road_disruptions" in ids
 
 
 def test_non_berlin_energy_reference_is_explicitly_not_operational() -> None:
