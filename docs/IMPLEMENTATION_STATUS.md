@@ -26,7 +26,7 @@ The implementation now:
 
 The current route monitor does **not** integrate verified real-time road congestion telemetry. Every response exposes `traffic_data_available=false`, and the dashboard explicitly labels current route costs as baseline persisted road weights. A future verified traffic source may update route costs through the same contract without relabelling baseline data as live traffic.
 
-Deterministic tests cover normal routing, exact geometry/travel-time/length reconstruction, provenance, source-error degradation, missing-input unavailability, isolated-node degradation, bounded API behavior and recomputation after reference-snapshot replacement. Composed browser acceptance verifies automatic route rendering and keyboard inspection from persisted state.
+Deterministic tests cover normal routing, exact geometry/travel-time/length reconstruction, provenance, source-error degradation, missing-input unavailability, isolated-node degradation, bounded API behavior and recomputation after reference-snapshot replacement. Implementation head `ad3b51a0ad8790c8406f9e6e2d4f447a0ce2b3e2` passed protected CI run `35453388036` across backend, frontend and containers; the composed nginx → FastAPI → persisted state → React/MapLibre acceptance path passed **10/10** Playwright cases. Independent real-energy run `35453388101` also passed on that head. The documentation-only head must retain the protected checks before merge.
 
 ## Verified v1 evidence baseline
 
