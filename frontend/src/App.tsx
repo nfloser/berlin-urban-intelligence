@@ -9,7 +9,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   type AssessmentResponse,
   type CriticalFacility,
-  type CriticalRoute,
   type CriticalRouteSnapshotResponse,
   type EnergyResponse,
   type Health,
@@ -91,6 +90,7 @@ function App() {
   const [mapSelection, setMapSelection] = useState<MapSelection | null>(null);
   const [mapSelectionError, setMapSelectionError] = useState<string | null>(null);
   const [mapLayersReady, setMapLayersReady] = useState(false);
+  const [criticalRouteLayerReady, setCriticalRouteLayerReady] = useState(false);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [selectedObservationId, setSelectedObservationId] = useState<string | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowKind>("urban_snapshot");
@@ -474,6 +474,7 @@ function App() {
       setVisibility("climate-fill", visibleLayers.climate);
       setVisibility("critical-routes-line", criticalRoutesVisible);
       setVisibility("critical-route-selected-line", criticalRoutesVisible);
+      setCriticalRouteLayerReady(map.getLayer("critical-routes-line") !== undefined);
       setMapLayersReady(referenceMap !== null);
     };
 
@@ -785,6 +786,8 @@ function App() {
             aria-label="Berlin domain map"
             data-reference-layers-ready={mapLayersReady ? "true" : "false"}
             data-reference-map-truncated={referenceMapTruncated ? "true" : "false"}
+            data-critical-routes-ready={criticalRouteLayerReady ? "true" : "false"}
+            data-critical-routes-count={criticalRoutes?.returned ?? 0}
           />
           <div className="legend">
             <strong>Reference layers</strong>
