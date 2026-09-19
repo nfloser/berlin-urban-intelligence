@@ -40,6 +40,10 @@ from berlin_urban_intelligence.orchestrator.engine import (
     OrchestrationRequest,
     Orchestrator,
 )
+from berlin_urban_intelligence.runtime.critical_routes import (
+    CriticalRouteMonitor,
+    CriticalRouteSnapshot,
+)
 from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedStateStore
 from berlin_urban_intelligence.runtime.reference import ReferenceState, ReferenceStateStore
 from berlin_urban_intelligence.runtime.reload import ReloadingSnapshot
@@ -163,6 +167,7 @@ class _ApiStateController:
             derived_path, DerivedStateStore(derived_path).load
         )
         self._lock = RLock()
+        self._critical_routes: CriticalRouteSnapshot | None = None
 
     def initialize(self, app: FastAPI) -> None:
         with self._lock:
@@ -170,18 +175,16 @@ class _ApiStateController:
             self._reference.refresh(force=True)
             self._energy.refresh(force=True)
             self._derived.refresh(force=True)
-            self._apply(app)
+            self._apply(app, reference_changed=True)
 
     def refresh(self, app: FastAPI) -> None:
         with self._lock:
-            changed = [
-                self._runtime.refresh(),
-                self._reference.refresh(),
-                self._energy.refresh(),
-                self._derived.refresh(),
-            ]
-            if any(changed):
-                self._apply(app)
+            runtime_changed = self._runtime.refresh()
+            reference_changed = self._reference.refresh()
+            energy_changed = self._energy.refresh()
+            derived_changed = self._derived.refresh()
+            if any((runtime_changed, reference_changed, energy_changed, derived_changed)):
+                self._apply(app, reference_changed=reference_changed)
 
     def diagnostics(self) -> dict[str, object]:
         with self._lock:
@@ -192,11 +195,14 @@ class _ApiStateController:
                 "derived": self._derived.diagnostic.model_dump(mode="json"),
             }
 
-    def _apply(self, app: FastAPI) -> None:
+    def _apply(self, app: FastAPI, *, reference_changed: bool) -> None:
+        if reference_changed or self._critical_routes is None:
+            self._critical_routes = CriticalRouteMonitor(self._reference.value).build()
         app.state.runtime = self._runtime.value
         app.state.reference = self._reference.value
         app.state.energy_state = self._energy.value
         app.state.derived = self._derived.value
+        app.state.critical_routes = self._critical_routes
         app.state.agents = _build_agents(
             self._runtime.value,
             self._reference.value,
@@ -466,6 +472,26 @@ def create_app() -> FastAPI:
             )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=f"DERIVATION_FAILED: {exc}") from None
+
+    @app.get("/api/v1/resilience/critical-routes")
+    def critical_routes(
+        request: Request,
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=48, ge=1, le=250),
+    ) -> dict[str, object]:
+        snapshot: CriticalRouteSnapshot = request.app.state.critical_routes
+        route_count_total = len(snapshot.routes)
+        routes = _slice(snapshot.routes, offset, limit)
+        body = snapshot.model_dump(mode="json", exclude={"routes"})
+        body.update(
+            {
+                "route_count_total": route_count_total,
+                "returned": len(routes),
+                "truncated": offset + len(routes) < route_count_total,
+                "routes": [route.model_dump(mode="json") for route in routes],
+            }
+        )
+        return body
 
     @app.post("/api/v1/resilience/routes")
     def route(request: Request, payload: RouteRequest) -> dict[str, object]:

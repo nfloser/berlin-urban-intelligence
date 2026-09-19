@@ -15,6 +15,7 @@ Berlin Urban Intelligence is a research-oriented urban intelligence and digital-
 - [Structured observability](observability.md) — operation event names, safe fields, correlation semantics and noise policy.
 - [Real Berlin energy evidence](energy-real-evidence.md) — official source validation, chronological evaluation, measured metrics and claim boundaries.
 - [Real Berlin road-network evidence](road-network-verification.md) — strict live OSM readiness/routing evidence and provider-failure semantics.
+- [Dynamic critical-route monitoring](critical-route-monitoring.md) — automatic critical-facility routing, map refresh, provenance and the explicit no-live-traffic boundary.
 - [Cross-domain workflows](evaluation/cross-domain-workflows.md) — verified descriptive multi-domain products, provenance/freshness semantics and scientific claim boundaries.
 - [Performance baseline](performance.md) — reproducible latency/memory evidence, bounded map behavior and scaling limits.
 - [Accessibility baseline](accessibility.md) — automated keyboard/Axe acceptance, non-pointer routing and the manual release checklist.
@@ -51,7 +52,7 @@ Research documentation records assumptions, reproducibility boundaries, current 
 
 ## Current implementation status
 
-Version 1.0.0 includes canonical Pydantic contracts, configured source adapters, six domain/aggregation agents, live/reference acquisition, persisted runtime/reference/energy/derived state, leakage-safe energy evaluation and forecasting, resilience calculations, explicit scenarios, registry/capability-driven deterministic orchestration, first-class derivations/dependencies, RDF/semantic relationship projection, a FastAPI API, a React/MapLibre dashboard, structured observability and protected CI/container/browser acceptance.
+The stable v1.0.0 baseline includes canonical Pydantic contracts, configured source adapters, six domain/aggregation agents, live/reference acquisition, persisted runtime/reference/energy/derived state, leakage-safe energy evaluation and forecasting, resilience calculations, explicit scenarios, registry/capability-driven deterministic orchestration, first-class derivations/dependencies, RDF/semantic relationship projection, a FastAPI API, a React/MapLibre dashboard, structured observability and protected CI/container/browser acceptance. Current post-v1 development additionally includes automatic snapshot-bound critical-route monitoring and persistent MapLibre route visualization; see [dynamic critical-route monitoring](critical-route-monitoring.md).
 
 Some capabilities remain conditional on source data. Energy forecasts require an evaluated matching Berlin-scoped dataset artefact; the reproducible v1 evidence uses the clean official 2024 Stromnetz Berlin high-voltage curve and correctly treats the result as historical. Cross-domain derived products are emitted only when their required persisted source-backed inputs exist and retain source-specific timestamps/freshness. Resilience routing requires a persisted network snapshot; optional OSM acquisition has successful point-in-time real Berlin readiness evidence but remains provider-dependent.
 

@@ -49,6 +49,8 @@ def test_acceptance_fixture_cli_persists_all_expected_state_files(tmp_path: Path
     assert reference is not None
     assert runtime is not None
     assert derived is not None
+    assert len(reference.critical_facilities) == 2
+    assert {item.category for item in reference.critical_facilities} == {"hospital", "fire_station"}
     assert len(reference.network_nodes) == 3
     assert len(reference.network_edges) == 3
     assert len(runtime.source_statuses) == 1

@@ -22,7 +22,7 @@ Berlin Urban Intelligence makes those distinctions part of the executable data c
 
 ## Key capabilities
 
-| Area | Version 1.0.0 implementation |
+| Area | Current implementation |
 |---|---|
 | Canonical contracts | Frozen Pydantic models with explicit epistemic/data state, quality, UTC time, units, CRS and provenance. |
 | Live acquisition | Independent Berlin air-quality, DWD and VBB GTFS-Realtime refresh with source status, last-known-good semantics and a configurable persisted-state worker. |
@@ -33,6 +33,7 @@ Berlin Urban Intelligence makes those distinctions part of the executable data c
 | Cross-domain workflows | Verified Heat + Air Quality and Mobility + Air Quality descriptive products with independent timestamps, explicit non-causal interpretation and no universal score. |
 | Energy | Leakage-safe chronological evaluation against persistence/seasonal baselines plus Ridge/gradient-boosting candidates; fingerprint-bound one-step forecast artefacts and reproducible real Berlin evidence from an official 2024 high-voltage load publication. |
 | Resilience | Multi-edge weighted routing, route comparison, facility snapping and accessibility under immutable scenario overlays; separate live OSM smoke evidence proves point-in-time real Berlin network/routing compatibility. |
+| Critical-route monitoring | Automatically derives nearest reachable cross-category critical-facility routes when the persisted reference/network snapshot changes, caches them in the API and renders them as persistent MapLibre lines with 15 s dashboard polling, keyboard inspection and provenance. Real-time road traffic telemetry is not currently integrated. |
 | Scenarios | Explicit bounded heat, energy-demand, network-disruption and infrastructure-degradation scenarios with baseline/scenario/difference separation. |
 | Semantic layer | RDF projection with project ontology, PROV-O/SOSA usage, SHACL artefacts, semantic relationship inspection and version-controlled SPARQL examples. |
 | Interfaces | FastAPI backend and React/TypeScript/MapLibre research dashboard with provenance, derived, platform and routing/scenario inspection paths. |
@@ -150,7 +151,7 @@ Backend CI uses Python 3.12 and runs Ruff formatting/lint, strict mypy, the comp
 
 External-provider compatibility, dependency security, performance and real-data evaluation are deliberately separated from deterministic correctness CI so upstream availability does not turn repository correctness checks nondeterministic.
 
-The authoritative completion evidence is [docs/verification.md](docs/verification.md). Detailed point-in-time source evidence includes [real Berlin energy](docs/energy-real-evidence.md) and [real OSM road-network readiness](docs/road-network-verification.md).
+The authoritative completion evidence is [docs/verification.md](docs/verification.md). Detailed point-in-time source evidence includes [real Berlin energy](docs/energy-real-evidence.md) and [real OSM road-network readiness](docs/road-network-verification.md). Current post-v1 automatic routing behavior is documented in [dynamic critical-route monitoring](docs/critical-route-monitoring.md).
 
 ## Documentation
 
@@ -166,6 +167,7 @@ The documentation is organized for external engineering and research use:
 - [Evaluation](docs/evaluation/methodology.md)
 - [Research/reproducibility](docs/research/reproducibility.md)
 - [v1.0 verification matrix](docs/verification.md)
+- [Dynamic critical-route monitoring](docs/critical-route-monitoring.md)
 - [v1.0.0 release notes](docs/releases/v1.0.0.md)
 - [Changelog](CHANGELOG.md)
 - [Roadmap](docs/roadmap.md)
@@ -175,9 +177,9 @@ The documentation is organized for external engineering and research use:
 
 **v1 evidence gate:** **PASS**. The repository's documented v1 correctness/evidence criteria are satisfied, including protected backend/frontend/container acceptance, real Berlin energy evidence, multiple source-backed cross-domain workflows and point-in-time real Berlin OSM routing readiness.
 
-**Implemented:** typed canonical contracts; live/reference acquisition; persisted source/freshness state; six agents; deterministic registry/capability orchestration; derived dependency/lineage state; source-backed cross-domain products; scenario/resilience calculations; leakage-safe energy evaluation/forecasting; semantic RDF/relationship APIs; hot reload; FastAPI/dashboard; structured observability; security/accessibility/performance baselines; protected CI and scoped evidence workflows.
+**Implemented:** typed canonical contracts; live/reference acquisition; persisted source/freshness state; six agents; deterministic registry/capability orchestration; derived dependency/lineage state; source-backed cross-domain products; scenario/resilience calculations; snapshot-bound automatic critical-route monitoring and persistent map visualization; leakage-safe energy evaluation/forecasting; semantic RDF/relationship APIs; hot reload; FastAPI/dashboard; structured observability; security/accessibility/performance baselines; protected CI and scoped evidence workflows.
 
-**Conditional/external:** current live-source availability, public Overpass delivery, and any analytical result whose required persisted inputs are unavailable. These conditions degrade explicitly rather than being hidden behind generated production values.
+**Conditional/external:** current live-source availability, public Overpass delivery, and any analytical result whose required persisted inputs are unavailable. Critical-route monitoring requires a routable persisted road network and critical facilities; its current travel times use persisted road weights rather than real-time traffic telemetry. These conditions degrade explicitly rather than being hidden behind generated production values.
 
 **Not claimed:** municipal operations/control, permanent provider availability, universal Berlin scoring, causal cross-domain inference, formal WCAG conformance, calibrated energy prediction intervals, authenticated multi-tenant/public-cloud deployment, or production-scale capacity guarantees.
 

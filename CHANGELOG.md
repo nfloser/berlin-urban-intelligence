@@ -2,6 +2,22 @@
 
 All notable project changes are documented in this file. The project follows Semantic Versioning for published stable releases.
 
+## [Unreleased]
+
+### Added
+
+- automatic critical-facility route monitoring derived from the current persisted road/reference snapshot;
+- snapshot-bound backend caching with recomputation only when reference state changes;
+- bounded `/api/v1/resilience/critical-routes` API with geometry, travel time, distance, edge IDs, source/licence provenance and explicit unavailable/degraded states;
+- persistent MapLibre critical-route layer with automatic 15-second dashboard refresh, visibility control, route highlighting and keyboard-accessible inspection;
+- explicit `traffic_data_available=false` semantics so persisted road weights are never presented as real-time congestion data;
+- deterministic backend and composed Playwright coverage for automatic routing, reload invalidation, source degradation, unreachable facilities and map rendering.
+
+### Limitations
+
+- real-time road traffic/congestion telemetry is not integrated; dynamic route refresh currently reflects persisted network/reference changes, not a Google Maps traffic feed;
+- monitored routes require a routable persisted road network and critical facilities in at least two categories.
+
 ## [1.0.0] - 2026-09-16
 
 First stable release of Berlin Urban Intelligence as a research-oriented, agent-extensible urban intelligence and digital-twin integration platform for Berlin.

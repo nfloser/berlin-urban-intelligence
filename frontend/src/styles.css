@@ -158,3 +158,25 @@ dd { margin: 0; text-align: right; }
 .route-selection-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
 .secondary-action { padding: 9px 10px; border: 1px solid #536d86; border-radius: 7px; background: #101b25; cursor: pointer; font-size: 12px; }
 .secondary-action:hover, .secondary-action.active { background: #24394c; border-color: #83aeca; }
+
+
+.layer-swatch.critical-routes {
+  width: 18px;
+  height: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: #4ea5d9;
+}
+
+.critical-route-traffic-note {
+  padding-top: 3px;
+  border-top: 1px solid #263241;
+}
+
+.critical-route-detail strong {
+  color: #f0c75e;
+}
+
+.critical-route-detail span {
+  line-height: 1.4;
+}

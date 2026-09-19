@@ -31,6 +31,14 @@ The roadmap separates implemented capabilities from planned work. It is not a pr
 - Semantic Versioning release metadata, changelog and versioned release-note contract enforced by regression test;
 - MIT project-source licence.
 
+## Current post-v1 development — implemented
+
+- automatic critical-facility route monitoring over the current persisted weighted road network;
+- snapshot-bound route recomputation only when validated reference state changes;
+- bounded critical-route API with source/licence provenance and explicit unavailable/degraded semantics;
+- persistent MapLibre route visualization with 15-second dashboard polling, route selection and keyboard-accessible inspection;
+- explicit separation between dynamic platform-state refresh and real-time road traffic telemetry; current route costs do not claim live congestion.
+
 ## Short term — planned improvements
 
 - keep frontend API declarations systematically aligned with generated OpenAPI contracts;

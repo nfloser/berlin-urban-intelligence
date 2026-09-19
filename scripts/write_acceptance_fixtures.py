@@ -79,6 +79,19 @@ def build_reference_fixture() -> ReferenceState:
         ),
         source_identifier="hospital-1",
     )
+    fire_station = CriticalFacility(
+        id="critical:acceptance:fire-station",
+        name="Acceptance Fire Station",
+        category="fire_station",
+        confidence="test_fixture",
+        quality=QualityFlag.VALID,
+        provenance=fixture_provenance("acceptance facilities", "fire-station-1"),
+        spatial=SpatialReference(
+            crs="EPSG:4326",
+            geometry={"type": "Point", "coordinates": [13.42, 52.52]},
+        ),
+        source_identifier="fire-station-1",
+    )
     stop = UrbanEntity(
         id="transport-stop:acceptance:central",
         entity_type="transport_stop",
@@ -149,7 +162,7 @@ def build_reference_fixture() -> ReferenceState:
 
     return ReferenceState(
         generated_at=FIXTURE_TIME,
-        critical_facilities=(facility,),
+        critical_facilities=(facility, fire_station),
         official_model_features=(climate,),
         transport_stops=(stop,),
         network_nodes=nodes,

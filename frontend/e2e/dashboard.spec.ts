@@ -115,7 +115,7 @@ test("reference map loads the viewport, reloads after navigation and inspects ca
 
   const map = page.getByLabel("Berlin domain map");
   await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
-  await expect(page.getByText(/Critical facilities · 1 visible \/ 1 in viewport · 1 total/)).toBeVisible();
+  await expect(page.getByText(/Critical facilities · 2 visible \/ 2 in viewport · 2 total/)).toBeVisible();
   await expect(page.getByText(/VBB stops · 1 visible \/ 1 in viewport · 1 total/)).toBeVisible();
   await expect(
     page.getByText(/Official climate features · 1 visible \/ 1 in viewport · 1 total/),
@@ -149,10 +149,9 @@ test("reference map loads the viewport, reloads after navigation and inspects ca
 });
 
 test("a failed current viewport request clears the previous rendering projection", async ({ page }) => {
-  let viewportRequests = 0;
+  let failViewportRequests = false;
   await page.route(/\/api\/v1\/map\/reference\?/, async (route) => {
-    viewportRequests += 1;
-    if (viewportRequests === 1) {
+    if (!failViewportRequests) {
       await route.continue();
       return;
     }
@@ -166,13 +165,14 @@ test("a failed current viewport request clears the previous rendering projection
   await page.goto("/");
   const map = page.getByLabel("Berlin domain map");
   await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
-  await expect(page.getByText(/Critical facilities · 1 visible/)).toBeVisible();
+  await expect(page.getByText(/Critical facilities · 2 visible/)).toBeVisible();
 
+  failViewportRequests = true;
   await page.locator(".maplibregl-ctrl-zoom-in").click();
 
   await expect(page.getByText(/Reference map data unavailable:/)).toBeVisible();
   await expect(map).toHaveAttribute("data-reference-layers-ready", "false");
-  await expect(page.getByText(/Critical facilities · 1 visible/)).toHaveCount(0);
+  await expect(page.getByText(/Critical facilities · 2 visible/)).toHaveCount(0);
 });
 
 test("map-selected routing compares a baseline with an explicit closed-edge scenario", async ({
