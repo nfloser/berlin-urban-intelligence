@@ -18,7 +18,7 @@ test("critical facility routes appear automatically and remain keyboard inspecta
     monitor.getByText(/No live traffic telemetry is integrated/, { exact: false }),
   ).toBeVisible();
 
-  const routeSelect = page.getByLabel("Critical route");
+  const routeSelect = page.getByLabel("Critical route", { exact: true });
   await expect(routeSelect).toBeVisible();
   await routeSelect.focus();
   await expect(routeSelect).toBeFocused();
