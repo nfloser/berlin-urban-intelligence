@@ -9,7 +9,7 @@ from typing import Literal, cast
 import networkx as nx
 from pydantic import BaseModel, ConfigDict, Field
 from pyproj import Transformer
-from shapely.geometry import LineString, shape
+from shapely.geometry import shape
 from shapely.ops import transform as shapely_transform
 
 from berlin_urban_intelligence.agents.resilience import snap_facilities_to_network
