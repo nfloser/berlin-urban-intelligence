@@ -261,7 +261,11 @@ class CriticalRouteMonitor:
 
     def _active_disruptions(self, computed_at: datetime) -> tuple[TrafficDisruption, ...]:
         state = self._traffic_state
-        if state is None or state.last_success_at is None:
+        if (
+            state is None
+            or state.last_success_at is None
+            or state.freshness is not FreshnessStatus.VALID
+        ):
             return ()
         return tuple(
             sorted(
