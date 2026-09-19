@@ -323,9 +323,7 @@ def test_stale_disruption_state_is_visible_but_does_not_change_routes() -> None:
             "coordinates": [[13.4000, 52.5200], [13.4100, 52.5200]],
         },
     )
-    stale_state = traffic_state(closure).model_copy(
-        update={"freshness": FreshnessStatus.STALE}
-    )
+    stale_state = traffic_state(closure).model_copy(update={"freshness": FreshnessStatus.STALE})
 
     snapshot = CriticalRouteMonitor(
         reference_with_alternative(),
