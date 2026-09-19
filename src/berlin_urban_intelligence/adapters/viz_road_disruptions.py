@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
+import httpx
 from pydantic import HttpUrl
 
 from berlin_urban_intelligence.runtime.traffic_disruptions import TrafficDisruption
@@ -73,6 +74,31 @@ def _network_reference_ids(value: object) -> tuple[str, ...]:
         if isinstance(identifier, str) and identifier.strip():
             identifiers.add(identifier.strip())
     return tuple(sorted(identifiers))
+
+
+class VizRoadDisruptionClient:
+    """Small network client restricted to the official public VIZ disruption endpoint."""
+
+    source_url = "https://api.viz.berlin.de/daten/baustellen_sperrungen.json"
+
+    def __init__(self, *, client: object | None = None, timeout_s: float = 30.0) -> None:
+        self._owned_client = client is None
+        self._client = client or httpx.Client(timeout=timeout_s, follow_redirects=True)
+
+    def fetch(self) -> dict[str, object]:
+        response = self._client.get(
+            self.source_url,
+            headers={"Accept": "application/geo+json, application/json"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("VIZ response root must be an object")
+        return payload
+
+    def close(self) -> None:
+        if self._owned_client:
+            self._client.close()
 
 
 class VizRoadDisruptionAdapter:
