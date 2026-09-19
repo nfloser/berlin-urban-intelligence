@@ -9,6 +9,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   type AssessmentResponse,
   type CriticalFacility,
+  type CriticalRoute,
+  type CriticalRouteSnapshotResponse,
   type EnergyResponse,
   type Health,
   type MobilityResponse,
@@ -63,6 +65,7 @@ const WORKFLOWS: Array<{ value: WorkflowKind; label: string }> = [
 ];
 const REFERENCE_LAYERS: ReferenceMapLayer[] = ["facilities", "stops", "climate"];
 const EMPTY_FEATURE_COLLECTION: FeatureCollection = { type: "FeatureCollection", features: [] };
+const CRITICAL_ROUTE_POLL_INTERVAL_MS = 15_000;
 
 type LoadState = "loading" | "ready" | "error";
 type ActionState = "idle" | "running" | "error";
@@ -111,7 +114,13 @@ function App() {
   const [routeState, setRouteState] = useState<ActionState>("idle");
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeComparison, setRouteComparison] = useState<RouteComparisonResponse | null>(null);
+  const [criticalRoutes, setCriticalRoutes] = useState<CriticalRouteSnapshotResponse | null>(null);
+  const [criticalRoutesError, setCriticalRoutesError] = useState<string | null>(null);
+  const [criticalRoutesVisible, setCriticalRoutesVisible] = useState(true);
+  const [selectedCriticalRouteId, setSelectedCriticalRouteId] = useState<string | null>(null);
 
+  const selectedCriticalRoute =
+    criticalRoutes?.routes.find((item) => item.id === selectedCriticalRouteId) ?? null;
   const selectedObservation =
     observations.find((item) => item.id === selectedObservationId) ?? null;
   const layerSummaries = referenceMap ? referenceLayerSummaries(referenceMap.metadata) : [];
@@ -143,6 +152,40 @@ function App() {
       });
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCriticalRoutes = async () => {
+      try {
+        const result = await fetchJson<CriticalRouteSnapshotResponse>(
+          "/api/v1/resilience/critical-routes?limit=250",
+        );
+        if (cancelled) return;
+        setCriticalRoutes(result);
+        setCriticalRoutesError(null);
+        setSelectedCriticalRouteId((current) => {
+          if (current && result.routes.some((route) => route.id === current)) return current;
+          return result.routes[0]?.id ?? null;
+        });
+      } catch (reason) {
+        if (cancelled) return;
+        setCriticalRoutesError(
+          reason instanceof Error ? reason.message : "Critical route monitor unavailable.",
+        );
+      }
+    };
+
+    void loadCriticalRoutes();
+    const interval = window.setInterval(() => {
+      void loadCriticalRoutes();
+    }, CRITICAL_ROUTE_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
     };
   }, []);
 
@@ -231,11 +274,17 @@ function App() {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || loadState !== "ready" || referenceMap === null) return;
+    if (!map || loadState !== "ready") return;
     setMapLayersReady(false);
-    const facilityData = featureCollectionForLayer(referenceMap, "facilities");
-    const stopData = featureCollectionForLayer(referenceMap, "stops");
-    const climateData = featureCollectionForLayer(referenceMap, "climate");
+    const facilityData = referenceMap
+      ? featureCollectionForLayer(referenceMap, "facilities")
+      : EMPTY_FEATURE_COLLECTION;
+    const stopData = referenceMap
+      ? featureCollectionForLayer(referenceMap, "stops")
+      : EMPTY_FEATURE_COLLECTION;
+    const climateData = referenceMap
+      ? featureCollectionForLayer(referenceMap, "climate")
+      : EMPTY_FEATURE_COLLECTION;
     const inspectionData: FeatureCollection = mapSelection
       ? toFeatureCollection([mapSelection.item])
       : EMPTY_FEATURE_COLLECTION;
@@ -257,6 +306,29 @@ function App() {
         })),
     };
     const scenarioRouteData = routeData(routeComparison?.scenario_geometry ?? null);
+    const criticalRouteData: FeatureCollection = {
+      type: "FeatureCollection",
+      features: (criticalRoutes?.routes ?? []).map((route) => ({
+        type: "Feature",
+        id: route.id,
+        properties: { route_id: route.id },
+        geometry: route.geometry,
+      })),
+    };
+    const selectedCriticalRouteData: FeatureCollection = {
+      type: "FeatureCollection",
+      features: selectedCriticalRoute
+        ? [
+            {
+              type: "Feature",
+              id: selectedCriticalRoute.id,
+              properties: { route_id: selectedCriticalRoute.id },
+              geometry: selectedCriticalRoute.geometry,
+            },
+          ]
+        : [],
+    };
+    const criticalRouteColor = criticalRoutes?.status === "degraded" ? "#e3bd71" : "#4ea5d9";
     const setVisibility = (layerId: string, visible: boolean) => {
       if (map.getLayer(layerId)) {
         map.setLayoutProperty(layerId, "visibility", visible ? "visible" : "none");
@@ -276,6 +348,8 @@ function App() {
       upsert("route-baseline", baselineRouteData);
       upsert("route-scenario", scenarioRouteData);
       upsert("route-selection", selectionData);
+      upsert("critical-routes", criticalRouteData);
+      upsert("critical-route-selected", selectedCriticalRouteData);
 
       if (!map.getLayer("climate-fill")) {
         map.addLayer({
@@ -340,6 +414,32 @@ function App() {
           },
         });
       }
+      if (!map.getLayer("critical-routes-line")) {
+        map.addLayer({
+          id: "critical-routes-line",
+          type: "line",
+          source: "critical-routes",
+          paint: {
+            "line-color": criticalRouteColor,
+            "line-width": 5,
+            "line-opacity": 0.78,
+          },
+        });
+      } else {
+        map.setPaintProperty("critical-routes-line", "line-color", criticalRouteColor);
+      }
+      if (!map.getLayer("critical-route-selected-line")) {
+        map.addLayer({
+          id: "critical-route-selected-line",
+          type: "line",
+          source: "critical-route-selected",
+          paint: {
+            "line-color": "#f0c75e",
+            "line-width": 8,
+            "line-opacity": 0.96,
+          },
+        });
+      }
       if (!map.getLayer("route-selection-circle")) {
         map.addLayer({
           id: "route-selection-circle",
@@ -372,7 +472,9 @@ function App() {
       setVisibility("facilities-circle", visibleLayers.facilities);
       setVisibility("stops-circle", visibleLayers.stops);
       setVisibility("climate-fill", visibleLayers.climate);
-      setMapLayersReady(true);
+      setVisibility("critical-routes-line", criticalRoutesVisible);
+      setVisibility("critical-route-selected-line", criticalRoutesVisible);
+      setMapLayersReady(referenceMap !== null);
     };
 
     const maybeInstallLayers = () => {
@@ -405,7 +507,30 @@ function App() {
     routeBaseline,
     routeOrigin,
     routeDestination,
+    criticalRoutes,
+    selectedCriticalRoute,
+    criticalRoutesVisible,
   ]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || loadState !== "ready" || routeSelectionMode !== null) return;
+
+    const inspectCriticalRoute = (event: maplibregl.MapMouseEvent) => {
+      if (!criticalRoutesVisible || !map.getLayer("critical-routes-line")) return;
+      const hitBox = referenceHitTestBox(event.point);
+      const hit = map.queryRenderedFeatures(hitBox, { layers: ["critical-routes-line"] })[0];
+      const routeId = hit?.properties?.route_id;
+      if (routeId !== null && routeId !== undefined) {
+        setSelectedCriticalRouteId(String(routeId));
+      }
+    };
+
+    map.on("click", inspectCriticalRoute);
+    return () => {
+      map.off("click", inspectCriticalRoute);
+    };
+  }, [criticalRoutesVisible, loadState, routeSelectionMode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -684,6 +809,21 @@ function App() {
                 </span>
               </label>
             ))}
+            <label className="layer-toggle">
+              <input
+                checked={criticalRoutesVisible}
+                onChange={(event) => setCriticalRoutesVisible(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="layer-swatch critical-routes" />
+              <span>
+                Critical routes · {criticalRoutes?.returned ?? 0} shown /{" "}
+                {criticalRoutes?.route_count_total ?? 0} monitored · refresh 15 s
+              </span>
+            </label>
+            <p className="critical-route-traffic-note">
+              Baseline road weights only · live road traffic telemetry: not integrated
+            </p>
             {referenceMap === null && <span>No reference viewport has been loaded yet.</span>}
             {mapDataError && (
               <p className="inline-error">Reference map data unavailable: {mapDataError}</p>
@@ -696,6 +836,70 @@ function App() {
           {mapSelectionError && (
             <p className="inline-error">Reference detail unavailable: {mapSelectionError}</p>
           )}
+
+          <section aria-label="Critical route monitor">
+            <div className="section-heading compact-heading">
+              <h2>Critical route monitor</h2>
+              <span className={`status status-${criticalRoutes?.status ?? "unknown"}`}>
+                {criticalRoutes?.status ?? "unknown"}
+              </span>
+            </div>
+            <dl>
+              <dt>Monitored routes</dt>
+              <dd>{criticalRoutes?.route_count_total ?? "Unavailable"}</dd>
+              <dt>Reference snapshot</dt>
+              <dd>{criticalRoutes?.reference_generated_at ?? "Unavailable"}</dd>
+              <dt>Road traffic telemetry</dt>
+              <dd>{criticalRoutes?.traffic_data_available ? "Available" : "Not integrated"}</dd>
+            </dl>
+            {criticalRoutes && criticalRoutes.routes.length > 0 && (
+              <label className="field">
+                <span>Critical route</span>
+                <select
+                  aria-label="Critical route"
+                  value={selectedCriticalRouteId ?? ""}
+                  onChange={(event) => setSelectedCriticalRouteId(event.target.value)}
+                >
+                  {criticalRoutes.routes.map((route) => (
+                    <option key={route.id} value={route.id}>
+                      {route.origin_name} → {route.destination_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {selectedCriticalRoute && (
+              <div className="result-box critical-route-detail" aria-live="polite">
+                <strong>
+                  {selectedCriticalRoute.origin_name} → {selectedCriticalRoute.destination_name}
+                </strong>
+                <span>
+                  {selectedCriticalRoute.origin_category} → {selectedCriticalRoute.destination_category}
+                </span>
+                <span>Baseline travel time: {(selectedCriticalRoute.travel_time_s / 60).toFixed(1)} min</span>
+                <span>Road distance: {(selectedCriticalRoute.length_m / 1000).toFixed(2)} km</span>
+                <span>Edges: {selectedCriticalRoute.edge_ids.length}</span>
+                <span>
+                  Providers:{" "}
+                  {selectedCriticalRoute.provenance.source_providers.length > 0
+                    ? selectedCriticalRoute.provenance.source_providers.join(", ")
+                    : "Unavailable"}
+                </span>
+                <span>
+                  Licences:{" "}
+                  {selectedCriticalRoute.provenance.source_licences.length > 0
+                    ? selectedCriticalRoute.provenance.source_licences.join(", ")
+                    : "Unavailable"}
+                </span>
+              </div>
+            )}
+            {criticalRoutes?.note && <p className="method-note">{criticalRoutes.note}</p>}
+            {criticalRoutesError && (
+              <p className="inline-error" role="alert">
+                Critical routes unavailable: {criticalRoutesError}
+              </p>
+            )}
+          </section>
 
           <section>
             <h2>Mobility</h2>
