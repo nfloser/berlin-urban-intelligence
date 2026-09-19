@@ -177,6 +177,28 @@ jobs:
           if missing:
               raise SystemExit(f"VIZ documented schema keys missing: {missing}")
 
+      - name: Discover live Masterportal disruption layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/masterportal
+          candidates=(
+            "https://viz.berlin.de/site/_masterportal/berlin/resources/services-internet.json"
+            "https://viz.berlin.de/site/_masterportal/berlin/resources/services.json"
+            "https://viz.berlin.de/site/_masterportal/resources/services-internet.json"
+          )
+          for url in "${candidates[@]}"; do
+            name=$(printf '%s' "$url" | sha256sum | cut -c1-12)
+            code=$(curl --silent --show-error --location --max-time 30 \
+              --output "evidence/masterportal/$name.json" \
+              --write-out '%{http_code}' "$url" || true)
+            printf '%s %s\n' "$code" "$url" | tee -a evidence/masterportal/status.txt
+            if [ "$code" = "200" ]; then
+              grep -n -i -C 8 'baustellen_viz\|Landesmeldestelle' \
+                "evidence/masterportal/$name.json" || true
+            fi
+          done
+
       - name: Upload point-in-time schema evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -185,5 +207,6 @@ jobs:
           path: |
             evidence/schema-summary.json
             evidence/sha256.txt
+            evidence/masterportal/
           if-no-files-found: warn
           retention-days: 14
