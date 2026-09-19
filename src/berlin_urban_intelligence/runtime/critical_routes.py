@@ -679,8 +679,7 @@ class CriticalRouteMonitor:
             unreachable_facility_ids=tuple(sorted(unreachable)),
             source_errors=dict(reference.errors),
             disruption_data_available=(
-                self._traffic_state is not None
-                and self._traffic_state.last_success_at is not None
+                self._traffic_state is not None and self._traffic_state.last_success_at is not None
             ),
             disruption_generated_at=(
                 self._traffic_state.generated_at if self._traffic_state else None
