@@ -81,7 +81,7 @@ class VizRoadDisruptionClient:
 
     source_url = "https://api.viz.berlin.de/daten/baustellen_sperrungen.json"
 
-    def __init__(self, *, client: object | None = None, timeout_s: float = 30.0) -> None:
+    def __init__(self, *, client: httpx.Client | None = None, timeout_s: float = 30.0) -> None:
         self._owned_client = client is None
         self._client = client or httpx.Client(timeout=timeout_s, follow_redirects=True)
 
