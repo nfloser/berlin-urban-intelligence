@@ -30,7 +30,7 @@ test("critical facility routes appear automatically and remain keyboard inspecta
 
   await routeSelect.selectOption({ label: "Acceptance Hospital → Acceptance Fire Station" });
   await expect(
-    monitor.getByText("Acceptance Hospital → Acceptance Fire Station", { exact: true }),
+    monitor.locator("strong").filter({ hasText: "Acceptance Hospital → Acceptance Fire Station" }),
   ).toBeVisible();
 
   const toggle = page.getByRole("checkbox", { name: /Critical routes/ });
