@@ -147,6 +147,33 @@ def test_monitor_keeps_routes_but_marks_snapshot_degraded_when_reference_has_sou
     assert "live traffic" in snapshot.note.lower()
 
 
+def test_monitor_degrades_when_a_snapped_facility_is_on_an_isolated_node() -> None:
+    base = reference_fixture()
+    isolated_facility = facility(
+        "facility:isolated",
+        "Isolated facility",
+        "emergency_service",
+        13.4300,
+        52.5400,
+    )
+    isolated_node = node("isolated", 13.4300, 52.5400)
+    reference = base.model_copy(
+        update={
+            "critical_facilities": (*base.critical_facilities, isolated_facility),
+            "network_nodes": (*base.network_nodes, isolated_node),
+        }
+    )
+
+    snapshot = CriticalRouteMonitor(reference, now_factory=lambda: NOW).build()
+
+    assert snapshot.status is AvailabilityStatus.DEGRADED
+    assert "facility:isolated" in snapshot.unreachable_facility_ids
+    assert "facility:isolated" not in {
+        route.origin_facility_id for route in snapshot.routes
+    }
+    assert len(snapshot.routes) == 3
+
+
 def test_monitor_is_explicitly_unavailable_without_required_reference_inputs() -> None:
     empty = ReferenceState(generated_at=NOW)
 
