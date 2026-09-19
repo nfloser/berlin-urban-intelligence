@@ -12,7 +12,7 @@ NOW = datetime(2026, 9, 19, 16, 30, tzinfo=UTC)
 
 
 class SuccessfulClient:
-    source_url = "https://api.viz.berlin.de/daten/baustellen_sperrungen.json"
+    source_url = "https://api.viz.berlin.de/daten/baustellen_sperrungen_viz.json"
 
     def fetch(self) -> dict[str, object]:
         return {
@@ -26,8 +26,8 @@ class SuccessfulClient:
                         "subtype": "Sperrung",
                         "severity": "Vollsperrung",
                         "validity": {
-                            "from": "19.09.2026 17:00",
-                            "to": "19.09.2026 20:00",
+                            "from": "2026-09-19T17:00",
+                            "to": "2026-09-19T20:00",
                         },
                         "tstore": "2026-09-19T15:01:00Z",
                         "street": "Teststraße",
@@ -127,3 +127,22 @@ def test_previous_state_source_id_must_match() -> None:
         assert "source_id" in str(exc)
     else:
         raise AssertionError("mismatched source state must be rejected")
+
+
+class StaleSuccessfulClient(SuccessfulClient):
+    def fetch(self) -> dict[str, object]:
+        payload = super().fetch()
+        payload["features"][0]["properties"]["tstore"] = "2026-09-15T10:00:00Z"
+        return payload
+
+
+def test_successful_but_old_provider_content_is_marked_stale() -> None:
+    state = TrafficDisruptionRefreshCoordinator(
+        client=StaleSuccessfulClient(),
+        now_factory=lambda: NOW,
+    ).refresh()
+
+    assert state.last_success_at == NOW
+    assert state.source_error is None
+    assert state.disruptions
+    assert state.freshness is FreshnessStatus.STALE
