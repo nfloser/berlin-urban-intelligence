@@ -452,7 +452,13 @@ function App() {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || loadState !== "ready" || criticalRoutes === null) return;
+    if (
+      !map ||
+      loadState !== "ready" ||
+      criticalRoutes === null ||
+      (!mapLayersReady && mapDataError === null)
+    )
+      return;
 
     const criticalRouteData: FeatureCollection = {
       type: "FeatureCollection",
@@ -527,18 +533,31 @@ function App() {
       setCriticalRouteLayerReady(true);
     };
 
-    const installCriticalRouteLayersWhenIdle = () => {
-      map.off("idle", installCriticalRouteLayersWhenIdle);
+    const installCriticalRouteLayersWhenReady = () => {
+      if (!map.isStyleLoaded()) return;
       installCriticalRouteLayers();
+      map.off("styledata", installCriticalRouteLayersWhenReady);
+      map.off("load", installCriticalRouteLayersWhenReady);
     };
 
-    if (map.isStyleLoaded()) installCriticalRouteLayers();
-    else map.on("idle", installCriticalRouteLayersWhenIdle);
+    installCriticalRouteLayersWhenReady();
+    if (!map.isStyleLoaded()) {
+      map.on("styledata", installCriticalRouteLayersWhenReady);
+      map.on("load", installCriticalRouteLayersWhenReady);
+    }
 
     return () => {
-      map.off("idle", installCriticalRouteLayersWhenIdle);
+      map.off("styledata", installCriticalRouteLayersWhenReady);
+      map.off("load", installCriticalRouteLayersWhenReady);
     };
-  }, [criticalRoutes, criticalRoutesVisible, loadState, selectedCriticalRoute]);
+  }, [
+    criticalRoutes,
+    criticalRoutesVisible,
+    loadState,
+    mapDataError,
+    mapLayersReady,
+    selectedCriticalRoute,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
