@@ -123,6 +123,4 @@ class TrafficDisruptionStateStore:
     def load(self) -> TrafficDisruptionState | None:
         if not self.path.exists():
             return None
-        return TrafficDisruptionState.model_validate_json(
-            self.path.read_text(encoding="utf-8")
-        )
+        return TrafficDisruptionState.model_validate_json(self.path.read_text(encoding="utf-8"))
