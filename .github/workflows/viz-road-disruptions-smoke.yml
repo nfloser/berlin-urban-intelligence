@@ -67,24 +67,41 @@ jobs:
               if not isinstance(properties, dict):
                   continue
               property_keys.update(properties.keys())
-              validity = properties.get("@validity")
+              validity = properties.get("validity")
               validity_shapes[type(validity).__name__] += 1
               if len(samples) < 5:
                   samples.append(
                       {
-                          "id": feature.get("id"),
+                          "feature_id": feature.get("id"),
+                          "property_id": properties.get("id"),
                           "geometry_type": geometry.get("type") if isinstance(geometry, dict) else None,
                           "subtype": properties.get("subtype"),
                           "severity": properties.get("severity"),
                           "validity": validity,
+                          "tstore": properties.get("tstore"),
+                          "netrefs": properties.get("netrefs"),
+                          "objectState": properties.get("objectState"),
+                          "is_future": properties.get("is_future"),
+                          "geometry": geometry,
                           "street": properties.get("street"),
                           "section": properties.get("section"),
                           "content": properties.get("content"),
                       }
                   )
 
-          required = {"subtype", "severity", "@validity", "street", "section", "content"}
+          required = {"id", "subtype", "severity", "validity", "content"}
           missing = sorted(required - set(property_keys))
+          subtype_counts = Counter(
+              str(feature.get("properties", {}).get("subtype"))
+              for feature in features
+              if isinstance(feature, dict) and isinstance(feature.get("properties"), dict)
+          )
+          severity_counts = Counter(
+              str(feature.get("properties", {}).get("severity"))
+              for feature in features
+              if isinstance(feature, dict) and isinstance(feature.get("properties"), dict)
+          )
+
           summary = {
               "type": payload.get("type"),
               "feature_count": len(features),
@@ -92,6 +109,8 @@ jobs:
               "property_keys": sorted(property_keys),
               "property_key_counts": dict(sorted(property_keys.items())),
               "validity_shapes": dict(sorted(validity_shapes.items())),
+              "subtype_counts": dict(sorted(subtype_counts.items())),
+              "severity_counts": dict(sorted(severity_counts.items())),
               "missing_documented_keys": missing,
               "samples": samples,
           }
