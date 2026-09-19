@@ -157,9 +157,7 @@ def test_traffic_disruption_api_is_bounded_and_defaults_to_active_items(
 
     with TestClient(create_app()) as client:
         active_response = client.get("/api/v1/traffic/disruptions?limit=10")
-        all_response = client.get(
-            "/api/v1/traffic/disruptions?active_only=false&offset=1&limit=1"
-        )
+        all_response = client.get("/api/v1/traffic/disruptions?active_only=false&offset=1&limit=1")
 
     assert active_response.status_code == 200
     active_body = active_response.json()
