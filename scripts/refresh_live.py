@@ -17,6 +17,13 @@ from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedState
 from berlin_urban_intelligence.runtime.derived_refresh import DerivedRefreshCoordinator
 from berlin_urban_intelligence.runtime.refresh import RefreshCoordinator
 from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
+from berlin_urban_intelligence.runtime.traffic_disruption_refresh import (
+    TrafficDisruptionRefreshCoordinator,
+)
+from berlin_urban_intelligence.runtime.traffic_disruptions import (
+    TrafficDisruptionState,
+    TrafficDisruptionStateStore,
+)
 from berlin_urban_intelligence.runtime.worker import SnapshotRefreshWorker
 
 
@@ -29,11 +36,23 @@ def _write_rdf(state: RuntimeState, derived: DerivedState, path: Path) -> None:
     path.write_text(graph.serialize(), encoding="utf-8")
 
 
-def _print_summary(state: RuntimeState, state_path: str, derived_records: int) -> None:
+def _print_summary(
+    state: RuntimeState,
+    state_path: str,
+    derived_records: int,
+    traffic: TrafficDisruptionState,
+) -> None:
     print(f"runtime_state={state_path}", flush=True)
     print(f"observations={len(state.observations)}", flush=True)
     print(f"mobility_snapshot={'yes' if state.mobility is not None else 'no'}", flush=True)
     print(f"derived_records={derived_records}", flush=True)
+    print(
+        "traffic_disruptions="
+        f"{len(traffic.disruptions)} freshness={traffic.freshness.value} "
+        f"source_error={traffic.source_error or '-'} "
+        f"latest_source_update={traffic.latest_source_update_at or '-'}",
+        flush=True,
+    )
     for source_id, source_state in sorted(state.source_statuses.items()):
         print(
             f"source={source_id} availability={source_state.availability.value} "
@@ -46,6 +65,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--state", default="data/runtime/state.json")
     parser.add_argument("--derived", default="data/runtime/derived.json")
+    parser.add_argument(
+        "--traffic-disruptions",
+        default="data/runtime/traffic-disruptions.json",
+    )
     parser.add_argument("--rdf", default="data/generated/latest.ttl")
     parser.add_argument(
         "--interval-seconds",
@@ -59,6 +82,8 @@ def main() -> int:
 
     store = RuntimeStateStore(Path(args.state))
     derived_store = DerivedStateStore(Path(args.derived))
+    traffic_store = TrafficDisruptionStateStore(Path(args.traffic_disruptions))
+    traffic_refresh = TrafficDisruptionRefreshCoordinator()
     derived_refresh = DerivedRefreshCoordinator()
     worker = SnapshotRefreshWorker(
         coordinator=RefreshCoordinator(),
@@ -68,12 +93,15 @@ def main() -> int:
     rdf_path = Path(args.rdf)
 
     def after_refresh(state: RuntimeState) -> None:
+        previous_traffic = traffic_store.load()
+        traffic = traffic_refresh.refresh(previous_state=previous_traffic)
+        traffic_store.save(traffic)
         previous_derived = derived_store.load()
         outcome = derived_refresh.refresh(state, previous_derived)
         if outcome.changed:
             derived_store.save(outcome.state)
         _write_rdf(state, outcome.state, rdf_path)
-        _print_summary(state, args.state, len(outcome.state.records))
+        _print_summary(state, args.state, len(outcome.state.records), traffic)
 
     if args.interval_seconds > 0:
         worker.run_forever(after_refresh=after_refresh)
