@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
 from berlin_urban_intelligence.adapters.viz_road_disruptions import VizRoadDisruptionAdapter
 from berlin_urban_intelligence.runtime.traffic_disruptions import (
     TrafficDisruptionState,
