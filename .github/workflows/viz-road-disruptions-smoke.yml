@@ -1,0 +1,115 @@
+name: Berlin VIZ road disruption smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/viz-road-disruptions-smoke.yml"
+      - "src/berlin_urban_intelligence/adapters/viz_road_disruptions.py"
+      - "src/berlin_urban_intelligence/runtime/traffic_disruptions.py"
+      - "scripts/refresh_traffic_disruptions.py"
+      - "config/sources.yaml"
+      - "tests/test_viz_road_disruptions.py"
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch official VIZ GeoJSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          curl --fail --silent --show-error --location \
+            --max-time 45 \
+            --retry 2 \
+            --retry-delay 2 \
+            -H 'Accept: application/geo+json, application/json' \
+            'https://api.viz.berlin.de/daten/baustellen_sperrungen.json' \
+            -o evidence/viz-road-disruptions.json
+          test -s evidence/viz-road-disruptions.json
+          sha256sum evidence/viz-road-disruptions.json | tee evidence/sha256.txt
+
+      - name: Inspect provider schema
+        shell: python
+        run: |
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          source = Path("evidence/viz-road-disruptions.json")
+          payload = json.loads(source.read_text(encoding="utf-8-sig"))
+          if not isinstance(payload, dict) or payload.get("type") != "FeatureCollection":
+              raise SystemExit("VIZ response is not a GeoJSON FeatureCollection")
+          features = payload.get("features")
+          if not isinstance(features, list) or not features:
+              raise SystemExit("VIZ response contains no features")
+
+          property_keys = Counter()
+          geometry_types = Counter()
+          validity_shapes = Counter()
+          samples = []
+          for feature in features:
+              if not isinstance(feature, dict):
+                  continue
+              geometry = feature.get("geometry")
+              if isinstance(geometry, dict):
+                  geometry_types[str(geometry.get("type"))] += 1
+              properties = feature.get("properties")
+              if not isinstance(properties, dict):
+                  continue
+              property_keys.update(properties.keys())
+              validity = properties.get("@validity")
+              validity_shapes[type(validity).__name__] += 1
+              if len(samples) < 5:
+                  samples.append(
+                      {
+                          "id": feature.get("id"),
+                          "geometry_type": geometry.get("type") if isinstance(geometry, dict) else None,
+                          "subtype": properties.get("subtype"),
+                          "severity": properties.get("severity"),
+                          "validity": validity,
+                          "street": properties.get("street"),
+                          "section": properties.get("section"),
+                          "content": properties.get("content"),
+                      }
+                  )
+
+          required = {"subtype", "severity", "@validity", "street", "section", "content"}
+          missing = sorted(required - set(property_keys))
+          summary = {
+              "type": payload.get("type"),
+              "feature_count": len(features),
+              "geometry_types": dict(sorted(geometry_types.items())),
+              "property_keys": sorted(property_keys),
+              "property_key_counts": dict(sorted(property_keys.items())),
+              "validity_shapes": dict(sorted(validity_shapes.items())),
+              "missing_documented_keys": missing,
+              "samples": samples,
+          }
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          Path("evidence/schema-summary.json").write_text(
+              json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          if missing:
+              raise SystemExit(f"VIZ documented schema keys missing: {missing}")
+
+      - name: Upload point-in-time schema evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: viz-road-disruption-schema-${{ github.run_id }}
+          path: |
+            evidence/schema-summary.json
+            evidence/sha256.txt
+          if-no-files-found: warn
+          retention-days: 14
