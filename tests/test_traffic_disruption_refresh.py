@@ -60,6 +60,7 @@ def test_refresh_success_persists_current_source_state() -> None:
 
     assert state.generated_at == NOW
     assert state.last_success_at == NOW
+    assert state.latest_source_update_at == datetime(2026, 9, 19, 15, 1, tzinfo=UTC)
     assert state.source_error is None
     assert state.freshness is FreshnessStatus.VALID
     assert [item.id for item in state.disruptions] == ["viz:1"]
@@ -143,6 +144,7 @@ def test_successful_but_old_provider_content_is_marked_stale() -> None:
     ).refresh()
 
     assert state.last_success_at == NOW
+    assert state.latest_source_update_at == datetime(2026, 9, 15, 10, 0, tzinfo=UTC)
     assert state.source_error is None
     assert state.disruptions
     assert state.freshness is FreshnessStatus.STALE
