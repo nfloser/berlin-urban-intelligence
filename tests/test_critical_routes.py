@@ -270,9 +270,7 @@ def test_non_closure_disruption_is_visible_without_invented_time_penalty() -> No
         now_factory=lambda: NOW,
     ).build()
 
-    route = next(
-        item for item in snapshot.routes if item.origin_facility_id == "facility:hospital"
-    )
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
     assert route.route_state == "disrupted"
     assert route.active_disruption_ids == ("viz:works:bc",)
     assert route.closed_edge_ids == ()
