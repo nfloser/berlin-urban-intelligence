@@ -277,9 +277,7 @@ class CriticalRouteMonitor:
     ) -> bool:
         route_shape = self._metric_shape(route_geometry)
         disruption_shape = self._metric_shape(disruption.spatial.geometry or {})
-        return bool(
-            route_shape.distance(disruption_shape) <= self._disruption_match_distance_m
-        )
+        return bool(route_shape.distance(disruption_shape) <= self._disruption_match_distance_m)
 
     def _closed_edge_ids(
         self,
