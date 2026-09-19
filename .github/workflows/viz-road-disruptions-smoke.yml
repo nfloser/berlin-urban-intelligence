@@ -43,7 +43,9 @@ jobs:
         run: |
           import json
           from collections import Counter
+          from datetime import UTC, datetime
           from pathlib import Path
+          from zoneinfo import ZoneInfo
 
           source = Path("evidence/viz-road-disruptions.json")
           payload = json.loads(source.read_text(encoding="utf-8-sig"))
@@ -57,6 +59,16 @@ jobs:
           geometry_types = Counter()
           validity_shapes = Counter()
           samples = []
+          berlin_tz = ZoneInfo("Europe/Berlin")
+          now_utc = datetime.now(UTC)
+          now_local = now_utc.astimezone(berlin_tz).replace(tzinfo=None)
+          active_count = 0
+          expired_count = 0
+          future_count = 0
+          validity_parse_errors = 0
+          validity_starts = []
+          validity_ends = []
+          source_updates = []
           for feature in features:
               if not isinstance(feature, dict):
                   continue
@@ -69,6 +81,28 @@ jobs:
               property_keys.update(properties.keys())
               validity = properties.get("validity")
               validity_shapes[type(validity).__name__] += 1
+              if isinstance(validity, dict):
+                  try:
+                      start = datetime.strptime(str(validity.get("from")), "%d.%m.%Y %H:%M")
+                      end = datetime.strptime(str(validity.get("to")), "%d.%m.%Y %H:%M")
+                      validity_starts.append(start)
+                      validity_ends.append(end)
+                      if start <= now_local <= end:
+                          active_count += 1
+                      elif end < now_local:
+                          expired_count += 1
+                      else:
+                          future_count += 1
+                  except (TypeError, ValueError):
+                      validity_parse_errors += 1
+              tstore = properties.get("tstore")
+              if isinstance(tstore, str):
+                  try:
+                      source_updates.append(
+                          datetime.fromisoformat(tstore.replace("Z", "+00:00")).astimezone(UTC)
+                      )
+                  except ValueError:
+                      pass
               if len(samples) < 5:
                   samples.append(
                       {
@@ -111,6 +145,27 @@ jobs:
               "validity_shapes": dict(sorted(validity_shapes.items())),
               "subtype_counts": dict(sorted(subtype_counts.items())),
               "severity_counts": dict(sorted(severity_counts.items())),
+              "temporal_state": {
+                  "probe_now_utc": now_utc.isoformat(),
+                  "active_count": active_count,
+                  "expired_count": expired_count,
+                  "future_count": future_count,
+                  "validity_parse_errors": validity_parse_errors,
+                  "earliest_valid_from_local": (
+                      min(validity_starts).isoformat() if validity_starts else None
+                  ),
+                  "latest_valid_to_local": (
+                      max(validity_ends).isoformat() if validity_ends else None
+                  ),
+                  "latest_tstore_utc": (
+                      max(source_updates).isoformat() if source_updates else None
+                  ),
+                  "latest_tstore_age_hours": (
+                      round((now_utc - max(source_updates)).total_seconds() / 3600, 3)
+                      if source_updates
+                      else None
+                  ),
+              },
               "missing_documented_keys": missing,
               "samples": samples,
           }
