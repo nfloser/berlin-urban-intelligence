@@ -4,12 +4,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
+
 from berlin_urban_intelligence.adapters.viz_road_disruptions import VizRoadDisruptionAdapter
 from berlin_urban_intelligence.runtime.traffic_disruptions import (
     TrafficDisruptionState,
     TrafficDisruptionStateStore,
 )
-from pydantic import ValidationError
 
 RETRIEVED_AT = datetime(2026, 9, 19, 16, 15, tzinfo=UTC)
 SOURCE_URL = "https://api.viz.berlin.de/daten/baustellen_sperrungen.json"
