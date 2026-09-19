@@ -533,6 +533,11 @@ function App() {
       setCriticalRouteLayerReady(true);
     };
 
+    if (mapLayersReady) {
+      installCriticalRouteLayers();
+      return;
+    }
+
     const installCriticalRouteLayersWhenReady = () => {
       if (!map.isStyleLoaded()) return;
       installCriticalRouteLayers();
