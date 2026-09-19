@@ -525,19 +525,18 @@ function App() {
         criticalRoutesVisible ? "visible" : "none",
       );
       setCriticalRouteLayerReady(true);
-      map.off("styledata", installCriticalRouteLayers);
-      map.off("load", installCriticalRouteLayers);
+    };
+
+    const installCriticalRouteLayersWhenIdle = () => {
+      map.off("idle", installCriticalRouteLayersWhenIdle);
+      installCriticalRouteLayers();
     };
 
     if (map.isStyleLoaded()) installCriticalRouteLayers();
-    else {
-      map.on("styledata", installCriticalRouteLayers);
-      map.on("load", installCriticalRouteLayers);
-    }
+    else map.on("idle", installCriticalRouteLayersWhenIdle);
 
     return () => {
-      map.off("styledata", installCriticalRouteLayers);
-      map.off("load", installCriticalRouteLayers);
+      map.off("idle", installCriticalRouteLayersWhenIdle);
     };
   }, [criticalRoutes, criticalRoutesVisible, loadState, selectedCriticalRoute]);
 
