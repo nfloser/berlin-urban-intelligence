@@ -9,9 +9,14 @@ from pydantic import HttpUrl
 from berlin_urban_intelligence.api.app import create_app
 from berlin_urban_intelligence.runtime.critical_routes import CriticalRouteMonitor
 from berlin_urban_intelligence.runtime.reference import ReferenceState, ReferenceStateStore
+from berlin_urban_intelligence.runtime.traffic_disruptions import (
+    TrafficDisruption,
+    TrafficDisruptionState,
+)
 from berlin_urban_intelligence.shared.contracts import (
     AvailabilityStatus,
     CriticalFacility,
+    FreshnessStatus,
     NetworkEdge,
     NetworkNode,
     Provenance,
@@ -109,6 +114,65 @@ def reference_fixture(*, direct_travel_time_s: float = 120.0) -> ReferenceState:
     )
 
 
+def disruption(
+    disruption_id: str,
+    severity: str | None,
+    geometry: dict[str, object],
+) -> TrafficDisruption:
+    return TrafficDisruption(
+        id=disruption_id,
+        subtype="Sperrung" if severity == "Vollsperrung" else "Baustelle",
+        severity=severity,
+        street="Teststraße",
+        section="Testabschnitt",
+        description="Source-backed traffic disruption",
+        valid_from=NOW - timedelta(hours=1),
+        valid_to=NOW + timedelta(hours=1),
+        source_updated_at=NOW - timedelta(minutes=5),
+        is_full_closure=severity == "Vollsperrung",
+        spatial=SpatialReference(crs="EPSG:4326", geometry=geometry),
+        provenance=Provenance(
+            provider="Verkehrsinformationszentrale Berlin (VIZ)",
+            dataset="VIZ road disruptions",
+            source_url=HttpUrl("https://api.viz.berlin.de/daten/baustellen_sperrungen.json"),
+            original_identifier=disruption_id,
+            observation_time=NOW - timedelta(minutes=5),
+            retrieved_at=NOW,
+            processed_at=NOW,
+            agent="resilience",
+            agent_version="1.0.0",
+            source_licence="Datenlizenz Deutschland - Namensnennung - Version 2.0",
+        ),
+    )
+
+
+def traffic_state(*items: TrafficDisruption) -> TrafficDisruptionState:
+    return TrafficDisruptionState(
+        generated_at=NOW,
+        source_id="berlin_viz_road_disruptions",
+        disruptions=items,
+        last_success_at=NOW,
+        freshness="valid",
+    )
+
+
+def reference_with_alternative() -> ReferenceState:
+    base = reference_fixture()
+    return base.model_copy(
+        update={
+            "network_nodes": (
+                *base.network_nodes,
+                node("x", 13.4100, 52.5300),
+            ),
+            "network_edges": (
+                *base.network_edges,
+                edge("ax", "a", "x", 100.0, length_m=1200.0),
+                edge("xc", "x", "c", 100.0, length_m=1200.0),
+            ),
+        }
+    )
+
+
 def test_monitor_derives_nearest_cross_category_routes_with_geometry_and_provenance() -> None:
     snapshot = CriticalRouteMonitor(reference_fixture(), now_factory=lambda: NOW).build()
 
@@ -133,6 +197,146 @@ def test_monitor_derives_nearest_cross_category_routes_with_geometry_and_provena
     assert hospital_route.provenance.traffic_data_available is False
     assert hospital_route.provenance.source_providers == ("Critical route test provider",)
     assert hospital_route.provenance.source_licences == ("ODbL-1.0",)
+
+
+def test_active_full_closure_reroutes_affected_critical_route_without_speed_inference() -> None:
+    closure = disruption(
+        "viz:closure:ab",
+        "Vollsperrung",
+        {
+            "type": "LineString",
+            "coordinates": [[13.4000, 52.5200], [13.4100, 52.5200]],
+        },
+    )
+
+    snapshot = CriticalRouteMonitor(
+        reference_with_alternative(),
+        traffic_state=traffic_state(closure),
+        now_factory=lambda: NOW,
+    ).build()
+
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
+    assert snapshot.disruption_data_available is True
+    assert snapshot.traffic_data_available is False
+    assert route.travel_time_s == 120.0
+    assert route.edge_ids == ("ab", "bc")
+    assert route.route_state == "rerouted"
+    assert route.active_disruption_ids == ("viz:closure:ab",)
+    assert route.closed_edge_ids == ("ab",)
+    assert route.disruption_aware_travel_time_s == 200.0
+    assert route.disruption_aware_edge_ids == ("ax", "xc")
+    assert route.disruption_aware_geometry == {
+        "type": "LineString",
+        "coordinates": [[13.4, 52.52], [13.41, 52.53], [13.42, 52.52]],
+    }
+    assert route.travel_time_delta_s == 80.0
+
+
+def test_full_closure_without_alternative_marks_route_blocked() -> None:
+    closure = disruption(
+        "viz:closure:ab",
+        "Vollsperrung",
+        {
+            "type": "LineString",
+            "coordinates": [[13.4000, 52.5200], [13.4100, 52.5200]],
+        },
+    )
+
+    snapshot = CriticalRouteMonitor(
+        reference_fixture(),
+        traffic_state=traffic_state(closure),
+        now_factory=lambda: NOW,
+    ).build()
+
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
+    assert route.route_state == "blocked"
+    assert route.disruption_aware_travel_time_s is None
+    assert route.disruption_aware_geometry is None
+    assert route.closed_edge_ids == ("ab",)
+
+
+def test_non_closure_disruption_is_visible_without_invented_time_penalty() -> None:
+    works = disruption(
+        "viz:works:bc",
+        "keine Sperrung",
+        {
+            "type": "LineString",
+            "coordinates": [[13.4100, 52.5200], [13.4200, 52.5200]],
+        },
+    )
+
+    snapshot = CriticalRouteMonitor(
+        reference_fixture(),
+        traffic_state=traffic_state(works),
+        now_factory=lambda: NOW,
+    ).build()
+
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
+    assert route.route_state == "disrupted"
+    assert route.active_disruption_ids == ("viz:works:bc",)
+    assert route.closed_edge_ids == ()
+    assert route.disruption_aware_travel_time_s == 120.0
+    assert route.travel_time_delta_s == 0.0
+
+
+def test_expired_or_future_disruptions_do_not_change_route_state() -> None:
+    expired = disruption(
+        "viz:expired",
+        "Vollsperrung",
+        {"type": "Point", "coordinates": [13.405, 52.52]},
+    ).model_copy(
+        update={
+            "valid_from": NOW - timedelta(hours=3),
+            "valid_to": NOW - timedelta(hours=2),
+        }
+    )
+    future = disruption(
+        "viz:future",
+        "Vollsperrung",
+        {"type": "Point", "coordinates": [13.405, 52.52]},
+    ).model_copy(
+        update={
+            "valid_from": NOW + timedelta(hours=2),
+            "valid_to": NOW + timedelta(hours=3),
+        }
+    )
+
+    snapshot = CriticalRouteMonitor(
+        reference_fixture(),
+        traffic_state=traffic_state(expired, future),
+        now_factory=lambda: NOW,
+    ).build()
+
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
+    assert route.route_state == "baseline"
+    assert route.active_disruption_ids == ()
+    assert route.closed_edge_ids == ()
+    assert route.disruption_aware_travel_time_s == 120.0
+
+
+def test_stale_disruption_state_is_visible_but_does_not_change_routes() -> None:
+    closure = disruption(
+        "viz:stale-closure:ab",
+        "Vollsperrung",
+        {
+            "type": "LineString",
+            "coordinates": [[13.4000, 52.5200], [13.4100, 52.5200]],
+        },
+    )
+    stale_state = traffic_state(closure).model_copy(update={"freshness": FreshnessStatus.STALE})
+
+    snapshot = CriticalRouteMonitor(
+        reference_with_alternative(),
+        traffic_state=stale_state,
+        now_factory=lambda: NOW,
+    ).build()
+
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
+    assert snapshot.disruption_data_available is True
+    assert snapshot.disruption_freshness is FreshnessStatus.STALE
+    assert route.route_state == "baseline"
+    assert route.active_disruption_ids == ()
+    assert route.disruption_aware_travel_time_s == route.travel_time_s
 
 
 def test_monitor_keeps_routes_but_marks_snapshot_degraded_when_reference_has_source_error() -> None:

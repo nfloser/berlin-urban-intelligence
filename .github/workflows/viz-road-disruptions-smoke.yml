@@ -1,0 +1,212 @@
+name: Berlin VIZ road disruption smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/viz-road-disruptions-smoke.yml"
+      - "src/berlin_urban_intelligence/adapters/viz_road_disruptions.py"
+      - "src/berlin_urban_intelligence/runtime/traffic_disruptions.py"
+      - "scripts/refresh_traffic_disruptions.py"
+      - "config/sources.yaml"
+      - "tests/test_viz_road_disruptions.py"
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch official VIZ GeoJSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          curl --fail --silent --show-error --location \
+            --max-time 45 \
+            --retry 2 \
+            --retry-delay 2 \
+            -H 'Accept: application/geo+json, application/json' \
+            'https://api.viz.berlin.de/daten/baustellen_sperrungen_viz.json' \
+            -o evidence/viz-road-disruptions.json
+          test -s evidence/viz-road-disruptions.json
+          sha256sum evidence/viz-road-disruptions.json | tee evidence/sha256.txt
+
+      - name: Inspect provider schema
+        shell: python
+        run: |
+          import json
+          from collections import Counter
+          from datetime import UTC, datetime
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          source = Path("evidence/viz-road-disruptions.json")
+          payload = json.loads(source.read_text(encoding="utf-8-sig"))
+          if not isinstance(payload, dict) or payload.get("type") != "FeatureCollection":
+              raise SystemExit("VIZ response is not a GeoJSON FeatureCollection")
+          features = payload.get("features")
+          if not isinstance(features, list) or not features:
+              raise SystemExit("VIZ response contains no features")
+
+          property_keys = Counter()
+          geometry_types = Counter()
+          validity_shapes = Counter()
+          samples = []
+          berlin_tz = ZoneInfo("Europe/Berlin")
+          now_utc = datetime.now(UTC)
+          now_local = now_utc.astimezone(berlin_tz).replace(tzinfo=None)
+          active_count = 0
+          expired_count = 0
+          future_count = 0
+          validity_parse_errors = 0
+          validity_starts = []
+          validity_ends = []
+          source_updates = []
+          for feature in features:
+              if not isinstance(feature, dict):
+                  continue
+              geometry = feature.get("geometry")
+              if isinstance(geometry, dict):
+                  geometry_types[str(geometry.get("type"))] += 1
+              properties = feature.get("properties")
+              if not isinstance(properties, dict):
+                  continue
+              property_keys.update(properties.keys())
+              validity = properties.get("validity")
+              validity_shapes[type(validity).__name__] += 1
+              if isinstance(validity, dict):
+                  try:
+                      start = datetime.strptime(str(validity.get("from")), "%d.%m.%Y %H:%M")
+                      end = datetime.strptime(str(validity.get("to")), "%d.%m.%Y %H:%M")
+                      validity_starts.append(start)
+                      validity_ends.append(end)
+                      if start <= now_local <= end:
+                          active_count += 1
+                      elif end < now_local:
+                          expired_count += 1
+                      else:
+                          future_count += 1
+                  except (TypeError, ValueError):
+                      validity_parse_errors += 1
+              tstore = properties.get("tstore")
+              if isinstance(tstore, str):
+                  try:
+                      source_updates.append(
+                          datetime.fromisoformat(tstore.replace("Z", "+00:00")).astimezone(UTC)
+                      )
+                  except ValueError:
+                      pass
+              if len(samples) < 5:
+                  samples.append(
+                      {
+                          "feature_id": feature.get("id"),
+                          "property_id": properties.get("id"),
+                          "geometry_type": geometry.get("type") if isinstance(geometry, dict) else None,
+                          "subtype": properties.get("subtype"),
+                          "severity": properties.get("severity"),
+                          "validity": validity,
+                          "tstore": properties.get("tstore"),
+                          "netrefs": properties.get("netrefs"),
+                          "objectState": properties.get("objectState"),
+                          "is_future": properties.get("is_future"),
+                          "geometry": geometry,
+                          "street": properties.get("street"),
+                          "section": properties.get("section"),
+                          "content": properties.get("content"),
+                      }
+                  )
+
+          required = {"id", "subtype", "severity", "validity", "content"}
+          missing = sorted(required - set(property_keys))
+          subtype_counts = Counter(
+              str(feature.get("properties", {}).get("subtype"))
+              for feature in features
+              if isinstance(feature, dict) and isinstance(feature.get("properties"), dict)
+          )
+          severity_counts = Counter(
+              str(feature.get("properties", {}).get("severity"))
+              for feature in features
+              if isinstance(feature, dict) and isinstance(feature.get("properties"), dict)
+          )
+
+          summary = {
+              "type": payload.get("type"),
+              "feature_count": len(features),
+              "geometry_types": dict(sorted(geometry_types.items())),
+              "property_keys": sorted(property_keys),
+              "property_key_counts": dict(sorted(property_keys.items())),
+              "validity_shapes": dict(sorted(validity_shapes.items())),
+              "subtype_counts": dict(sorted(subtype_counts.items())),
+              "severity_counts": dict(sorted(severity_counts.items())),
+              "temporal_state": {
+                  "probe_now_utc": now_utc.isoformat(),
+                  "active_count": active_count,
+                  "expired_count": expired_count,
+                  "future_count": future_count,
+                  "validity_parse_errors": validity_parse_errors,
+                  "earliest_valid_from_local": (
+                      min(validity_starts).isoformat() if validity_starts else None
+                  ),
+                  "latest_valid_to_local": (
+                      max(validity_ends).isoformat() if validity_ends else None
+                  ),
+                  "latest_tstore_utc": (
+                      max(source_updates).isoformat() if source_updates else None
+                  ),
+                  "latest_tstore_age_hours": (
+                      round((now_utc - max(source_updates)).total_seconds() / 3600, 3)
+                      if source_updates
+                      else None
+                  ),
+              },
+              "missing_documented_keys": missing,
+              "samples": samples,
+          }
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          Path("evidence/schema-summary.json").write_text(
+              json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          if missing:
+              raise SystemExit(f"VIZ documented schema keys missing: {missing}")
+
+      - name: Discover live Masterportal disruption layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/masterportal
+          candidates=(
+            "https://viz.berlin.de/site/_masterportal/berlin/resources/services-internet.json"
+            "https://viz.berlin.de/site/_masterportal/berlin/resources/services.json"
+            "https://viz.berlin.de/site/_masterportal/resources/services-internet.json"
+          )
+          for url in "${candidates[@]}"; do
+            name=$(printf '%s' "$url" | sha256sum | cut -c1-12)
+            code=$(curl --silent --show-error --location --max-time 30 \
+              --output "evidence/masterportal/$name.json" \
+              --write-out '%{http_code}' "$url" || true)
+            printf '%s %s\n' "$code" "$url" | tee -a evidence/masterportal/status.txt
+            if [ "$code" = "200" ]; then
+              grep -n -i -C 8 'baustellen_viz\|Landesmeldestelle' \
+                "evidence/masterportal/$name.json" || true
+            fi
+          done
+
+      - name: Upload point-in-time schema evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: viz-road-disruption-schema-${{ github.run_id }}
+          path: |
+            evidence/schema-summary.json
+            evidence/sha256.txt
+            evidence/masterportal/
+          if-no-files-found: warn
+          retention-days: 14

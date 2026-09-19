@@ -110,6 +110,25 @@ sources:
       - Completeness and correctness vary by feature and area.
       - OSM objects must not be treated as authoritative critical-infrastructure truth without qualification.
 
+  - id: berlin_viz_road_disruptions
+    provider: Verkehrsinformationszentrale Berlin (VIZ)
+    dataset: Baustellen, Sperrungen und sonstige Störungen von besonderem verkehrlichem Interesse (VIZ-Redaktion)
+    domain: resilience
+    reference_url: https://daten.berlin.de/datensaetze/baustellen-sperrungen-und-sonstige-storungen-von-besonderem-verkehrlichem-interesse
+    api_url: https://api.viz.berlin.de/daten/baustellen_sperrungen_viz.json
+    authoritative: true
+    licence: Datenlizenz Deutschland - Namensnennung - Version 2.0
+    attribution: "Verkehrsinformationszentrale Berlin (VIZ) / Senatsverwaltung für Mobilität, Verkehr, Klimaschutz und Umwelt"
+    expected_update_frequency: hourly publication; editorial source updates depend on active reporting
+    temporal_coverage: current and scheduled editorial road disruptions
+    spatial_coverage: Berlin road network and publisher-relevant surrounding events
+    limitations:
+      - Berlin currently publishes parallel Landesmeldestelle and VIZ editorial feeds during an upstream system transition; the editorial feed is the route-impact source because it carries explicit severity.
+      - Only source severity Vollsperrung is allowed to remove matched road edges; other restrictions remain visible without an inferred speed penalty.
+      - Source freshness is derived from tstore and stale data is never allowed to alter routing.
+      - The feed reports disruptions and closures, not floating-car congestion speeds; traffic_data_available remains false.
+      - Spatial matching to the OSM-derived routing graph is approximate and explicitly distance-bounded.
+
   - id: stromnetz_berlin_grid_load
     provider: Stromnetz Berlin GmbH
     dataset: Jahreshöchstlast und Lastverlauf des Berliner Verteilungsnetzes

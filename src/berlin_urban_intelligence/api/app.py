@@ -48,8 +48,12 @@ from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedState
 from berlin_urban_intelligence.runtime.reference import ReferenceState, ReferenceStateStore
 from berlin_urban_intelligence.runtime.reload import ReloadingSnapshot
 from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
+from berlin_urban_intelligence.runtime.traffic_disruptions import (
+    TrafficDisruptionState,
+    TrafficDisruptionStateStore,
+)
 from berlin_urban_intelligence.scenario_engine.models import Scenario
-from berlin_urban_intelligence.shared.contracts import NetworkNode
+from berlin_urban_intelligence.shared.contracts import FreshnessStatus, NetworkNode
 from berlin_urban_intelligence.shared.observability import structured_log
 from berlin_urban_intelligence.shared.source_registry import SourceRegistry
 
@@ -59,6 +63,7 @@ DEFAULT_RUNTIME_STATE = PROJECT_ROOT / "data" / "runtime" / "state.json"
 DEFAULT_REFERENCE_STATE = PROJECT_ROOT / "data" / "runtime" / "reference.json"
 DEFAULT_ENERGY_STATE = PROJECT_ROOT / "data" / "runtime" / "energy.json"
 DEFAULT_DERIVED_STATE = PROJECT_ROOT / "data" / "runtime" / "derived.json"
+DEFAULT_TRAFFIC_DISRUPTION_STATE = PROJECT_ROOT / "data" / "runtime" / "traffic-disruptions.json"
 DEFAULT_SOURCE_REGISTRY = PROJECT_ROOT / "config" / "sources.yaml"
 MAX_PAGE_SIZE = 1000
 
@@ -154,6 +159,9 @@ class _ApiStateController:
         reference_path = _path_from_env("BUI_REFERENCE_STATE", DEFAULT_REFERENCE_STATE)
         energy_path = _path_from_env("BUI_ENERGY_STATE", DEFAULT_ENERGY_STATE)
         derived_path = _path_from_env("BUI_DERIVED_STATE", DEFAULT_DERIVED_STATE)
+        traffic_path = _path_from_env(
+            "BUI_TRAFFIC_DISRUPTION_STATE", DEFAULT_TRAFFIC_DISRUPTION_STATE
+        )
         self._runtime: ReloadingSnapshot[RuntimeState] = ReloadingSnapshot(
             runtime_path, RuntimeStateStore(runtime_path).load
         )
@@ -166,6 +174,11 @@ class _ApiStateController:
         self._derived: ReloadingSnapshot[DerivedState] = ReloadingSnapshot(
             derived_path, DerivedStateStore(derived_path).load
         )
+        self._traffic_disruptions: ReloadingSnapshot[TrafficDisruptionState] = ReloadingSnapshot(
+            traffic_path,
+            TrafficDisruptionStateStore(traffic_path).load,
+            name="traffic_disruptions",
+        )
         self._lock = RLock()
         self._critical_routes: CriticalRouteSnapshot | None = None
 
@@ -175,7 +188,8 @@ class _ApiStateController:
             self._reference.refresh(force=True)
             self._energy.refresh(force=True)
             self._derived.refresh(force=True)
-            self._apply(app, reference_changed=True)
+            self._traffic_disruptions.refresh(force=True)
+            self._apply(app, reference_changed=True, traffic_changed=True)
 
     def refresh(self, app: FastAPI) -> None:
         with self._lock:
@@ -183,8 +197,21 @@ class _ApiStateController:
             reference_changed = self._reference.refresh()
             energy_changed = self._energy.refresh()
             derived_changed = self._derived.refresh()
-            if any((runtime_changed, reference_changed, energy_changed, derived_changed)):
-                self._apply(app, reference_changed=reference_changed)
+            traffic_changed = self._traffic_disruptions.refresh()
+            if any(
+                (
+                    runtime_changed,
+                    reference_changed,
+                    energy_changed,
+                    derived_changed,
+                    traffic_changed,
+                )
+            ):
+                self._apply(
+                    app,
+                    reference_changed=reference_changed,
+                    traffic_changed=traffic_changed,
+                )
 
     def diagnostics(self) -> dict[str, object]:
         with self._lock:
@@ -193,15 +220,28 @@ class _ApiStateController:
                 "reference": self._reference.diagnostic.model_dump(mode="json"),
                 "energy": self._energy.diagnostic.model_dump(mode="json"),
                 "derived": self._derived.diagnostic.model_dump(mode="json"),
+                "traffic_disruptions": self._traffic_disruptions.diagnostic.model_dump(
+                    mode="json"
+                ),
             }
 
-    def _apply(self, app: FastAPI, *, reference_changed: bool) -> None:
-        if reference_changed or self._critical_routes is None:
-            self._critical_routes = CriticalRouteMonitor(self._reference.value).build()
+    def _apply(
+        self,
+        app: FastAPI,
+        *,
+        reference_changed: bool,
+        traffic_changed: bool,
+    ) -> None:
+        if reference_changed or traffic_changed or self._critical_routes is None:
+            self._critical_routes = CriticalRouteMonitor(
+                self._reference.value,
+                traffic_state=self._traffic_disruptions.value,
+            ).build()
         app.state.runtime = self._runtime.value
         app.state.reference = self._reference.value
         app.state.energy_state = self._energy.value
         app.state.derived = self._derived.value
+        app.state.traffic_disruptions = self._traffic_disruptions.value
         app.state.critical_routes = self._critical_routes
         app.state.agents = _build_agents(
             self._runtime.value,
@@ -284,6 +324,7 @@ def create_app() -> FastAPI:
         reference: ReferenceState | None = request.app.state.reference
         energy_state: EnergyState | None = request.app.state.energy_state
         derived: DerivedState | None = request.app.state.derived
+        traffic: TrafficDisruptionState | None = request.app.state.traffic_disruptions
         controller: _ApiStateController = request.app.state.snapshot_controller
         return {
             "name": "Berlin Urban Intelligence",
@@ -293,6 +334,7 @@ def create_app() -> FastAPI:
             "reference_generated_at": reference.generated_at if reference else None,
             "energy_generated_at": energy_state.generated_at if energy_state else None,
             "derived_generated_at": derived.generated_at if derived else None,
+            "traffic_disruption_generated_at": traffic.generated_at if traffic else None,
             "snapshot_reload": controller.diagnostics(),
             "synthetic_production_fallback": False,
         }
@@ -336,6 +378,7 @@ def create_app() -> FastAPI:
     def state(request: Request) -> dict[str, object]:
         runtime: RuntimeState | None = request.app.state.runtime
         reference: ReferenceState | None = request.app.state.reference
+        traffic: TrafficDisruptionState | None = request.app.state.traffic_disruptions
         return {
             "runtime": runtime.model_dump(mode="json") if runtime else None,
             "reference_summary": {
@@ -348,6 +391,65 @@ def create_app() -> FastAPI:
             }
             if reference
             else None,
+            "traffic_disruption_summary": {
+                "generated_at": traffic.generated_at,
+                "source_id": traffic.source_id,
+                "freshness": traffic.freshness,
+                "source_error": traffic.source_error,
+                "disruptions": len(traffic.disruptions),
+            }
+            if traffic
+            else None,
+        }
+
+    @app.get("/api/v1/traffic/disruptions")
+    def traffic_disruptions(
+        request: Request,
+        active_only: bool = Query(default=True),
+        offset: int = Query(default=0, ge=0),
+        limit: int = Query(default=250, ge=1, le=MAX_PAGE_SIZE),
+    ) -> dict[str, object]:
+        traffic: TrafficDisruptionState | None = request.app.state.traffic_disruptions
+        if traffic is None:
+            return {
+                "generated_at": None,
+                "source_id": "berlin_viz_road_disruptions",
+                "last_success_at": None,
+                "latest_source_update_at": None,
+                "source_error": "STATE_UNAVAILABLE",
+                "freshness": FreshnessStatus.UNAVAILABLE.value,
+                "routing_eligible": False,
+                "evaluated_at": None,
+                "disruption_count_total": 0,
+                "active_count_total": 0,
+                "returned": 0,
+                "truncated": False,
+                "disruptions": [],
+            }
+
+        active = tuple(
+            item for item in traffic.disruptions if item.active_at(traffic.generated_at)
+        )
+        selected = active if active_only else traffic.disruptions
+        page = _slice(selected, offset, limit)
+        return {
+            "generated_at": traffic.generated_at,
+            "source_id": traffic.source_id,
+            "last_success_at": traffic.last_success_at,
+            "latest_source_update_at": traffic.latest_source_update_at,
+            "source_error": traffic.source_error,
+            "freshness": traffic.freshness.value,
+            "routing_eligible": (
+                traffic.last_success_at is not None
+                and traffic.source_error is None
+                and traffic.freshness is FreshnessStatus.VALID
+            ),
+            "evaluated_at": traffic.generated_at,
+            "disruption_count_total": len(traffic.disruptions),
+            "active_count_total": len(active),
+            "returned": len(page),
+            "truncated": offset + len(page) < len(selected),
+            "disruptions": [item.model_dump(mode="json") for item in page],
         }
 
     @app.get("/api/v1/observations")
