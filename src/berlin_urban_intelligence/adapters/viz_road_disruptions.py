@@ -31,9 +31,7 @@ def _local_berlin_time(value: object, field_name: str) -> datetime:
             else datetime.strptime(text, "%d.%m.%Y %H:%M")
         )
     except ValueError as exc:
-        raise ValueError(
-            f"{field_name} must use YYYY-MM-DDTHH:MM or DD.MM.YYYY HH:MM"
-        ) from exc
+        raise ValueError(f"{field_name} must use YYYY-MM-DDTHH:MM or DD.MM.YYYY HH:MM") from exc
     if naive.tzinfo is not None:
         raise ValueError(f"{field_name} must be a timezone-naive Berlin civil time")
 
