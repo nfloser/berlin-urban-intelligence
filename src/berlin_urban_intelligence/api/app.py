@@ -40,7 +40,10 @@ from berlin_urban_intelligence.orchestrator.engine import (
     OrchestrationRequest,
     Orchestrator,
 )
-from berlin_urban_intelligence.runtime.critical_routes import CriticalRouteMonitor, CriticalRouteSnapshot
+from berlin_urban_intelligence.runtime.critical_routes import (
+    CriticalRouteMonitor,
+    CriticalRouteSnapshot,
+)
 from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedStateStore
 from berlin_urban_intelligence.runtime.reference import ReferenceState, ReferenceStateStore
 from berlin_urban_intelligence.runtime.reload import ReloadingSnapshot
