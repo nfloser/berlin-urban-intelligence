@@ -168,9 +168,7 @@ def test_monitor_degrades_when_a_snapped_facility_is_on_an_isolated_node() -> No
 
     assert snapshot.status is AvailabilityStatus.DEGRADED
     assert "facility:isolated" in snapshot.unreachable_facility_ids
-    assert "facility:isolated" not in {
-        route.origin_facility_id for route in snapshot.routes
-    }
+    assert "facility:isolated" not in {route.origin_facility_id for route in snapshot.routes}
     assert len(snapshot.routes) == 3
 
 
