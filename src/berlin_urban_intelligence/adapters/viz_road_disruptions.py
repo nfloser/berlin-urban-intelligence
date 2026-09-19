@@ -13,17 +13,29 @@ from berlin_urban_intelligence.shared.contracts import Provenance, SpatialRefere
 
 BERLIN_TZ = ZoneInfo("Europe/Berlin")
 PROVIDER = "Verkehrsinformationszentrale Berlin (VIZ)"
-DATASET = "Baustellen, Sperrungen und sonstige Störungen von besonderem verkehrlichem Interesse"
+DATASET = (
+    "Baustellen, Sperrungen und sonstige Störungen von besonderem verkehrlichem Interesse "
+    "(VIZ-Redaktion)"
+)
 LICENCE = "Datenlizenz Deutschland - Namensnennung - Version 2.0"
 
 
 def _local_berlin_time(value: object, field_name: str) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{field_name} must be a non-empty Berlin local-time string")
+    text = value.strip()
     try:
-        naive = datetime.strptime(value.strip(), "%d.%m.%Y %H:%M")
+        naive = (
+            datetime.fromisoformat(text)
+            if "T" in text
+            else datetime.strptime(text, "%d.%m.%Y %H:%M")
+        )
     except ValueError as exc:
-        raise ValueError(f"{field_name} must use DD.MM.YYYY HH:MM") from exc
+        raise ValueError(
+            f"{field_name} must use YYYY-MM-DDTHH:MM or DD.MM.YYYY HH:MM"
+        ) from exc
+    if naive.tzinfo is not None:
+        raise ValueError(f"{field_name} must be a timezone-naive Berlin civil time")
 
     first = naive.replace(tzinfo=BERLIN_TZ, fold=0)
     second = naive.replace(tzinfo=BERLIN_TZ, fold=1)
@@ -79,7 +91,7 @@ def _network_reference_ids(value: object) -> tuple[str, ...]:
 class VizRoadDisruptionClient:
     """Small network client restricted to the official public VIZ disruption endpoint."""
 
-    source_url = "https://api.viz.berlin.de/daten/baustellen_sperrungen.json"
+    source_url = "https://api.viz.berlin.de/daten/baustellen_sperrungen_viz.json"
 
     def __init__(self, *, client: httpx.Client | None = None, timeout_s: float = 30.0) -> None:
         self._owned_client = client is None
