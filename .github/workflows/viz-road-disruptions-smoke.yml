@@ -33,7 +33,7 @@ jobs:
             --retry 2 \
             --retry-delay 2 \
             -H 'Accept: application/geo+json, application/json' \
-            'https://api.viz.berlin.de/daten/baustellen_sperrungen.json' \
+            'https://api.viz.berlin.de/tic3/baustellen_sperrungen_tic.json' \
             -o evidence/viz-road-disruptions.json
           test -s evidence/viz-road-disruptions.json
           sha256sum evidence/viz-road-disruptions.json | tee evidence/sha256.txt
