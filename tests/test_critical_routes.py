@@ -306,9 +306,7 @@ def test_expired_or_future_disruptions_do_not_change_route_state() -> None:
         now_factory=lambda: NOW,
     ).build()
 
-    route = next(
-        item for item in snapshot.routes if item.origin_facility_id == "facility:hospital"
-    )
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
     assert route.route_state == "baseline"
     assert route.active_disruption_ids == ()
     assert route.closed_edge_ids == ()
