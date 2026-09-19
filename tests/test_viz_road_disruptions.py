@@ -21,18 +21,25 @@ def sample_feature_collection() -> dict[str, object]:
         "features": [
             {
                 "type": "Feature",
-                "id": "viz:closure:1",
                 "geometry": {
-                    "type": "LineString",
-                    "coordinates": [[13.3880, 52.5160], [13.3900, 52.5165]],
+                    "type": "GeometryCollection",
+                    "geometries": [
+                        {"type": "Point", "coordinates": [13.3890, 52.5162]},
+                        {
+                            "type": "LineString",
+                            "coordinates": [[13.3880, 52.5160], [13.3900, 52.5165]],
+                        },
+                    ],
                 },
                 "properties": {
+                    "id": "viz:closure:1",
                     "subtype": "Sperrung",
                     "severity": "Vollsperrung",
-                    "@validity": {
-                        "from": "2026-09-19T14:00:00+00:00",
-                        "to": "2026-09-20T18:00:00+00:00",
+                    "validity": {
+                        "from": "19.09.2026 16:00",
+                        "to": "20.09.2026 20:00",
                     },
+                    "tstore": "2026-09-19T14:05:00Z",
                     "street": "Behrenstraße",
                     "section": "zwischen Glinkastraße und Wilhelmstraße",
                     "content": "Vollsperrung für den Kfz-Verkehr",
@@ -46,12 +53,14 @@ def sample_feature_collection() -> dict[str, object]:
                     "coordinates": [13.4050, 52.5200],
                 },
                 "properties": {
+                    "id": "viz:works:2",
                     "subtype": "Baustelle",
-                    "severity": "Fahrbahn verengt",
-                    "@validity": {
-                        "from": "2026-09-19T15:00:00+00:00",
-                        "to": "2026-09-21T16:00:00+00:00",
+                    "severity": "keine Sperrung",
+                    "validity": {
+                        "from": "19.09.2026 17:00",
+                        "to": "21.09.2026 18:00",
                     },
+                    "tstore": "2026-09-19T15:01:00Z",
                     "street": "Alexanderstraße",
                     "section": "Höhe Musterstraße",
                     "content": "Leitungsarbeiten",
@@ -78,9 +87,10 @@ def test_adapter_parses_official_documented_fields_without_inventing_speed_penal
     assert closure.description == "Vollsperrung für den Kfz-Verkehr"
     assert closure.valid_from == datetime(2026, 9, 19, 14, 0, tzinfo=UTC)
     assert closure.valid_to == datetime(2026, 9, 20, 18, 0, tzinfo=UTC)
+    assert closure.source_updated_at == datetime(2026, 9, 19, 14, 5, tzinfo=UTC)
     assert closure.is_full_closure is True
     assert closure.speed_penalty_factor is None
-    assert closure.spatial.geometry["type"] == "LineString"
+    assert closure.spatial.geometry["type"] == "GeometryCollection"
     assert closure.provenance.provider == "Verkehrsinformationszentrale Berlin (VIZ)"
     assert closure.provenance.source_licence == (
         "Datenlizenz Deutschland - Namensnennung - Version 2.0"
@@ -106,9 +116,9 @@ def test_adapter_rejects_semantic_schema_drift() -> None:
 
 def test_adapter_rejects_invalid_or_missing_validity() -> None:
     payload = sample_feature_collection()
-    payload["features"][0]["properties"]["@validity"] = {
-        "from": "2026-09-20T20:00:00+00:00",
-        "to": "2026-09-19T20:00:00+00:00",
+    payload["features"][0]["properties"]["validity"] = {
+        "from": "20.09.2026 22:00",
+        "to": "19.09.2026 22:00",
     }
 
     with pytest.raises((ValueError, ValidationError)):
