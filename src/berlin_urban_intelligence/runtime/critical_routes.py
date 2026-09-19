@@ -279,6 +279,21 @@ class CriticalRouteMonitor:
         disruption_shape = self._metric_shape(disruption.spatial.geometry or {})
         return bool(route_shape.distance(disruption_shape) <= self._disruption_match_distance_m)
 
+    def _edge_matches_disruption(
+        self,
+        edge_geometry: dict[str, object],
+        disruption: TrafficDisruption,
+    ) -> bool:
+        edge_shape = self._metric_shape(edge_geometry)
+        disruption_shape = self._metric_shape(disruption.spatial.geometry or {})
+        intersection = edge_shape.intersection(disruption_shape)
+        if float(intersection.length) > 1.0:
+            return True
+        midpoint = edge_shape.interpolate(0.5, normalized=True)
+        return bool(
+            midpoint.distance(disruption_shape) <= self._disruption_match_distance_m
+        )
+
     def _closed_edge_ids(
         self,
         *,
@@ -289,18 +304,14 @@ class CriticalRouteMonitor:
         full_closures = tuple(item for item in disruptions if item.is_full_closure)
         if not full_closures:
             return ()
-        closure_shapes = [
-            (item.id, self._metric_shape(item.spatial.geometry or {})) for item in full_closures
-        ]
         closed: set[str] = set()
         for edge in reference.network_edges:
             geometry = self._edge_geometry(edge, nodes)
             if geometry is None:
                 continue
-            edge_shape = self._metric_shape(geometry)
             if any(
-                edge_shape.distance(closure_shape) <= self._disruption_match_distance_m
-                for _, closure_shape in closure_shapes
+                self._edge_matches_disruption(geometry, disruption)
+                for disruption in full_closures
             ):
                 closed.add(edge.id)
         return tuple(sorted(closed))
@@ -696,7 +707,7 @@ class CriticalRouteMonitor:
                 "Routes are recomputed from the current persisted weighted road/reference "
                 "snapshot. Active official VIZ disruptions can mark routes disrupted, rerouted "
                 "or blocked; only severity=Vollsperrung removes matched road edges. "
-                "No live congestion-speed telemetry is integrated and no speed penalty is "
+                "No live traffic congestion-speed telemetry is integrated and no speed penalty is "
                 "invented for other restrictions."
             ),
         )
