@@ -16,6 +16,7 @@ from berlin_urban_intelligence.runtime.traffic_disruptions import (
 from berlin_urban_intelligence.shared.contracts import (
     AvailabilityStatus,
     CriticalFacility,
+    FreshnessStatus,
     NetworkEdge,
     NetworkNode,
     Provenance,
@@ -311,6 +312,33 @@ def test_expired_or_future_disruptions_do_not_change_route_state() -> None:
     assert route.active_disruption_ids == ()
     assert route.closed_edge_ids == ()
     assert route.disruption_aware_travel_time_s == 120.0
+
+
+def test_stale_disruption_state_is_visible_but_does_not_change_routes() -> None:
+    closure = disruption(
+        "viz:stale-closure:ab",
+        "Vollsperrung",
+        {
+            "type": "LineString",
+            "coordinates": [[13.4000, 52.5200], [13.4100, 52.5200]],
+        },
+    )
+    stale_state = traffic_state(closure).model_copy(
+        update={"freshness": FreshnessStatus.STALE}
+    )
+
+    snapshot = CriticalRouteMonitor(
+        reference_with_alternative(),
+        traffic_state=stale_state,
+        now_factory=lambda: NOW,
+    ).build()
+
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
+    assert snapshot.disruption_data_available is True
+    assert snapshot.disruption_freshness is FreshnessStatus.STALE
+    assert route.route_state == "baseline"
+    assert route.active_disruption_ids == ()
+    assert route.disruption_aware_travel_time_s == route.travel_time_s
 
 
 def test_monitor_keeps_routes_but_marks_snapshot_degraded_when_reference_has_source_error() -> None:
