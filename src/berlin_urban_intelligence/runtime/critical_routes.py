@@ -247,7 +247,11 @@ class CriticalRouteMonitor:
         facilities = {item.id: item for item in reference.critical_facilities}
         nodes = {item.id: item for item in reference.network_nodes}
         unsnapped = tuple(
-            sorted(item.id for item in reference.critical_facilities if item.id not in links_by_facility)
+            sorted(
+                item.id
+                for item in reference.critical_facilities
+                if item.id not in links_by_facility
+            )
         )
         graph = self._build_graph(reference.network_edges)
         reverse_graph = graph.reverse(copy=False)
@@ -272,7 +276,9 @@ class CriticalRouteMonitor:
                 for facility, node_id in items
             ]
             if not target_links:
-                unreachable.update(facility.id for facility, _ in links_by_category[origin_category])
+                unreachable.update(
+                    facility.id for facility, _ in links_by_category[origin_category]
+                )
                 continue
             target_node_ids = sorted({node_id for _, node_id in target_links})
             _, reverse_paths = nx.multi_source_dijkstra(
