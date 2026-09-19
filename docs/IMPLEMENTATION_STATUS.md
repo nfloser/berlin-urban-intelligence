@@ -2,28 +2,31 @@
 
 ## Current phase
 
-Phase 23 — **v1.0.0 release candidate**.
+Phase 24 — **post-v1 dynamic critical-route monitoring**.
 
-The repository-wide v1 evidence closure is complete. Security (#18), structured observability (#19), reproducible real Berlin energy evidence (#20), multiple source-backed cross-domain workflows (#21) and real Berlin road-network readiness (#14) are verified against the documented acceptance contracts.
+The v1.0 evidence baseline remains PASS and the release-candidate metadata was squash-merged to `main` in PR #37 as `8300ba79715d6080b54a29a0ed9c837705c73fd9`. GitHub publication issue #36 remains open only for creation/verification of the external `v1.0.0` tag and GitHub Release; it is not an application-runtime blocker.
 
-The aggregate v1.0 evidence gate is **PASS**. PR #35 was squash-merged to `main` as `bc3c63521895be019b91e322b679f62e0f34be5f` after final protected backend/frontend/container CI and independent real-energy evidence passed. Issue #14 is closed with the successful live OSM evidence and retained failed-provider attempts.
+Issue #38 / PR #39 adds automatic critical-facility route monitoring over the current persisted road/reference snapshot. The feature is post-v1 development and is recorded under the changelog's `Unreleased` section rather than being retroactively attributed to the reviewed v1.0.0 release candidate.
 
-Issue #36 / PR #37 now prepares the first stable Semantic Versioning release. The release work is intentionally separated from feature/evidence closure: version metadata, public release documentation and the eventual GitHub tag/release are reviewed and verified on a dedicated `release/1.0.0` branch before any tag is created.
+## Current feature work
 
-## Current release work
+PR #39 follows TDD. Initial test-only CI run `35446611803` was RED before the `runtime.critical_routes` implementation existed.
 
-PR #37 introduces a permanent stable-release metadata contract and prepares version `1.0.0`.
+The implementation now:
 
-TDD evidence for the release contract is explicit:
+- snaps persisted critical facilities to the persisted road network using the existing metric snapping contract;
+- derives the nearest reachable facility in another critical-facility category using weighted multi-source Dijkstra searches;
+- returns route geometry, travel time, road distance, nodes, edge IDs, quality/freshness and source/licence provenance;
+- caches the full monitor result against the reference snapshot and recomputes it only when validated reference state changes;
+- exposes a bounded `GET /api/v1/resilience/critical-routes` API;
+- polls that inexpensive cached API from the dashboard every 15 seconds;
+- renders all monitored routes automatically as a persistent MapLibre layer, with a separate highlighted selected route;
+- provides both pointer route selection and keyboard-accessible select-based inspection;
+- keeps missing roads/facilities, source errors, unsnapped facilities and unreachable facilities explicit rather than fabricating route data.
 
-- the initial test-only CI exposed repository-style issues that were corrected without changing release metadata;
-- run `35094619615` then passed Ruff and strict mypy and reached the intended RED state in Pytest: **145 existing tests passed and exactly one new release-metadata test failed** because the repository still declared major version `0`;
-- implementation then updated `VERSION`, `pyproject.toml`, public README release claims, changelog and versioned release notes;
-- the remaining central documentation is being aligned before the final protected release-candidate run.
+The current route monitor does **not** integrate verified real-time road congestion telemetry. Every response exposes `traffic_data_available=false`, and the dashboard explicitly labels current route costs as baseline persisted road weights. A future verified traffic source may update route costs through the same contract without relabelling baseline data as live traffic.
 
-The release metadata regression test requires the stable version to be consistent across `VERSION`, Python project metadata and README, verifies the MIT licence disclosure, requires a dated changelog entry and requires versioned release notes with explicit limitations.
-
-No release tag is created from the branch head. `v1.0.0` will be published only from the reviewed, CI-verified merged release commit.
+Deterministic tests cover normal routing, exact geometry/travel-time/length reconstruction, provenance, source-error degradation, missing-input unavailability, isolated-node degradation, bounded API behavior and recomputation after reference-snapshot replacement. Composed browser acceptance verifies automatic route rendering and keyboard inspection from persisted state.
 
 ## Verified v1 evidence baseline
 
@@ -68,8 +71,8 @@ This is point-in-time provider compatibility/readiness evidence, not a guarantee
 - Source-backed cross-domain products are omitted when required inputs are absent; no synthetic replacement score is generated.
 - RDF projection and bounded semantic relationship inspection use validated persisted state.
 - FastAPI exposes system/source/agent/domain/reference/scenario/derived/dependency/semantic/map and resilience surfaces.
-- The React/MapLibre dashboard exposes reference/provenance inspection, platform/derived inspection, deterministic workflows, explicit cross-domain interpretation, scenarios and baseline-versus-disruption routing.
-- Critical resilience routing has an equivalent coordinate-driven keyboard path over the same routing APIs.
+- The React/MapLibre dashboard exposes reference/provenance inspection, platform/derived inspection, deterministic workflows, explicit cross-domain interpretation, scenarios, baseline-versus-disruption routing and automatic critical-route monitoring.
+- Critical resilience routing has an equivalent coordinate-driven keyboard path over the same routing APIs; automatic monitored critical routes additionally expose a keyboard-selectable inspector.
 - Browser acceptance runs against the composed application stack and includes pinned Axe accessibility scanning for representative states.
 - Structured observability covers request, source-refresh, reload, derivation-refresh and scenario boundaries with safe low-cardinality fields.
 - Security and dependency-audit workflows remain separate from application-domain logic.
