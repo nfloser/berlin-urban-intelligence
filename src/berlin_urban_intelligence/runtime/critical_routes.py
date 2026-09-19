@@ -290,9 +290,7 @@ class CriticalRouteMonitor:
         if float(intersection.length) > 1.0:
             return True
         midpoint = edge_shape.interpolate(0.5, normalized=True)
-        return bool(
-            midpoint.distance(disruption_shape) <= self._disruption_match_distance_m
-        )
+        return bool(midpoint.distance(disruption_shape) <= self._disruption_match_distance_m)
 
     def _closed_edge_ids(
         self,
@@ -310,8 +308,7 @@ class CriticalRouteMonitor:
             if geometry is None:
                 continue
             if any(
-                self._edge_matches_disruption(geometry, disruption)
-                for disruption in full_closures
+                self._edge_matches_disruption(geometry, disruption) for disruption in full_closures
             ):
                 closed.add(edge.id)
         return tuple(sorted(closed))
