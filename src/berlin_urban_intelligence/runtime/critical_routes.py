@@ -27,7 +27,6 @@ from berlin_urban_intelligence.shared.contracts import (
     QualityFlag,
 )
 
-
 _TO_METRIC = Transformer.from_crs("EPSG:4326", "EPSG:25833", always_xy=True).transform
 
 
