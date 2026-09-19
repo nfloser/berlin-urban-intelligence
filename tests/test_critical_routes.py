@@ -133,9 +133,7 @@ def disruption(
         provenance=Provenance(
             provider="Verkehrsinformationszentrale Berlin (VIZ)",
             dataset="VIZ road disruptions",
-            source_url=HttpUrl(
-                "https://api.viz.berlin.de/daten/baustellen_sperrungen.json"
-            ),
+            source_url=HttpUrl("https://api.viz.berlin.de/daten/baustellen_sperrungen.json"),
             original_identifier=disruption_id,
             observation_time=NOW - timedelta(minutes=5),
             retrieved_at=NOW,
@@ -200,7 +198,6 @@ def test_monitor_derives_nearest_cross_category_routes_with_geometry_and_provena
     assert hospital_route.provenance.source_licences == ("ODbL-1.0",)
 
 
-
 def test_active_full_closure_reroutes_affected_critical_route_without_speed_inference() -> None:
     closure = disruption(
         "viz:closure:ab",
@@ -217,9 +214,7 @@ def test_active_full_closure_reroutes_affected_critical_route_without_speed_infe
         now_factory=lambda: NOW,
     ).build()
 
-    route = next(
-        item for item in snapshot.routes if item.origin_facility_id == "facility:hospital"
-    )
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
     assert snapshot.disruption_data_available is True
     assert snapshot.traffic_data_available is False
     assert route.travel_time_s == 120.0
