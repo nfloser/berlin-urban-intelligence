@@ -247,9 +247,7 @@ def test_full_closure_without_alternative_marks_route_blocked() -> None:
         now_factory=lambda: NOW,
     ).build()
 
-    route = next(
-        item for item in snapshot.routes if item.origin_facility_id == "facility:hospital"
-    )
+    route = next(item for item in snapshot.routes if item.origin_facility_id == "facility:hospital")
     assert route.route_state == "blocked"
     assert route.disruption_aware_travel_time_s is None
     assert route.disruption_aware_geometry is None
