@@ -115,7 +115,7 @@ test("reference map loads the viewport, reloads after navigation and inspects ca
 
   const map = page.getByLabel("Berlin domain map");
   await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
-  await expect(page.getByText(/Critical facilities · 1 visible \/ 1 in viewport · 1 total/)).toBeVisible();
+  await expect(page.getByText(/Critical facilities · 2 visible \/ 2 in viewport · 2 total/)).toBeVisible();
   await expect(page.getByText(/VBB stops · 1 visible \/ 1 in viewport · 1 total/)).toBeVisible();
   await expect(
     page.getByText(/Official climate features · 1 visible \/ 1 in viewport · 1 total/),
@@ -166,7 +166,7 @@ test("a failed current viewport request clears the previous rendering projection
   await page.goto("/");
   const map = page.getByLabel("Berlin domain map");
   await expect(map).toHaveAttribute("data-reference-layers-ready", "true", { timeout: 15_000 });
-  await expect(page.getByText(/Critical facilities · 1 visible/)).toBeVisible();
+  await expect(page.getByText(/Critical facilities · 2 visible/)).toBeVisible();
 
   await page.locator(".maplibregl-ctrl-zoom-in").click();
 
