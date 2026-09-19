@@ -215,6 +215,52 @@ export type RouteComparisonResponse = {
   scenario_geometry: Geometry | null;
 };
 
+export type CriticalRouteProvenance = {
+  reference_generated_at: string;
+  computed_at: string;
+  source_providers: string[];
+  source_datasets: string[];
+  source_licences: string[];
+  processing_method: string;
+  traffic_data_available: false;
+};
+
+export type CriticalRoute = {
+  id: string;
+  origin_facility_id: string;
+  origin_name: string;
+  origin_category: string;
+  destination_facility_id: string;
+  destination_name: string;
+  destination_category: string;
+  travel_time_s: number;
+  length_m: number;
+  node_path: string[];
+  edge_ids: string[];
+  geometry: Geometry;
+  quality: string;
+  freshness: string;
+  route_state: "baseline";
+  provenance: CriticalRouteProvenance;
+};
+
+export type CriticalRouteSnapshotResponse = {
+  computed_at: string;
+  reference_generated_at: string | null;
+  status: "available" | "degraded" | "unavailable" | "unknown";
+  freshness: string;
+  quality: string;
+  unsnapped_facility_ids: string[];
+  unreachable_facility_ids: string[];
+  source_errors: Record<string, string>;
+  traffic_data_available: false;
+  note: string;
+  route_count_total: number;
+  returned: number;
+  truncated: boolean;
+  routes: CriticalRoute[];
+};
+
 export type AssessmentResponse = {
   generated_at: string;
   scenario_name: string;
