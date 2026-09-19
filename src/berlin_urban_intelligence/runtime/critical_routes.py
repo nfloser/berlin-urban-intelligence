@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, cast
 
 import networkx as nx
 from pydantic import BaseModel, ConfigDict, Field
@@ -288,11 +288,15 @@ class CriticalRouteMonitor:
                     facility.id for facility, _ in links_by_category[origin_category]
                 )
                 continue
-            _, reverse_paths = nx.multi_source_dijkstra(
-                reverse_graph,
-                sources=target_node_ids,
-                weight="travel_time_s",
+            dijkstra_result = cast(
+                tuple[dict[str, float], dict[str, list[str]]],
+                nx.multi_source_dijkstra(
+                    reverse_graph,
+                    sources=target_node_ids,
+                    weight="travel_time_s",
+                ),
             )
+            _, reverse_paths = dijkstra_result
             allowed_target_ids = {facility.id for facility, _ in target_links}
             for origin, origin_node_id in sorted(
                 links_by_category[origin_category],
