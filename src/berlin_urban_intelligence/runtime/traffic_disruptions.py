@@ -92,6 +92,7 @@ class TrafficDisruptionState(CanonicalModel):
     source_id: str = Field(min_length=1)
     disruptions: tuple[TrafficDisruption, ...] = ()
     last_success_at: datetime | None = None
+    latest_source_update_at: datetime | None = None
     source_error: str | None = None
     freshness: FreshnessStatus = FreshnessStatus.UNKNOWN
 
@@ -107,6 +108,12 @@ class TrafficDisruptionState(CanonicalModel):
                 self,
                 "last_success_at",
                 _aware_utc(self.last_success_at, "last_success_at"),
+            )
+        if self.latest_source_update_at is not None:
+            object.__setattr__(
+                self,
+                "latest_source_update_at",
+                _aware_utc(self.latest_source_update_at, "latest_source_update_at"),
             )
         return self
 
