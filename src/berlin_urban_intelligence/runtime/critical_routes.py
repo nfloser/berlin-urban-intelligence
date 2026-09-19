@@ -290,8 +290,7 @@ class CriticalRouteMonitor:
         if not full_closures:
             return ()
         closure_shapes = [
-            (item.id, self._metric_shape(item.spatial.geometry or {}))
-            for item in full_closures
+            (item.id, self._metric_shape(item.spatial.geometry or {})) for item in full_closures
         ]
         closed: set[str] = set()
         for edge in reference.network_edges:
@@ -338,17 +337,13 @@ class CriticalRouteMonitor:
             return route
 
         matched = tuple(
-            item
-            for item in active_disruptions
-            if self._matches_geometry(route.geometry, item)
+            item for item in active_disruptions if self._matches_geometry(route.geometry, item)
         )
         matched_ids = tuple(item.id for item in matched)
         route_closed_edges = tuple(
             edge_id for edge_id in route.edge_ids if edge_id in set(closed_edge_ids)
         )
-        disruption_providers = tuple(
-            sorted({item.provenance.provider for item in matched})
-        )
+        disruption_providers = tuple(sorted({item.provenance.provider for item in matched}))
         disruption_licences = tuple(
             sorted(
                 {
@@ -449,8 +444,7 @@ class CriticalRouteMonitor:
             quality=QualityFlag.UNKNOWN,
             source_errors=dict(reference.errors) if reference else {},
             disruption_data_available=(
-                self._traffic_state is not None
-                and self._traffic_state.last_success_at is not None
+                self._traffic_state is not None and self._traffic_state.last_success_at is not None
             ),
             disruption_generated_at=(
                 self._traffic_state.generated_at if self._traffic_state else None
