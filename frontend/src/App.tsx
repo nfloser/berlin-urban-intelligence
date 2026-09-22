@@ -1434,14 +1434,14 @@ function App() {
               onClick={() => startRouteSelection("origin")}
               type="button"
             >
-              {routeOrigin ? "Origin selected" : "Select origin on map"}
+              {routeOrigin ? "Scenario origin selected" : "Select scenario origin on map"}
             </button>
             <button
               className={`secondary-action${routeSelectionMode === "destination" ? " active" : ""}`}
               onClick={() => startRouteSelection("destination")}
               type="button"
             >
-              {routeDestination ? "Destination selected" : "Select destination on map"}
+              {routeDestination ? "Scenario destination selected" : "Select scenario destination on map"}
             </button>
           </div>
           {routeSelectionMode && (
