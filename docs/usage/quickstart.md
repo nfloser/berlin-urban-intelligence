@@ -94,7 +94,7 @@ Reference endpoints can legitimately be empty when the corresponding acquisition
 
 ## Use the dashboard map
 
-The first dashboard viewport is map-first. Use the floating route planner to search persisted Berlin critical facilities or VBB stops, or select origin/destination directly on the map. Search results are resolved to the nearest persisted road-network node and the route is calculated automatically.
+The first dashboard viewport is map-first. Use the floating route planner to search persisted Berlin critical facilities or VBB stops, or select any origin/destination directly on the map. Search results and map clicks are resolved to the nearest persisted road-network node and the route is calculated automatically. The current text search is intentionally limited to persisted reference places; arbitrary-address geocoding is not yet claimed.
 
 The normal route API keeps its baseline path for auditability and separately returns the effective route after current VIZ disruption constraints:
 
