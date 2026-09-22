@@ -102,6 +102,20 @@ class CriticalRouteSnapshot(BaseModel):
     note: str
 
 
+class RouteDisruptionImpact(BaseModel):
+    """Observed VIZ impact constraints for one baseline route."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    evaluated_at: datetime
+    disruption_data_available: bool
+    disruption_freshness: FreshnessStatus
+    disruption_source_error: str | None = None
+    active_disruption_ids: tuple[str, ...] = ()
+    route_closed_edge_ids: tuple[str, ...] = ()
+    network_closed_edge_ids: tuple[str, ...] = ()
+
+
 class CriticalRouteMonitor:
     """Derive a bounded-query-friendly route snapshot once per reference snapshot.
 
@@ -445,6 +459,49 @@ class CriticalRouteMonitor:
                 "travel_time_delta_s": travel_time_s - route.travel_time_s,
                 "provenance": provenance,
             }
+        )
+
+    def route_disruption_impact(
+        self,
+        *,
+        geometry: dict[str, object],
+        edge_ids: tuple[str, ...] | list[str],
+        evaluated_at: datetime | None = None,
+    ) -> RouteDisruptionImpact:
+        at = (evaluated_at or self._now_factory()).astimezone(UTC)
+        state = self._traffic_state
+        active = self._active_disruptions(at)
+        matched_ids = tuple(
+            sorted(item.id for item in active if self._matches_geometry(geometry, item))
+        )
+
+        reference = self._reference
+        if reference is None:
+            network_closed_edge_ids: tuple[str, ...] = ()
+        else:
+            nodes = {item.id: item for item in reference.network_nodes}
+            network_closed_edge_ids = self._closed_edge_ids(
+                reference=reference,
+                nodes=nodes,
+                disruptions=active,
+            )
+        closed_set = set(network_closed_edge_ids)
+        route_closed_edge_ids = tuple(
+            edge_id for edge_id in edge_ids if edge_id in closed_set
+        )
+
+        return RouteDisruptionImpact(
+            evaluated_at=at,
+            disruption_data_available=(
+                state is not None and state.last_success_at is not None
+            ),
+            disruption_freshness=(
+                state.freshness if state is not None else FreshnessStatus.UNAVAILABLE
+            ),
+            disruption_source_error=state.source_error if state is not None else None,
+            active_disruption_ids=matched_ids,
+            route_closed_edge_ids=route_closed_edge_ids,
+            network_closed_edge_ids=network_closed_edge_ids,
         )
 
     def _unavailable(self, *, computed_at: datetime, note: str) -> CriticalRouteSnapshot:
