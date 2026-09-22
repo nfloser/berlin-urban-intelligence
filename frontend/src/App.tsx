@@ -1189,7 +1189,13 @@ function App() {
               <dd>{criticalRoutes?.route_count_total ?? "Unavailable"}</dd>
               <dt>Reference snapshot</dt>
               <dd>{criticalRoutes?.reference_generated_at ?? "Unavailable"}</dd>
-              <dt>Road traffic telemetry</dt>
+              <dt>Road disruptions</dt>
+              <dd>
+                {criticalRoutes?.disruption_data_available
+                  ? `Available · ${criticalRoutes.disruption_freshness}`
+                  : "Unavailable"}
+              </dd>
+              <dt>Congestion-speed telemetry</dt>
               <dd>{criticalRoutes?.traffic_data_available ? "Available" : "Not integrated"}</dd>
             </dl>
             {criticalRoutes && criticalRoutes.routes.length > 0 && (
@@ -1216,9 +1222,39 @@ function App() {
                 <span>
                   {selectedCriticalRoute.origin_category} → {selectedCriticalRoute.destination_category}
                 </span>
-                <span>Baseline travel time: {(selectedCriticalRoute.travel_time_s / 60).toFixed(1)} min</span>
-                <span>Road distance: {(selectedCriticalRoute.length_m / 1000).toFixed(2)} km</span>
-                <span>Edges: {selectedCriticalRoute.edge_ids.length}</span>
+                <span className={`critical-route-state route-state-${selectedCriticalRoute.route_state}`}>
+                  State: {selectedCriticalRoute.route_state}
+                </span>
+                <span>
+                  Baseline: {(selectedCriticalRoute.travel_time_s / 60).toFixed(1)} min ·{" "}
+                  {(selectedCriticalRoute.length_m / 1000).toFixed(2)} km
+                </span>
+                {selectedCriticalRoute.disruption_aware_travel_time_s !== null && (
+                  <span>
+                    Effective:{" "}
+                    {(selectedCriticalRoute.disruption_aware_travel_time_s / 60).toFixed(1)} min ·{" "}
+                    {selectedCriticalRoute.disruption_aware_length_m !== null
+                      ? `${(selectedCriticalRoute.disruption_aware_length_m / 1000).toFixed(2)} km`
+                      : "distance unavailable"}
+                  </span>
+                )}
+                {selectedCriticalRoute.travel_time_delta_s !== null &&
+                  selectedCriticalRoute.travel_time_delta_s > 0 && (
+                    <span>
+                      Added travel time:{" "}
+                      {(selectedCriticalRoute.travel_time_delta_s / 60).toFixed(1)} min
+                    </span>
+                  )}
+                {selectedCriticalRoute.active_disruption_ids.length > 0 && (
+                  <span>
+                    Active disruptions: {selectedCriticalRoute.active_disruption_ids.length}
+                  </span>
+                )}
+                <span>
+                  Edges:{" "}
+                  {selectedCriticalRoute.disruption_aware_edge_ids.length ||
+                    selectedCriticalRoute.edge_ids.length}
+                </span>
                 <span>
                   Providers:{" "}
                   {selectedCriticalRoute.provenance.source_providers.length > 0
