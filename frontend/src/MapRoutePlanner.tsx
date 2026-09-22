@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type MapSearchResult,
   type NetworkNodePick,
@@ -54,6 +54,12 @@ export default function MapRoutePlanner({
   const [results, setResults] = useState<MapSearchResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
+  const searchSession = useRef(0);
+
+  const activateField = (kind: RouteEndpointKind) => {
+    searchSession.current += 1;
+    setActiveField(kind);
+  };
 
   useEffect(() => setOriginQuery(originLabel), [originLabel]);
   useEffect(() => setDestinationQuery(destinationLabel), [destinationLabel]);
@@ -90,6 +96,7 @@ export default function MapRoutePlanner({
   const choose = async (item: MapSearchResult) => {
     if (activeField === null) return;
     const kind = activeField;
+    const selectionSession = searchSession.current;
     setResolving(true);
     setSearchError(null);
     try {
@@ -101,8 +108,10 @@ export default function MapRoutePlanner({
       onResolve(kind, node, item.name);
       if (kind === "origin") setOriginQuery(item.name);
       else setDestinationQuery(item.name);
-      setResults([]);
-      setActiveField(null);
+      if (searchSession.current === selectionSession) {
+        setResults([]);
+        setActiveField(null);
+      }
     } catch (reason) {
       setSearchError(reason instanceof Error ? reason.message : "Could not resolve road network.");
     } finally {
@@ -130,9 +139,9 @@ export default function MapRoutePlanner({
             value={originQuery}
             onChange={(event) => {
               setOriginQuery(event.target.value);
-              setActiveField("origin");
+              activateField("origin");
             }}
-            onFocus={() => setActiveField("origin")}
+            onFocus={() => activateField("origin")}
           />
           <button
             aria-label="Select origin on map"
@@ -155,9 +164,9 @@ export default function MapRoutePlanner({
             value={destinationQuery}
             onChange={(event) => {
               setDestinationQuery(event.target.value);
-              setActiveField("destination");
+              activateField("destination");
             }}
-            onFocus={() => setActiveField("destination")}
+            onFocus={() => activateField("destination")}
           />
           <button
             aria-label="Select destination on map"
