@@ -486,15 +486,11 @@ class CriticalRouteMonitor:
                 disruptions=active,
             )
         closed_set = set(network_closed_edge_ids)
-        route_closed_edge_ids = tuple(
-            edge_id for edge_id in edge_ids if edge_id in closed_set
-        )
+        route_closed_edge_ids = tuple(edge_id for edge_id in edge_ids if edge_id in closed_set)
 
         return RouteDisruptionImpact(
             evaluated_at=at,
-            disruption_data_available=(
-                state is not None and state.last_success_at is not None
-            ),
+            disruption_data_available=(state is not None and state.last_success_at is not None),
             disruption_freshness=(
                 state.freshness if state is not None else FreshnessStatus.UNAVAILABLE
             ),
