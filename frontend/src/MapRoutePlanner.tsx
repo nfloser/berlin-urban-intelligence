@@ -116,7 +116,7 @@ export default function MapRoutePlanner({
   return (
     <section className="map-route-planner" aria-label="Route planner">
       <div className="route-planner-brand">
-        <strong>Berlin Urban Intelligence</strong>
+        <h1>Berlin Urban Intelligence</h1>
         <span>Live road disruptions · source-backed routing</span>
       </div>
 
