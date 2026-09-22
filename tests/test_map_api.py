@@ -231,7 +231,6 @@ def test_reference_detail_endpoint_distinguishes_invalid_layer_and_missing_id(
     assert "reference object not found" in missing.json()["detail"]
 
 
-
 def test_reference_search_finds_routable_facilities_and_stops(monkeypatch, tmp_path) -> None:
     with client_with_reference(monkeypatch, tmp_path) as client:
         response = client.get("/api/v1/map/search", params={"q": "inside", "limit": 10})
