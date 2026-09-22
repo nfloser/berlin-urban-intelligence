@@ -231,3 +231,35 @@ def test_running_api_recomputes_critical_routes_when_traffic_snapshot_changes(
     assert second_route["active_disruption_ids"] == ["viz:closure:ab"]
     assert system["traffic_disruption_generated_at"] == NOW.isoformat().replace("+00:00", "Z")
     assert system["snapshot_reload"]["traffic_disruptions"]["status"] == "current"
+
+
+
+def test_user_selected_route_is_rerouted_around_current_viz_full_closure(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _, traffic_path = configure_paths(monkeypatch, tmp_path)
+    closure = disruption(
+        "viz:user-route:closure:ab",
+        valid_from=NOW - timedelta(hours=1),
+        valid_to=NOW + timedelta(hours=1),
+    )
+    TrafficDisruptionStateStore(traffic_path).save(traffic_state(closure))
+
+    with TestClient(create_app()) as client:
+        response = client.post(
+            "/api/v1/resilience/routes",
+            json={"origin": "a", "destination": "c"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["travel_time_s"] == 100.0
+    assert body["edge_ids"] == ["ab", "bc"]
+    assert body["route_state"] == "rerouted"
+    assert body["active_disruption_ids"] == ["viz:user-route:closure:ab"]
+    assert body["closed_edge_ids"] == ["ab"]
+    assert body["effective_travel_time_s"] == 160.0
+    assert body["effective_edge_ids"] == ["ax", "xc"]
+    assert body["travel_time_delta_s"] == 60.0
+    assert body["effective_geometry"]["type"] == "LineString"
