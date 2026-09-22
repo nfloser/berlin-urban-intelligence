@@ -23,7 +23,7 @@ from berlin_urban_intelligence.shared.contracts import (
     SpatialReference,
 )
 
-NOW = datetime(2026, 9, 19, 17, 30, tzinfo=UTC)
+NOW = datetime.now(UTC).replace(microsecond=0)
 VIZ_URL = HttpUrl("https://api.viz.berlin.de/daten/baustellen_sperrungen_viz.json")
 
 
