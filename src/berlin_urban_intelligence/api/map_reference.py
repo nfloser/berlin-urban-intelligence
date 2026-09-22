@@ -241,6 +241,96 @@ def reference_search(
     return [item[4] for item in ranked[:limit]]
 
 
+def _point_coordinates(item: MapItem) -> tuple[float, float] | None:
+    spatial = item.spatial
+    if spatial is None or spatial.crs != "EPSG:4326" or spatial.geometry is None:
+        return None
+    if spatial.geometry.get("type") != "Point":
+        return None
+    coordinates = spatial.geometry.get("coordinates")
+    if (
+        not isinstance(coordinates, (list, tuple))
+        or len(coordinates) < 2
+        or not isinstance(coordinates[0], Real)
+        or isinstance(coordinates[0], bool)
+        or not isinstance(coordinates[1], Real)
+        or isinstance(coordinates[1], bool)
+    ):
+        return None
+    return float(coordinates[0]), float(coordinates[1])
+
+
+def reference_search(
+    state: ReferenceState | None,
+    *,
+    query: str,
+    limit: int = 12,
+) -> list[dict[str, object]]:
+    normalized = query.strip().casefold()
+    if len(normalized) < 2:
+        raise ValueError("search query must contain at least two characters")
+    if limit <= 0 or limit > 50:
+        raise ValueError("search limit must be between 1 and 50")
+    if state is None:
+        return []
+
+    matches: list[tuple[int, str, str, dict[str, object]]] = []
+    layer_rank = {"facilities": 0, "stops": 1}
+    for layer in ("facilities", "stops"):
+        for item in _layer_items(state, cast(MapLayer, layer)):
+            coordinates = _point_coordinates(item)
+            if coordinates is None:
+                continue
+            if isinstance(item, CriticalFacility):
+                name = item.name or item.id
+                subtitle = item.category.replace("_", " ")
+                searchable = " ".join(
+                    part
+                    for part in (
+                        item.id,
+                        item.name,
+                        item.category,
+                        item.source_identifier,
+                    )
+                    if part
+                ).casefold()
+            elif isinstance(item, UrbanEntity):
+                name = item.name or item.id
+                subtitle = item.entity_type.replace("_", " ")
+                searchable = " ".join(
+                    part
+                    for part in (
+                        item.id,
+                        item.name,
+                        item.entity_type,
+                        item.source_identifier,
+                    )
+                    if part
+                ).casefold()
+            else:
+                continue
+            if normalized not in searchable:
+                continue
+            longitude, latitude = coordinates
+            matches.append(
+                (
+                    layer_rank[layer],
+                    name.casefold(),
+                    item.id,
+                    {
+                        "id": item.id,
+                        "layer": layer,
+                        "name": name,
+                        "subtitle": subtitle,
+                        "longitude": longitude,
+                        "latitude": latitude,
+                    },
+                )
+            )
+    matches.sort(key=lambda item: (item[0], item[1], item[2]))
+    return [item[3] for item in matches[:limit]]
+
+
 def reference_item(
     state: ReferenceState | None, *, layer: MapLayer, resource_id: str
 ) -> MapItem | None:
