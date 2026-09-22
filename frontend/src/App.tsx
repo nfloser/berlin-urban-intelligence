@@ -329,12 +329,35 @@ function App() {
     const inspectionData: FeatureCollection = mapSelection
       ? toFeatureCollection([mapSelection.item])
       : EMPTY_FEATURE_COLLECTION;
+    const trafficData: FeatureCollection = {
+      type: "FeatureCollection",
+      features: (trafficDisruptions?.disruptions ?? []).flatMap((item) =>
+        item.spatial?.geometry
+          ? [
+              {
+                type: "Feature" as const,
+                id: item.id,
+                properties: {
+                  disruption_id: item.id,
+                  severity: item.severity ?? "",
+                  subtype: item.subtype,
+                  is_full_closure: item.is_full_closure,
+                },
+                geometry: item.spatial.geometry,
+              },
+            ]
+          : [],
+      ),
+    };
     const routeData = (geometry: RouteComparisonResponse["baseline_geometry"]): FeatureCollection => ({
       type: "FeatureCollection",
       features: geometry ? [{ type: "Feature", properties: {}, geometry }] : [],
     });
     const baselineRouteData = routeData(
-      routeComparison?.baseline_geometry ?? routeBaseline?.geometry ?? null,
+      routeComparison?.baseline_geometry ??
+        routeBaseline?.effective_geometry ??
+        routeBaseline?.geometry ??
+        null,
     );
     const selectionData: FeatureCollection = {
       type: "FeatureCollection",
@@ -366,6 +389,7 @@ function App() {
       upsert("route-baseline", baselineRouteData);
       upsert("route-scenario", scenarioRouteData);
       upsert("route-selection", selectionData);
+      upsert("traffic-disruptions", trafficData);
       if (!map.getSource("critical-routes")) {
         map.addSource("critical-routes", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
       }
@@ -439,15 +463,71 @@ function App() {
           },
         });
       }
+      if (!map.getLayer("traffic-disruptions-line")) {
+        map.addLayer({
+          id: "traffic-disruptions-line",
+          type: "line",
+          source: "traffic-disruptions",
+          paint: {
+            "line-color": [
+              "case",
+              ["==", ["get", "is_full_closure"], true],
+              "#d93025",
+              "#f9ab00",
+            ],
+            "line-width": [
+              "case",
+              ["==", ["get", "is_full_closure"], true],
+              6,
+              4,
+            ],
+            "line-opacity": 0.88,
+          },
+        });
+      }
+      if (!map.getLayer("traffic-disruptions-circle")) {
+        map.addLayer({
+          id: "traffic-disruptions-circle",
+          type: "circle",
+          source: "traffic-disruptions",
+          paint: {
+            "circle-radius": [
+              "case",
+              ["==", ["get", "is_full_closure"], true],
+              7,
+              5,
+            ],
+            "circle-color": [
+              "case",
+              ["==", ["get", "is_full_closure"], true],
+              "#d93025",
+              "#f9ab00",
+            ],
+            "circle-stroke-color": "#ffffff",
+            "circle-stroke-width": 1.5,
+            "circle-opacity": 0.92,
+          },
+        });
+      }
       if (!map.getLayer("critical-routes-line")) {
         map.addLayer({
           id: "critical-routes-line",
           type: "line",
           source: "critical-routes",
           paint: {
-            "line-color": "#4ea5d9",
+            "line-color": [
+              "match",
+              ["get", "route_state"],
+              "blocked",
+              "#d93025",
+              "rerouted",
+              "#188038",
+              "disrupted",
+              "#f9ab00",
+              "#4285f4",
+            ],
             "line-width": 5,
-            "line-opacity": 0.78,
+            "line-opacity": 0.82,
           },
         });
       }
@@ -481,7 +561,7 @@ function App() {
           id: "route-baseline-line",
           type: "line",
           source: "route-baseline",
-          paint: { "line-color": "#dfe8f0", "line-width": 4, "line-opacity": 0.72 },
+          paint: { "line-color": "#4285f4", "line-width": 7, "line-opacity": 0.92 },
         });
       }
       if (!map.getLayer("route-scenario-line")) {
@@ -495,6 +575,20 @@ function App() {
       setVisibility("facilities-circle", visibleLayers.facilities);
       setVisibility("stops-circle", visibleLayers.stops);
       setVisibility("climate-fill", visibleLayers.climate);
+      setVisibility("traffic-disruptions-line", trafficDisruptionsVisible);
+      setVisibility("traffic-disruptions-circle", trafficDisruptionsVisible);
+      if (map.getLayer("route-baseline-line")) {
+        const routeColor =
+          routeBaseline?.route_state === "blocked"
+            ? "#d93025"
+            : routeBaseline?.route_state === "rerouted"
+              ? "#188038"
+              : routeBaseline?.route_state === "disrupted"
+                ? "#f9ab00"
+                : "#4285f4";
+        map.setPaintProperty("route-baseline-line", "line-color", routeColor);
+      }
+      setTrafficLayerReady(true);
       setMapLayersReady(true);
     };
 
@@ -528,6 +622,8 @@ function App() {
     routeBaseline,
     routeOrigin,
     routeDestination,
+    trafficDisruptions,
+    trafficDisruptionsVisible,
   ]);
 
   useEffect(() => {
@@ -551,8 +647,11 @@ function App() {
       features: (criticalRoutes?.routes ?? []).map((route) => ({
         type: "Feature",
         id: route.id,
-        properties: { route_id: route.id },
-        geometry: route.geometry,
+        properties: { route_id: route.id, route_state: route.route_state },
+        geometry:
+          route.route_state === "rerouted" && route.disruption_aware_geometry
+            ? route.disruption_aware_geometry
+            : route.geometry,
       })),
     };
     const selectedCriticalRouteData: FeatureCollection = {
@@ -562,8 +661,15 @@ function App() {
             {
               type: "Feature",
               id: selectedCriticalRoute.id,
-              properties: { route_id: selectedCriticalRoute.id },
-              geometry: selectedCriticalRoute.geometry,
+              properties: {
+                route_id: selectedCriticalRoute.id,
+                route_state: selectedCriticalRoute.route_state,
+              },
+              geometry:
+                selectedCriticalRoute.route_state === "rerouted" &&
+                selectedCriticalRoute.disruption_aware_geometry
+                  ? selectedCriticalRoute.disruption_aware_geometry
+                  : selectedCriticalRoute.geometry,
             },
           ]
         : [],
@@ -571,11 +677,6 @@ function App() {
 
     routeSource.setData(criticalRouteData);
     selectedSource.setData(selectedCriticalRouteData);
-    map.setPaintProperty(
-      "critical-routes-line",
-      "line-color",
-      criticalRoutes?.status === "degraded" ? "#e3bd71" : "#4ea5d9",
-    );
     map.setLayoutProperty(
       "critical-routes-line",
       "visibility",
