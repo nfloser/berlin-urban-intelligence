@@ -600,18 +600,107 @@ def create_app() -> FastAPI:
             result = agent.shortest_path(payload.origin, payload.destination)
         except Exception as exc:
             raise HTTPException(status_code=422, detail=f"DERIVATION_FAILED: {exc}") from None
+
         reference: ReferenceState | None = request.app.state.reference
+        traffic: TrafficDisruptionState | None = request.app.state.traffic_disruptions
         nodes = {node.id: node for node in (reference.network_nodes if reference else ())}
-        coordinates = [
-            [nodes[node_id].longitude, nodes[node_id].latitude]
-            for node_id in result.node_path
-            if node_id in nodes
-            and nodes[node_id].longitude is not None
-            and nodes[node_id].latitude is not None
-        ]
+        edge_lengths = {
+            edge.id: edge.length_m for edge in (reference.network_edges if reference else ())
+        }
+
+        def line(path: list[str]) -> dict[str, object] | None:
+            coordinates = [
+                [nodes[node_id].longitude, nodes[node_id].latitude]
+                for node_id in path
+                if node_id in nodes
+                and nodes[node_id].longitude is not None
+                and nodes[node_id].latitude is not None
+            ]
+            if len(coordinates) < 2:
+                return None
+            return {"type": "LineString", "coordinates": coordinates}
+
+        def length(edge_ids: list[str]) -> float:
+            return float(sum(edge_lengths.get(edge_id, 0.0) for edge_id in edge_ids))
+
+        baseline_geometry = line(result.node_path)
+        baseline_length_m = length(result.edge_ids)
         body = result.model_dump(mode="json")
-        body["geometry"] = (
-            {"type": "LineString", "coordinates": coordinates} if len(coordinates) >= 2 else None
+        body.update(
+            {
+                "geometry": baseline_geometry,
+                "length_m": baseline_length_m,
+                "route_state": "baseline",
+                "active_disruption_ids": [],
+                "closed_edge_ids": [],
+                "effective_node_path": result.node_path,
+                "effective_edge_ids": result.edge_ids,
+                "effective_travel_time_s": result.travel_time_s,
+                "effective_length_m": baseline_length_m,
+                "effective_geometry": baseline_geometry,
+                "travel_time_delta_s": 0.0,
+                "disruption_data_available": (
+                    traffic is not None and traffic.last_success_at is not None
+                ),
+                "disruption_freshness": (
+                    traffic.freshness.value if traffic is not None else "unavailable"
+                ),
+                "disruption_source_error": traffic.source_error if traffic is not None else None,
+            }
+        )
+        if reference is None or baseline_geometry is None:
+            return body
+
+        impact = CriticalRouteMonitor(
+            reference,
+            traffic_state=traffic,
+        ).route_disruption_impact(
+            geometry=baseline_geometry,
+            edge_ids=result.edge_ids,
+        )
+        body["active_disruption_ids"] = list(impact.active_disruption_ids)
+        body["closed_edge_ids"] = list(impact.route_closed_edge_ids)
+        body["disruption_data_available"] = impact.disruption_data_available
+        body["disruption_freshness"] = impact.disruption_freshness.value
+        body["disruption_source_error"] = impact.disruption_source_error
+
+        if not impact.active_disruption_ids:
+            return body
+        if not impact.route_closed_edge_ids:
+            body["route_state"] = "disrupted"
+            return body
+
+        rerouted = agent.shortest_path_avoiding_edges(
+            payload.origin,
+            payload.destination,
+            impact.network_closed_edge_ids,
+        )
+        if rerouted is None:
+            body.update(
+                {
+                    "route_state": "blocked",
+                    "effective_node_path": [],
+                    "effective_edge_ids": [],
+                    "effective_travel_time_s": None,
+                    "effective_length_m": None,
+                    "effective_geometry": None,
+                    "travel_time_delta_s": None,
+                }
+            )
+            return body
+
+        effective_geometry = line(rerouted.node_path)
+        effective_length_m = length(rerouted.edge_ids)
+        body.update(
+            {
+                "route_state": "rerouted",
+                "effective_node_path": rerouted.node_path,
+                "effective_edge_ids": rerouted.edge_ids,
+                "effective_travel_time_s": rerouted.travel_time_s,
+                "effective_length_m": effective_length_m,
+                "effective_geometry": effective_geometry,
+                "travel_time_delta_s": rerouted.travel_time_s - result.travel_time_s,
+            }
         )
         return body
 
