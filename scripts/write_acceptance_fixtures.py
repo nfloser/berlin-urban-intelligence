@@ -22,6 +22,11 @@ from berlin_urban_intelligence.knowledge.derivations import (
 from berlin_urban_intelligence.runtime.derived import DerivedState, DerivedStateStore
 from berlin_urban_intelligence.runtime.reference import ReferenceState, ReferenceStateStore
 from berlin_urban_intelligence.runtime.state import RuntimeState, RuntimeStateStore
+from berlin_urban_intelligence.runtime.traffic_disruptions import (
+    TrafficDisruption,
+    TrafficDisruptionState,
+    TrafficDisruptionStateStore,
+)
 from berlin_urban_intelligence.shared.contracts import (
     AvailabilityStatus,
     CriticalFacility,
@@ -325,27 +330,72 @@ def build_derived_fixture() -> DerivedState:
     )
 
 
+def build_traffic_disruption_fixture() -> TrafficDisruptionState:
+    closure = TrafficDisruption(
+        id="viz:acceptance:closure-ab",
+        subtype="Sperrung",
+        severity="Vollsperrung",
+        street="Acceptance Route",
+        section="between acceptance node A and B",
+        description="Acceptance-only full closure used to verify observed rerouting.",
+        direction="both directions",
+        valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+        valid_to=datetime(2030, 1, 1, tzinfo=UTC),
+        source_updated_at=FIXTURE_TIME,
+        is_full_closure=True,
+        spatial=SpatialReference(
+            crs="EPSG:4326",
+            geometry={
+                "type": "LineString",
+                "coordinates": [[13.4, 52.52], [13.42, 52.52]],
+            },
+        ),
+        provenance=fixture_provenance(
+            "acceptance VIZ disruption fixture",
+            "viz:acceptance:closure-ab",
+            agent="resilience",
+            agent_version="1.0.0",
+        ),
+    )
+    return TrafficDisruptionState(
+        generated_at=FIXTURE_TIME,
+        source_id="berlin_viz_road_disruptions",
+        disruptions=(closure,),
+        last_success_at=FIXTURE_TIME,
+        latest_source_update_at=FIXTURE_TIME,
+        freshness=FreshnessStatus.VALID,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--reference", default="data/runtime/reference.json")
     parser.add_argument("--runtime", default="data/runtime/state.json")
     parser.add_argument("--derived", default="data/runtime/derived.json")
+    parser.add_argument(
+        "--traffic-disruptions",
+        default="data/runtime/traffic-disruptions.json",
+    )
     args = parser.parse_args()
 
     reference = build_reference_fixture()
     runtime = build_runtime_fixture()
     derived = build_derived_fixture()
+    traffic = build_traffic_disruption_fixture()
     ReferenceStateStore(Path(args.reference)).save(reference)
     RuntimeStateStore(Path(args.runtime)).save(runtime)
     DerivedStateStore(Path(args.derived)).save(derived)
+    TrafficDisruptionStateStore(Path(args.traffic_disruptions)).save(traffic)
 
     print(f"reference_fixture={args.reference}")
     print(f"runtime_fixture={args.runtime}")
     print(f"derived_fixture={args.derived}")
+    print(f"traffic_disruption_fixture={args.traffic_disruptions}")
     print(
         f"network_nodes={len(reference.network_nodes)} network_edges={len(reference.network_edges)}"
     )
     print(f"derived_records={len(derived.records)} source_statuses={len(runtime.source_statuses)}")
+    print(f"traffic_disruptions={len(traffic.disruptions)} freshness={traffic.freshness.value}")
     return 0
 
 
