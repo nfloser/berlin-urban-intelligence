@@ -75,15 +75,7 @@ pip install -e ".[osm]"
 python scripts/refresh_reference.py --with-osm
 ```
 
-If you generate or replace reference/runtime/energy state **after** the API process has already started, restart/reload the backend. State is loaded at application startup; the API does not automatically watch the files.
-
-With Docker Compose:
-
-```bash
-docker compose restart backend
-```
-
-This startup-snapshot behavior is a common reason for `/ready` showing `reference_state: false` even though `data/runtime/reference.json` exists on disk.
+The running API validates and hot-reloads atomic replacements of runtime, reference, energy, derived and traffic-disruption snapshots before requests. Invalid replacements do not displace the previous validated in-process state; reload diagnostics are exposed through `/api/v1/system`. A normal refresh therefore does not require a backend restart.
 
 ## Verify data presence
 
@@ -94,17 +86,26 @@ curl http://localhost:8000/api/v1/source-status
 curl http://localhost:8000/api/v1/observations
 curl http://localhost:8000/api/v1/facilities
 curl http://localhost:8000/api/v1/climate-features
+curl 'http://localhost:8000/api/v1/traffic/disruptions?active_only=true&limit=250'
+curl 'http://localhost:8000/api/v1/map/search?q=Alexanderplatz&limit=8'
 ```
 
 Reference endpoints can legitimately be empty when the corresponding acquisition was not run or failed. An empty result is not automatically a software error.
 
 ## Use the dashboard map
 
-The map shows only persisted, WGS84 reference features returned by the API. Its legend provides independent switches for critical facilities, VBB stops and official climate features; switching a layer changes only its visibility, never the underlying state. The colours identify the layer type rather than a risk level or live condition.
+The first dashboard viewport is map-first. Use the floating route planner to search persisted Berlin critical facilities or VBB stops, or select origin/destination directly on the map. Search results are resolved to the nearest persisted road-network node and the route is calculated automatically.
 
-A map can therefore remain visually unchanged after a workflow or heat assessment: workflows expose agent availability, and a heat assessment returns an explicitly hypothetical cross-domain result. Neither action mutates the observed/reference baseline or fabricates a spatial impact layer.
+The normal route API keeps its baseline path for auditability and separately returns the effective route after current VIZ disruption constraints:
 
-The dashboard also supports a spatial network-disruption comparison when a reference snapshot contains routing topology. Select origin and destination directly on the map; the API snaps each click to the nearest persisted network node and returns the baseline route. Select a displayed baseline route segment to close, then run the hypothetical disruption. The map renders the returned baseline geometry in white and the hypothetical disrupted route in red. It does not infer closures, nodes or a spatial heat impact from incomplete data.
+- **baseline** — no active VIZ disruption changes the route;
+- **disrupted** — an official disruption intersects the route, but no supported travel-time penalty is inferred;
+- **rerouted** — an explicit active VIZ `Vollsperrung` closes one or more matched route edges and an alternative exists;
+- **blocked** — an explicit active full closure removes the route and no alternative exists.
+
+The map renders official VIZ disruptions independently of facilities, VBB stops, climate features and automatically monitored critical routes. Full closures are red; other disruptions are amber. The route planner shows effective ETA/distance and automatically fits the map to the effective path. These features provide a familiar navigation workflow, but they do not claim Google Maps-equivalent geocoding, turn-by-turn instructions or live congestion-speed coverage.
+
+The lower research controls still provide an explicit hypothetical network-disruption comparison. This remains separate from source-backed VIZ observations: scenario closures are labelled hypothetical and never mutate the observed/reference baseline.
 
 ## Energy workflow
 
