@@ -233,7 +233,6 @@ def test_running_api_recomputes_critical_routes_when_traffic_snapshot_changes(
     assert system["snapshot_reload"]["traffic_disruptions"]["status"] == "current"
 
 
-
 def test_user_selected_route_is_rerouted_around_current_viz_full_closure(
     monkeypatch,
     tmp_path: Path,
