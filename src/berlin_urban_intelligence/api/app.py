@@ -220,9 +220,7 @@ class _ApiStateController:
                 "reference": self._reference.diagnostic.model_dump(mode="json"),
                 "energy": self._energy.diagnostic.model_dump(mode="json"),
                 "derived": self._derived.diagnostic.model_dump(mode="json"),
-                "traffic_disruptions": self._traffic_disruptions.diagnostic.model_dump(
-                    mode="json"
-                ),
+                "traffic_disruptions": self._traffic_disruptions.diagnostic.model_dump(mode="json"),
             }
 
     def _apply(
@@ -427,9 +425,7 @@ def create_app() -> FastAPI:
                 "disruptions": [],
             }
 
-        active = tuple(
-            item for item in traffic.disruptions if item.active_at(traffic.generated_at)
-        )
+        active = tuple(item for item in traffic.disruptions if item.active_at(traffic.generated_at))
         selected = active if active_only else traffic.disruptions
         page = _slice(selected, offset, limit)
         return {
