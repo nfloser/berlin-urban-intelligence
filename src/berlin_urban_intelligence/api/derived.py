@@ -11,6 +11,7 @@ from berlin_urban_intelligence.api.map_reference import (
     reference_feature_collection,
     reference_item,
     reference_search,
+    reference_search,
 )
 from berlin_urban_intelligence.runtime.derived import DerivedState
 from berlin_urban_intelligence.runtime.reference import ReferenceState
@@ -108,6 +109,19 @@ def reference_map(
         layers=selected_layers,
         limit_per_layer=limit_per_layer,
     )
+
+
+@router.get("/map/search")
+def map_search(
+    request: Request,
+    q: str = Query(min_length=2, max_length=120),
+    limit: int = Query(default=12, ge=1, le=50),
+) -> list[dict[str, object]]:
+    reference: ReferenceState | None = request.app.state.reference
+    try:
+        return reference_search(reference, query=q, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
 
 
 @router.get("/map/reference/{layer}/{resource_id:path}")
