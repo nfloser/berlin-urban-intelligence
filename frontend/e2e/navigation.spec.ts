@@ -16,7 +16,7 @@ test("map-first navigation searches places, inspects a VIZ closure and reroutes 
   await page.getByText("Inspect active disruptions", { exact: true }).click();
   await page.getByRole("button", { name: "Inspect disruption Acceptance Route" }).click();
 
-  const disruption = page.getByLabel("Road disruption detail");
+  const disruption = page.getByRole("article", { name: "Road disruption detail" });
   await expect(disruption).toBeVisible();
   await expect(disruption.getByText("Acceptance Route", { exact: true })).toBeVisible();
   await expect(disruption.getByText("Vollsperrung", { exact: true })).toBeVisible();
