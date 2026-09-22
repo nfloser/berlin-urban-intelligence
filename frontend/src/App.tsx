@@ -1146,6 +1146,24 @@ function App() {
                 {trafficDisruptions?.freshness ?? "unavailable"}
               </span>
             </label>
+            {trafficDisruptions && trafficDisruptions.disruptions.length > 0 && (
+              <details className="traffic-list">
+                <summary>Inspect active disruptions</summary>
+                <div>
+                  {trafficDisruptions.disruptions.slice(0, 5).map((item) => (
+                    <button
+                      aria-label={`Inspect disruption ${item.street ?? item.subtype}`}
+                      key={item.id}
+                      onClick={() => setSelectedTrafficDisruptionId(item.id)}
+                      type="button"
+                    >
+                      <strong>{item.street ?? item.subtype}</strong>
+                      <span>{item.severity ?? item.subtype}</span>
+                    </button>
+                  ))}
+                </div>
+              </details>
+            )}
             <label className="layer-toggle">
               <input
                 checked={criticalRoutesVisible}
