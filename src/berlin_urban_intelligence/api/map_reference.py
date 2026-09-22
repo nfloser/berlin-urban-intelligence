@@ -157,6 +157,90 @@ def _layer_items(state: ReferenceState | None, layer: MapLayer) -> Sequence[MapI
     return state.official_model_features
 
 
+def _point_coordinates(item: MapItem) -> tuple[float, float] | None:
+    spatial = item.spatial
+    if (
+        spatial is None
+        or spatial.crs != "EPSG:4326"
+        or spatial.geometry is None
+        or spatial.geometry.get("type") != "Point"
+    ):
+        return None
+    coordinates = spatial.geometry.get("coordinates")
+    if (
+        not isinstance(coordinates, (list, tuple))
+        or len(coordinates) < 2
+        or not isinstance(coordinates[0], Real)
+        or isinstance(coordinates[0], bool)
+        or not isinstance(coordinates[1], Real)
+        or isinstance(coordinates[1], bool)
+    ):
+        return None
+    return float(coordinates[0]), float(coordinates[1])
+
+
+def reference_search(
+    state: ReferenceState | None,
+    *,
+    query: str,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    normalized = " ".join(query.casefold().split())
+    if len(normalized) < 2:
+        raise ValueError("search query must contain at least two characters")
+    if limit <= 0 or limit > 50:
+        raise ValueError("search limit must be between 1 and 50")
+    if state is None:
+        return []
+
+    ranked: list[tuple[int, int, str, str, dict[str, Any]]] = []
+
+    def add(
+        item: CriticalFacility | UrbanEntity,
+        *,
+        layer: Literal["facilities", "stops"],
+        subtitle: str,
+        layer_rank: int,
+    ) -> None:
+        coordinates = _point_coordinates(item)
+        if coordinates is None:
+            return
+        name = item.name or item.id
+        name_key = name.casefold()
+        subtitle_key = subtitle.casefold()
+        if normalized not in name_key and normalized not in subtitle_key:
+            return
+        score = 0 if name_key.startswith(normalized) else 1 if normalized in name_key else 2
+        longitude, latitude = coordinates
+        result = {
+            "id": item.id,
+            "layer": layer,
+            "name": name,
+            "subtitle": subtitle,
+            "longitude": longitude,
+            "latitude": latitude,
+        }
+        ranked.append((score, layer_rank, name_key, item.id, result))
+
+    for facility in state.critical_facilities:
+        add(
+            facility,
+            layer="facilities",
+            subtitle=facility.category.replace("_", " "),
+            layer_rank=0,
+        )
+    for stop in state.transport_stops:
+        add(
+            stop,
+            layer="stops",
+            subtitle="transport stop",
+            layer_rank=1,
+        )
+
+    ranked.sort(key=lambda item: item[:4])
+    return [item[4] for item in ranked[:limit]]
+
+
 def reference_item(
     state: ReferenceState | None, *, layer: MapLayer, resource_id: str
 ) -> MapItem | None:
