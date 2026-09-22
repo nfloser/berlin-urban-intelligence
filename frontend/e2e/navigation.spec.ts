@@ -13,9 +13,8 @@ test("map-first navigation searches places, inspects a VIZ closure and reroutes 
   await expect(map).toHaveAttribute("data-traffic-disruptions-ready", "true");
   await expect(map).toHaveAttribute("data-traffic-disruptions-count", "1");
 
-  const box = await map.boundingBox();
-  expect(box).not.toBeNull();
-  await map.click({ position: { x: box!.width / 2, y: box!.height / 2 } });
+  await page.getByText("Inspect active disruptions", { exact: true }).click();
+  await page.getByRole("button", { name: "Inspect disruption Acceptance Route" }).click();
 
   const disruption = page.getByLabel("Road disruption detail");
   await expect(disruption).toBeVisible();
