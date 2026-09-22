@@ -229,3 +229,48 @@ def test_reference_detail_endpoint_distinguishes_invalid_layer_and_missing_id(
     assert "unknown map layer" in invalid_layer.json()["detail"]
     assert missing.status_code == 404
     assert "reference object not found" in missing.json()["detail"]
+
+
+
+def test_reference_search_finds_routable_facilities_and_stops(monkeypatch, tmp_path) -> None:
+    with client_with_reference(monkeypatch, tmp_path) as client:
+        response = client.get("/api/v1/map/search", params={"q": "inside", "limit": 10})
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {
+            "id": "facility:inside",
+            "layer": "facilities",
+            "name": "Inside hospital",
+            "subtitle": "hospital",
+            "longitude": 13.405,
+            "latitude": 52.52,
+        },
+        {
+            "id": "stop:inside:1",
+            "layer": "stops",
+            "name": "Inside stop 1",
+            "subtitle": "transport stop",
+            "longitude": 13.41,
+            "latitude": 52.521,
+        },
+        {
+            "id": "stop:inside:2",
+            "layer": "stops",
+            "name": "Inside stop 2",
+            "subtitle": "transport stop",
+            "longitude": 13.42,
+            "latitude": 52.522,
+        },
+    ]
+
+
+def test_reference_search_matches_facility_category_and_is_bounded(monkeypatch, tmp_path) -> None:
+    with client_with_reference(monkeypatch, tmp_path) as client:
+        response = client.get("/api/v1/map/search", params={"q": "hospital", "limit": 1})
+        too_short = client.get("/api/v1/map/search", params={"q": "i", "limit": 10})
+
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]["id"] == "facility:inside"
+    assert too_short.status_code == 422
