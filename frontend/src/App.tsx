@@ -718,6 +718,29 @@ function App() {
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || loadState !== "ready" || routeSelectionMode !== null) return;
+
+    const inspectTrafficDisruption = (event: maplibregl.MapMouseEvent) => {
+      if (!trafficDisruptionsVisible) return;
+      const layers = ["traffic-disruptions-line", "traffic-disruptions-circle"].filter(
+        (layerId) => map.getLayer(layerId) !== undefined,
+      );
+      if (layers.length === 0) return;
+      const hit = map.queryRenderedFeatures(referenceHitTestBox(event.point), { layers })[0];
+      const disruptionId = hit?.properties?.disruption_id;
+      if (disruptionId !== null && disruptionId !== undefined) {
+        setSelectedTrafficDisruptionId(String(disruptionId));
+      }
+    };
+
+    map.on("click", inspectTrafficDisruption);
+    return () => {
+      map.off("click", inspectTrafficDisruption);
+    };
+  }, [loadState, routeSelectionMode, trafficDisruptionsVisible]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || routeSelectionMode === null) return;
     const selectNearestNode = async (event: maplibregl.MapMouseEvent) => {
       setRouteError(null);
@@ -918,6 +941,36 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    if (!routeOrigin || !routeDestination) return;
+    void runRouteBaseline();
+  }, [routeOrigin?.node_id, routeDestination?.node_id]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const geometry =
+      routeComparison?.scenario_geometry ??
+      routeBaseline?.effective_geometry ??
+      routeBaseline?.geometry ??
+      null;
+    if (!map || !geometry || geometry.type !== "LineString" || geometry.coordinates.length < 2) {
+      return;
+    }
+    const bounds = new maplibregl.LngLatBounds();
+    for (const coordinate of geometry.coordinates) {
+      if (coordinate.length >= 2) {
+        bounds.extend([coordinate[0], coordinate[1]]);
+      }
+    }
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, {
+        padding: { top: 140, right: 390, bottom: 80, left: 390 },
+        maxZoom: 15,
+        duration: 650,
+      });
+    }
+  }, [routeBaseline, routeComparison]);
+
   const runRouteComparison = async () => {
     setRouteError(null);
     setRouteComparison(null);
@@ -1018,7 +1071,46 @@ function App() {
             data-reference-map-truncated={referenceMapTruncated ? "true" : "false"}
             data-critical-routes-ready={criticalRouteLayerReady ? "true" : "false"}
             data-critical-routes-count={criticalRoutes?.returned ?? 0}
+            data-traffic-disruptions-ready={trafficLayerReady ? "true" : "false"}
+            data-traffic-disruptions-count={trafficDisruptions?.returned ?? 0}
+            data-user-route-state={routeBaseline?.route_state ?? "none"}
           />
+          <MapRoutePlanner
+            origin={routeOrigin}
+            originLabel={routeOriginLabel}
+            destination={routeDestination}
+            destinationLabel={routeDestinationLabel}
+            route={routeBaseline}
+            routeState={routeState}
+            routeError={routeError}
+            selectionMode={routeSelectionMode}
+            onResolve={resolveRouteEndpoint}
+            onPickOnMap={startRouteSelection}
+            onSwap={swapRouteEndpoints}
+            onClear={clearRouteEndpoints}
+          />
+          {selectedTrafficDisruption && (
+            <article className="traffic-detail-card" aria-label="Road disruption detail">
+              <button
+                aria-label="Close road disruption detail"
+                className="traffic-detail-close"
+                onClick={() => setSelectedTrafficDisruptionId(null)}
+                type="button"
+              >
+                ×
+              </button>
+              <p className="eyebrow">Official VIZ disruption</p>
+              <strong>{selectedTrafficDisruption.street ?? selectedTrafficDisruption.subtype}</strong>
+              {selectedTrafficDisruption.section && <span>{selectedTrafficDisruption.section}</span>}
+              <span className={`traffic-severity${selectedTrafficDisruption.is_full_closure ? " closure" : ""}`}>
+                {selectedTrafficDisruption.severity ?? selectedTrafficDisruption.subtype}
+              </span>
+              <p>{selectedTrafficDisruption.description}</p>
+              <small>
+                Valid {selectedTrafficDisruption.valid_from} → {selectedTrafficDisruption.valid_to}
+              </small>
+            </article>
+          )}
           <div className="legend">
             <strong>Reference layers</strong>
             <p>Viewport projection of persisted reference data; simulated changes stay separate.</p>
@@ -1044,6 +1136,18 @@ function App() {
             ))}
             <label className="layer-toggle">
               <input
+                checked={trafficDisruptionsVisible}
+                onChange={(event) => setTrafficDisruptionsVisible(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="layer-swatch traffic-disruptions" />
+              <span>
+                VIZ road disruptions · {trafficDisruptions?.returned ?? 0} active ·{" "}
+                {trafficDisruptions?.freshness ?? "unavailable"}
+              </span>
+            </label>
+            <label className="layer-toggle">
+              <input
                 checked={criticalRoutesVisible}
                 onChange={(event) => setCriticalRoutesVisible(event.target.checked)}
                 type="checkbox"
@@ -1055,8 +1159,11 @@ function App() {
               </span>
             </label>
             <p className="critical-route-traffic-note">
-              Baseline road weights only · live road traffic telemetry: not integrated
+              VIZ closures can reroute paths · congestion-speed telemetry is not integrated
             </p>
+            {trafficDisruptionsError && (
+              <p className="inline-error">Road disruptions unavailable: {trafficDisruptionsError}</p>
+            )}
             {referenceMap === null && <span>No reference viewport has been loaded yet.</span>}
             {mapDataError && (
               <p className="inline-error">Reference map data unavailable: {mapDataError}</p>
