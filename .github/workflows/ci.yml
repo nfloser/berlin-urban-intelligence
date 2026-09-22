@@ -75,7 +75,8 @@ jobs:
             python scripts/write_acceptance_fixtures.py \
             --reference /app/data/runtime/reference.json \
             --runtime /app/data/runtime/state.json \
-            --derived /app/data/runtime/derived.json
+            --derived /app/data/runtime/derived.json \
+            --traffic-disruptions /app/data/runtime/traffic-disruptions.json
       - run: docker build -t berlin-urban-intelligence-dashboard:ci frontend
       - name: Start composed stack and verify HTTP and browser behavior
         run: |
