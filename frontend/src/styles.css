@@ -636,3 +636,56 @@ dd { margin: 0; text-align: right; }
     width: calc(100% - 20px);
   }
 }
+
+
+.maplibregl-ctrl-top-right {
+  top: 8px;
+  right: 360px;
+}
+
+.traffic-list {
+  border-top: 1px solid #263241;
+  padding-top: 5px;
+}
+
+.traffic-list summary {
+  color: #c4d0dc;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.traffic-list > div {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.traffic-list button {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #344354;
+  border-radius: 6px;
+  background: #101923;
+  color: #dce6ef;
+  text-align: left;
+  cursor: pointer;
+}
+
+.traffic-list button:hover,
+.traffic-list button:focus {
+  background: #1a2a39;
+}
+
+.traffic-list button span {
+  color: #9fb0c2;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .maplibregl-ctrl-top-right {
+    top: 205px;
+    right: 8px;
+  }
+}
