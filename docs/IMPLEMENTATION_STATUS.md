@@ -2,31 +2,34 @@
 
 ## Current phase
 
-Phase 24 — **post-v1 dynamic critical-route monitoring**.
+Phase 25 — **official VIZ disruption-aware map-first navigation**.
 
-The v1.0 evidence baseline remains PASS and the release-candidate metadata was squash-merged to `main` in PR #37 as `8300ba79715d6080b54a29a0ed9c837705c73fd9`. GitHub publication issue #36 remains open only for creation/verification of the external `v1.0.0` tag and GitHub Release; it is not an application-runtime blocker.
-
-Issue #38 / PR #39 adds automatic critical-facility route monitoring over the current persisted road/reference snapshot. The feature is post-v1 development and is recorded under the changelog's `Unreleased` section rather than being retroactively attributed to the reviewed v1.0.0 release candidate.
+The stable v1.0 evidence baseline remains PASS. Post-v1 issue #38 / PR #39 established automatic critical-route monitoring. Issue #40 / PR #41 extends that routing surface with current official Berlin VIZ editorial disruption state and a practical navigation-first MapLibre experience.
 
 ## Current feature work
 
-PR #39 follows TDD. Initial test-only CI run `35446611803` was RED before the `runtime.critical_routes` implementation existed.
+PR #41 follows the same TDD/evidence workflow. Live source probing first rejected the legacy VIZ endpoint for operational routing because its provider timestamps were stale in 2026, then distinguished the current Landesmeldestelle feed from the VIZ editorial feed. The editorial feed is used for route impact because it is current and exposes explicit severity semantics.
 
 The implementation now:
 
-- snaps persisted critical facilities to the persisted road network using the existing metric snapping contract;
-- derives the nearest reachable facility in another critical-facility category using weighted multi-source Dijkstra searches;
-- returns route geometry, travel time, road distance, nodes, edge IDs, quality/freshness and source/licence provenance;
-- caches the full monitor result against the reference snapshot and recomputes it only when validated reference state changes;
-- exposes a bounded `GET /api/v1/resilience/critical-routes` API;
-- polls that inexpensive cached API from the dashboard every 15 seconds;
-- renders all monitored routes automatically as a persistent MapLibre layer, with a separate highlighted selected route;
-- provides both pointer route selection and keyboard-accessible select-based inspection;
-- keeps missing roads/facilities, source errors, unsnapped facilities and unreachable facilities explicit rather than fabricating route data.
+- validates and persists official VIZ editorial road disruptions independently from runtime/reference state;
+- keeps provider retrieval success separate from provider-content freshness using `tstore`;
+- retains last-known-good disruption state on provider/schema failure;
+- prevents stale traffic state from modifying routes;
+- removes road edges only for active source records with exact severity `Vollsperrung`;
+- avoids shared-node false-positive edge closures through projected, distance-bounded matching;
+- preserves baseline route/time and separately exposes effective disrupted/rerouted/blocked results;
+- applies the same VIZ-aware behavior to user-selected origin → destination routes and automatic critical routes;
+- hot-reloads traffic-disruption snapshots without backend restart;
+- exposes bounded traffic-disruption and persisted-place search APIs;
+- refreshes VIZ state through the persistent Compose refresh worker;
+- presents a full-viewport map-first route planner with origin/destination search, arbitrary map-point selection, automatic nearest-node resolution, automatic route calculation and fit-to-route, effective ETA/distance, Swap/Clear and state-colored routing;
+- renders VIZ full closures in red and other source-backed disruptions in amber with inspectable validity/detail;
+- keeps the analytical/research surfaces and hypothetical disruption workflow separate from observed VIZ state.
 
-The current route monitor does **not** integrate verified real-time road congestion telemetry. Every response exposes `traffic_data_available=false`, and the dashboard explicitly labels current route costs as baseline persisted road weights. A future verified traffic source may update route costs through the same contract without relabelling baseline data as live traffic.
+The feature deliberately does **not** claim Google Maps-equivalent live congestion speeds or arbitrary-address geocoding. `traffic_data_available=false` remains authoritative for congestion-speed telemetry. Partial restrictions are not assigned inferred delay multipliers.
 
-Deterministic tests cover normal routing, exact geometry/travel-time/length reconstruction, provenance, source-error degradation, missing-input unavailability, isolated-node degradation, bounded API behavior and recomputation after reference-snapshot replacement. Implementation head `ad3b51a0ad8790c8406f9e6e2d4f447a0ce2b3e2` passed protected CI run `35453388036` across backend, frontend and containers; the composed nginx → FastAPI → persisted state → React/MapLibre acceptance path passed **10/10** Playwright cases. Independent real-energy run `35453388101` also passed on that head. The documentation-only head must retain the protected checks before merge.
+Implementation head `806ca896891c650e380e43adab6be650524fb35c` passed protected CI run `35757018243` across backend, frontend and containers. The composed nginx → FastAPI → persisted reference/traffic state → React/MapLibre path passed **11/11 Playwright cases** in 34.0 s, including the new map-first navigation/rerouting path and all prior map, scenario, accessibility and security regression paths. The same head also has successful current VIZ live-source smoke and independent real-energy evidence runs.
 
 ## Verified v1 evidence baseline
 
@@ -62,7 +65,7 @@ This is point-in-time provider compatibility/readiness evidence, not a guarantee
 
 ## Current architectural state
 
-- Runtime, reference, energy and derived state are persisted separately and loaded through validated stores.
+- Runtime, reference, energy, derived and traffic-disruption state are persisted separately and loaded through validated stores.
 - Snapshot control hot-reloads validated replacements; invalid replacements retain last-known-good state and expose diagnostics.
 - Six real agents expose explicit domains, capabilities, contracts, dependencies and health.
 - Cross-agent coordination remains at registry/orchestration/composition boundaries rather than hidden inside domain agents.
@@ -71,7 +74,7 @@ This is point-in-time provider compatibility/readiness evidence, not a guarantee
 - Source-backed cross-domain products are omitted when required inputs are absent; no synthetic replacement score is generated.
 - RDF projection and bounded semantic relationship inspection use validated persisted state.
 - FastAPI exposes system/source/agent/domain/reference/scenario/derived/dependency/semantic/map and resilience surfaces.
-- The React/MapLibre dashboard exposes reference/provenance inspection, platform/derived inspection, deterministic workflows, explicit cross-domain interpretation, scenarios, baseline-versus-disruption routing and automatic critical-route monitoring.
+- The React/MapLibre dashboard now uses a map-first navigation surface with persisted-place search, arbitrary map-point routing, source-backed VIZ disruption visualization, automatic disruption-aware rerouting and effective ETA/distance while retaining reference/provenance, platform/derived, deterministic workflow, scenario and critical-route inspection.
 - Critical resilience routing has an equivalent coordinate-driven keyboard path over the same routing APIs; automatic monitored critical routes additionally expose a keyboard-selectable inspector.
 - Browser acceptance runs against the composed application stack and includes pinned Axe accessibility scanning for representative states.
 - Structured observability covers request, source-refresh, reload, derivation-refresh and scenario boundaries with safe low-cardinality fields.

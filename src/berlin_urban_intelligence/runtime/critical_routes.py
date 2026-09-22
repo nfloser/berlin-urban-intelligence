@@ -8,9 +8,17 @@ from typing import Literal, cast
 
 import networkx as nx
 from pydantic import BaseModel, ConfigDict, Field
+from pyproj import Transformer
+from shapely.geometry import shape
+from shapely.geometry.base import BaseGeometry
+from shapely.ops import transform as shapely_transform
 
 from berlin_urban_intelligence.agents.resilience import snap_facilities_to_network
 from berlin_urban_intelligence.runtime.reference import ReferenceState
+from berlin_urban_intelligence.runtime.traffic_disruptions import (
+    TrafficDisruption,
+    TrafficDisruptionState,
+)
 from berlin_urban_intelligence.shared.contracts import (
     AvailabilityStatus,
     CriticalFacility,
@@ -19,6 +27,8 @@ from berlin_urban_intelligence.shared.contracts import (
     NetworkNode,
     QualityFlag,
 )
+
+_TO_METRIC = Transformer.from_crs("EPSG:4326", "EPSG:25833", always_xy=True).transform
 
 
 class CriticalRouteProvenance(BaseModel):
@@ -35,6 +45,8 @@ class CriticalRouteProvenance(BaseModel):
         "nearest cross-category critical-facility route over persisted weighted road network"
     )
     traffic_data_available: Literal[False] = False
+    disruption_source_providers: tuple[str, ...] = ()
+    disruption_source_licences: tuple[str, ...] = ()
 
 
 class CriticalRoute(BaseModel):
@@ -56,7 +68,15 @@ class CriticalRoute(BaseModel):
     geometry: dict[str, object]
     quality: QualityFlag
     freshness: FreshnessStatus = FreshnessStatus.UNKNOWN
-    route_state: Literal["baseline"] = "baseline"
+    route_state: Literal["baseline", "disrupted", "rerouted", "blocked"] = "baseline"
+    active_disruption_ids: tuple[str, ...] = ()
+    closed_edge_ids: tuple[str, ...] = ()
+    disruption_aware_travel_time_s: float | None = None
+    disruption_aware_length_m: float | None = None
+    disruption_aware_node_path: tuple[str, ...] = ()
+    disruption_aware_edge_ids: tuple[str, ...] = ()
+    disruption_aware_geometry: dict[str, object] | None = None
+    travel_time_delta_s: float | None = None
     provenance: CriticalRouteProvenance
 
 
@@ -75,7 +95,25 @@ class CriticalRouteSnapshot(BaseModel):
     unreachable_facility_ids: tuple[str, ...] = ()
     source_errors: dict[str, str] = Field(default_factory=dict)
     traffic_data_available: Literal[False] = False
+    disruption_data_available: bool = False
+    disruption_generated_at: datetime | None = None
+    disruption_freshness: FreshnessStatus = FreshnessStatus.UNAVAILABLE
+    disruption_source_error: str | None = None
     note: str
+
+
+class RouteDisruptionImpact(BaseModel):
+    """Observed VIZ impact constraints for one baseline route."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    evaluated_at: datetime
+    disruption_data_available: bool
+    disruption_freshness: FreshnessStatus
+    disruption_source_error: str | None = None
+    active_disruption_ids: tuple[str, ...] = ()
+    route_closed_edge_ids: tuple[str, ...] = ()
+    network_closed_edge_ids: tuple[str, ...] = ()
 
 
 class CriticalRouteMonitor:
@@ -90,13 +128,21 @@ class CriticalRouteMonitor:
         self,
         reference: ReferenceState | None,
         *,
+        traffic_state: TrafficDisruptionState | None = None,
         max_snap_distance_m: float = 1000.0,
+        disruption_match_distance_m: float = 25.0,
         now_factory: Callable[[], datetime] | None = None,
     ) -> None:
         if max_snap_distance_m <= 0 or max_snap_distance_m > 50_000:
             raise ValueError("max_snap_distance_m must be greater than zero and at most 50000")
+        if disruption_match_distance_m <= 0 or disruption_match_distance_m > 250:
+            raise ValueError(
+                "disruption_match_distance_m must be greater than zero and at most 250"
+            )
         self._reference = reference
+        self._traffic_state = traffic_state
         self._max_snap_distance_m = max_snap_distance_m
+        self._disruption_match_distance_m = disruption_match_distance_m
         self._now_factory = now_factory or (lambda: datetime.now(UTC))
 
     @staticmethod
@@ -199,6 +245,261 @@ class CriticalRouteMonitor:
             source_licences=tuple(sorted(licences)),
         )
 
+    @staticmethod
+    def _metric_shape(geometry: dict[str, object]) -> BaseGeometry:
+        return shapely_transform(_TO_METRIC, shape(geometry))
+
+    @staticmethod
+    def _edge_geometry(
+        edge: NetworkEdge,
+        nodes: dict[str, NetworkNode],
+    ) -> dict[str, object] | None:
+        source = nodes.get(edge.source)
+        target = nodes.get(edge.target)
+        if (
+            source is None
+            or target is None
+            or source.longitude is None
+            or source.latitude is None
+            or target.longitude is None
+            or target.latitude is None
+        ):
+            return None
+        return {
+            "type": "LineString",
+            "coordinates": [
+                [source.longitude, source.latitude],
+                [target.longitude, target.latitude],
+            ],
+        }
+
+    def _active_disruptions(self, computed_at: datetime) -> tuple[TrafficDisruption, ...]:
+        state = self._traffic_state
+        if (
+            state is None
+            or state.last_success_at is None
+            or state.freshness is not FreshnessStatus.VALID
+        ):
+            return ()
+        return tuple(
+            sorted(
+                (item for item in state.disruptions if item.active_at(computed_at)),
+                key=lambda item: item.id,
+            )
+        )
+
+    def _matches_geometry(
+        self,
+        route_geometry: dict[str, object],
+        disruption: TrafficDisruption,
+    ) -> bool:
+        route_shape = self._metric_shape(route_geometry)
+        disruption_shape = self._metric_shape(disruption.spatial.geometry or {})
+        return bool(route_shape.distance(disruption_shape) <= self._disruption_match_distance_m)
+
+    def _edge_matches_disruption(
+        self,
+        edge_geometry: dict[str, object],
+        disruption: TrafficDisruption,
+    ) -> bool:
+        edge_shape = self._metric_shape(edge_geometry)
+        disruption_shape = self._metric_shape(disruption.spatial.geometry or {})
+        intersection = edge_shape.intersection(disruption_shape)
+        if float(intersection.length) > 1.0:
+            return True
+        midpoint = edge_shape.interpolate(0.5, normalized=True)
+        return bool(midpoint.distance(disruption_shape) <= self._disruption_match_distance_m)
+
+    def _closed_edge_ids(
+        self,
+        *,
+        reference: ReferenceState,
+        nodes: dict[str, NetworkNode],
+        disruptions: tuple[TrafficDisruption, ...],
+    ) -> tuple[str, ...]:
+        full_closures = tuple(item for item in disruptions if item.is_full_closure)
+        if not full_closures:
+            return ()
+        closed: set[str] = set()
+        for edge in reference.network_edges:
+            geometry = self._edge_geometry(edge, nodes)
+            if geometry is None:
+                continue
+            if any(
+                self._edge_matches_disruption(geometry, disruption) for disruption in full_closures
+            ):
+                closed.add(edge.id)
+        return tuple(sorted(closed))
+
+    @staticmethod
+    def _remove_closed_edges(
+        graph: nx.MultiDiGraph[str],
+        closed_edge_ids: tuple[str, ...],
+    ) -> nx.MultiDiGraph[str]:
+        if not closed_edge_ids:
+            return graph.copy()
+        closed = set(closed_edge_ids)
+        candidate = graph.copy()
+        removals = [
+            (source, target, key)
+            for source, target, key, data in candidate.edges(keys=True, data=True)
+            if str(data.get("id")) in closed
+        ]
+        for source, target, key in removals:
+            candidate.remove_edge(source, target, key)
+        return candidate
+
+    def _apply_disruptions(
+        self,
+        *,
+        route: CriticalRoute,
+        graph: nx.MultiDiGraph[str],
+        nodes: dict[str, NetworkNode],
+        active_disruptions: tuple[TrafficDisruption, ...],
+        closed_edge_ids: tuple[str, ...],
+    ) -> CriticalRoute:
+        state = self._traffic_state
+        if state is None or state.last_success_at is None:
+            return route
+
+        matched = tuple(
+            item for item in active_disruptions if self._matches_geometry(route.geometry, item)
+        )
+        matched_ids = tuple(item.id for item in matched)
+        route_closed_edges = tuple(
+            edge_id for edge_id in route.edge_ids if edge_id in set(closed_edge_ids)
+        )
+        disruption_providers = tuple(sorted({item.provenance.provider for item in matched}))
+        disruption_licences = tuple(
+            sorted(
+                {
+                    item.provenance.source_licence
+                    for item in matched
+                    if item.provenance.source_licence
+                }
+            )
+        )
+        provenance = route.provenance.model_copy(
+            update={
+                "disruption_source_providers": disruption_providers,
+                "disruption_source_licences": disruption_licences,
+            }
+        )
+
+        if not matched:
+            return route.model_copy(
+                update={
+                    "disruption_aware_travel_time_s": route.travel_time_s,
+                    "disruption_aware_length_m": route.length_m,
+                    "disruption_aware_node_path": route.node_path,
+                    "disruption_aware_edge_ids": route.edge_ids,
+                    "disruption_aware_geometry": route.geometry,
+                    "travel_time_delta_s": 0.0,
+                    "provenance": provenance,
+                }
+            )
+
+        if not route_closed_edges:
+            return route.model_copy(
+                update={
+                    "route_state": "disrupted",
+                    "active_disruption_ids": matched_ids,
+                    "disruption_aware_travel_time_s": route.travel_time_s,
+                    "disruption_aware_length_m": route.length_m,
+                    "disruption_aware_node_path": route.node_path,
+                    "disruption_aware_edge_ids": route.edge_ids,
+                    "disruption_aware_geometry": route.geometry,
+                    "travel_time_delta_s": 0.0,
+                    "provenance": provenance,
+                }
+            )
+
+        reroute_graph = self._remove_closed_edges(graph, closed_edge_ids)
+        try:
+            node_path = tuple(
+                str(item)
+                for item in nx.shortest_path(
+                    reroute_graph,
+                    source=route.node_path[0],
+                    target=route.node_path[-1],
+                    weight="travel_time_s",
+                )
+            )
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return route.model_copy(
+                update={
+                    "route_state": "blocked",
+                    "active_disruption_ids": matched_ids,
+                    "closed_edge_ids": route_closed_edges,
+                    "provenance": provenance,
+                }
+            )
+
+        geometry = self._route_geometry(node_path, nodes)
+        if geometry is None:
+            return route.model_copy(
+                update={
+                    "route_state": "blocked",
+                    "active_disruption_ids": matched_ids,
+                    "closed_edge_ids": route_closed_edges,
+                    "provenance": provenance,
+                }
+            )
+        edge_ids, travel_time_s, length_m, _ = self._path_edges(reroute_graph, node_path)
+        return route.model_copy(
+            update={
+                "route_state": "rerouted",
+                "active_disruption_ids": matched_ids,
+                "closed_edge_ids": route_closed_edges,
+                "disruption_aware_travel_time_s": travel_time_s,
+                "disruption_aware_length_m": length_m,
+                "disruption_aware_node_path": node_path,
+                "disruption_aware_edge_ids": edge_ids,
+                "disruption_aware_geometry": geometry,
+                "travel_time_delta_s": travel_time_s - route.travel_time_s,
+                "provenance": provenance,
+            }
+        )
+
+    def route_disruption_impact(
+        self,
+        *,
+        geometry: dict[str, object],
+        edge_ids: tuple[str, ...] | list[str],
+        evaluated_at: datetime | None = None,
+    ) -> RouteDisruptionImpact:
+        at = (evaluated_at or self._now_factory()).astimezone(UTC)
+        state = self._traffic_state
+        active = self._active_disruptions(at)
+        matched_ids = tuple(
+            sorted(item.id for item in active if self._matches_geometry(geometry, item))
+        )
+
+        reference = self._reference
+        if reference is None:
+            network_closed_edge_ids: tuple[str, ...] = ()
+        else:
+            nodes = {item.id: item for item in reference.network_nodes}
+            network_closed_edge_ids = self._closed_edge_ids(
+                reference=reference,
+                nodes=nodes,
+                disruptions=active,
+            )
+        closed_set = set(network_closed_edge_ids)
+        route_closed_edge_ids = tuple(edge_id for edge_id in edge_ids if edge_id in closed_set)
+
+        return RouteDisruptionImpact(
+            evaluated_at=at,
+            disruption_data_available=(state is not None and state.last_success_at is not None),
+            disruption_freshness=(
+                state.freshness if state is not None else FreshnessStatus.UNAVAILABLE
+            ),
+            disruption_source_error=state.source_error if state is not None else None,
+            active_disruption_ids=matched_ids,
+            route_closed_edge_ids=route_closed_edge_ids,
+            network_closed_edge_ids=network_closed_edge_ids,
+        )
+
     def _unavailable(self, *, computed_at: datetime, note: str) -> CriticalRouteSnapshot:
         reference = self._reference
         return CriticalRouteSnapshot(
@@ -207,6 +508,20 @@ class CriticalRouteMonitor:
             status=AvailabilityStatus.UNAVAILABLE,
             quality=QualityFlag.UNKNOWN,
             source_errors=dict(reference.errors) if reference else {},
+            disruption_data_available=(
+                self._traffic_state is not None and self._traffic_state.last_success_at is not None
+            ),
+            disruption_generated_at=(
+                self._traffic_state.generated_at if self._traffic_state else None
+            ),
+            disruption_freshness=(
+                self._traffic_state.freshness
+                if self._traffic_state
+                else FreshnessStatus.UNAVAILABLE
+            ),
+            disruption_source_error=(
+                self._traffic_state.source_error if self._traffic_state else None
+            ),
             note=note,
         )
 
@@ -365,6 +680,22 @@ class CriticalRouteMonitor:
                 item.destination_facility_id,
             )
         )
+        active_disruptions = self._active_disruptions(computed_at)
+        closed_edge_ids = self._closed_edge_ids(
+            reference=reference,
+            nodes=nodes,
+            disruptions=active_disruptions,
+        )
+        routes = [
+            self._apply_disruptions(
+                route=item,
+                graph=graph,
+                nodes=nodes,
+                active_disruptions=active_disruptions,
+                closed_edge_ids=closed_edge_ids,
+            )
+            for item in routes
+        ]
         if not routes:
             return CriticalRouteSnapshot(
                 computed_at=computed_at,
@@ -374,13 +705,35 @@ class CriticalRouteMonitor:
                 unsnapped_facility_ids=unsnapped,
                 unreachable_facility_ids=tuple(sorted(unreachable)),
                 source_errors=dict(reference.errors),
+                disruption_data_available=(
+                    self._traffic_state is not None
+                    and self._traffic_state.last_success_at is not None
+                ),
+                disruption_generated_at=(
+                    self._traffic_state.generated_at if self._traffic_state else None
+                ),
+                disruption_freshness=(
+                    self._traffic_state.freshness
+                    if self._traffic_state
+                    else FreshnessStatus.UNAVAILABLE
+                ),
+                disruption_source_error=(
+                    self._traffic_state.source_error if self._traffic_state else None
+                ),
                 note=(
                     "No cross-category critical-facility route can be resolved from the persisted "
                     "road network. No live traffic or synthetic topology is substituted."
                 ),
             )
 
-        degraded = bool(reference.errors or unsnapped or unreachable)
+        disruption_degraded = bool(
+            self._traffic_state is not None
+            and (
+                self._traffic_state.source_error is not None
+                or self._traffic_state.freshness is FreshnessStatus.STALE
+            )
+        )
+        degraded = bool(reference.errors or unsnapped or unreachable or disruption_degraded)
         return CriticalRouteSnapshot(
             computed_at=computed_at,
             reference_generated_at=reference.generated_at,
@@ -390,10 +743,25 @@ class CriticalRouteMonitor:
             unsnapped_facility_ids=unsnapped,
             unreachable_facility_ids=tuple(sorted(unreachable)),
             source_errors=dict(reference.errors),
+            disruption_data_available=(
+                self._traffic_state is not None and self._traffic_state.last_success_at is not None
+            ),
+            disruption_generated_at=(
+                self._traffic_state.generated_at if self._traffic_state else None
+            ),
+            disruption_freshness=(
+                self._traffic_state.freshness
+                if self._traffic_state
+                else FreshnessStatus.UNAVAILABLE
+            ),
+            disruption_source_error=(
+                self._traffic_state.source_error if self._traffic_state else None
+            ),
             note=(
                 "Routes are recomputed from the current persisted weighted road/reference "
-                "snapshot. No live traffic telemetry is integrated; "
-                "traffic_data_available=false prevents "
-                "baseline road weights from being presented as Google-style congestion data."
+                "snapshot. Active official VIZ disruptions can mark routes disrupted, rerouted "
+                "or blocked; only severity=Vollsperrung removes matched road edges. "
+                "No live traffic congestion-speed telemetry is integrated and no speed penalty is "
+                "invented for other restrictions."
             ),
         )

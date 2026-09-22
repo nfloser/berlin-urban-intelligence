@@ -3,6 +3,7 @@ import {
   displayValue,
   heatAssessmentRequest,
   mapLayerCounts,
+  mapSearchPath,
   networkDisruptionRequest,
   routeRequest,
   systemSnapshotToken,
@@ -42,6 +43,14 @@ describe("dashboard data semantics", () => {
       ["Official climate features", 1],
     ]);
     expect(mapLayerCounts({ facilities: 0, stops: 0, climate: 0 })).toEqual([]);
+  });
+
+  it("builds a bounded routable map search path", () => {
+    expect(mapSearchPath("Acceptance Hospital", 6)).toBe(
+      "/api/v1/map/search?q=Acceptance+Hospital&limit=6",
+    );
+    expect(() => mapSearchPath("a")).toThrow(/two characters/);
+    expect(() => mapSearchPath("Berlin", 51)).toThrow(/between 1 and 50/);
   });
 
   it("builds a baseline route request only from selected map nodes", () => {
@@ -91,6 +100,7 @@ describe("dashboard data semantics", () => {
       reference_generated_at: "2026-09-14T18:00:00Z",
       energy_generated_at: "2026-09-14T12:00:00Z",
       derived_generated_at: "2026-09-14T12:05:00Z",
+      traffic_disruption_generated_at: "2026-09-14T12:06:00Z",
       snapshot_reload: {},
       synthetic_production_fallback: false,
     };
@@ -105,6 +115,12 @@ describe("dashboard data semantics", () => {
     );
     expect(systemSnapshotToken(base)).not.toBe(
       systemSnapshotToken({ ...base, derived_generated_at: "2026-09-15T08:02:00Z" }),
+    );
+    expect(systemSnapshotToken(base)).not.toBe(
+      systemSnapshotToken({
+        ...base,
+        traffic_disruption_generated_at: "2026-09-15T08:03:00Z",
+      }),
     );
   });
 });

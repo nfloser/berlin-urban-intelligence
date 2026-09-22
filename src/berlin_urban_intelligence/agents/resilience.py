@@ -328,10 +328,14 @@ class ResilienceAgent(BaseAgent):
                 data["travel_time_s"] = float(data["travel_time_s"]) * penalty
         return graph
 
-    def shortest_path(
-        self, origin: str, destination: str, scenario: Scenario | None = None
+    @staticmethod
+    def _route_result(
+        graph: nx.MultiDiGraph[str],
+        origin: str,
+        destination: str,
+        *,
+        scenario_name: str | None = None,
     ) -> RouteResult:
-        graph = self._scenario_graph(scenario)
         path = nx.shortest_path(graph, origin, destination, weight="travel_time_s")
         edge_ids: list[str] = []
         travel_time = 0.0
@@ -349,8 +353,34 @@ class ResilienceAgent(BaseAgent):
             node_path=list(path),
             edge_ids=edge_ids,
             travel_time_s=travel_time,
+            scenario_name=scenario_name,
+        )
+
+    def shortest_path(
+        self, origin: str, destination: str, scenario: Scenario | None = None
+    ) -> RouteResult:
+        return self._route_result(
+            self._scenario_graph(scenario),
+            origin,
+            destination,
             scenario_name=scenario.name if scenario else None,
         )
+
+    def shortest_path_avoiding_edges(
+        self,
+        origin: str,
+        destination: str,
+        closed_edge_ids: tuple[str, ...] | list[str],
+    ) -> RouteResult | None:
+        graph = self._base_graph.copy()
+        closed = set(closed_edge_ids)
+        for source, target, key, data in list(graph.edges(keys=True, data=True)):
+            if str(data.get("id")) in closed:
+                graph.remove_edge(source, target, key=key)
+        try:
+            return self._route_result(graph, origin, destination)
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return None
 
     def compare_route(self, origin: str, destination: str, scenario: Scenario) -> RouteComparison:
         baseline = self.shortest_path(origin, destination)

@@ -7,6 +7,7 @@ from pathlib import Path
 from berlin_urban_intelligence.runtime.derived import DerivedStateStore
 from berlin_urban_intelligence.runtime.reference import ReferenceStateStore
 from berlin_urban_intelligence.runtime.state import RuntimeStateStore
+from berlin_urban_intelligence.runtime.traffic_disruptions import TrafficDisruptionStateStore
 from berlin_urban_intelligence.shared.contracts import (
     AvailabilityStatus,
     DerivationStatus,
@@ -16,10 +17,11 @@ from berlin_urban_intelligence.shared.contracts import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _write_acceptance_state(tmp_path: Path) -> tuple[Path, Path, Path]:
+def _write_acceptance_state(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     reference_path = tmp_path / "reference.json"
     runtime_path = tmp_path / "state.json"
     derived_path = tmp_path / "derived.json"
+    traffic_path = tmp_path / "traffic-disruptions.json"
     subprocess.run(
         [
             sys.executable,
@@ -30,31 +32,38 @@ def _write_acceptance_state(tmp_path: Path) -> tuple[Path, Path, Path]:
             str(runtime_path),
             "--derived",
             str(derived_path),
+            "--traffic-disruptions",
+            str(traffic_path),
         ],
         cwd=REPO_ROOT,
         check=True,
         capture_output=True,
         text=True,
     )
-    return reference_path, runtime_path, derived_path
+    return reference_path, runtime_path, derived_path, traffic_path
 
 
 def test_acceptance_fixture_cli_persists_all_expected_state_files(tmp_path: Path) -> None:
-    reference_path, runtime_path, derived_path = _write_acceptance_state(tmp_path)
+    reference_path, runtime_path, derived_path, traffic_path = _write_acceptance_state(tmp_path)
 
     reference = ReferenceStateStore(reference_path).load()
     runtime = RuntimeStateStore(runtime_path).load()
     derived = DerivedStateStore(derived_path).load()
+    traffic = TrafficDisruptionStateStore(traffic_path).load()
 
     assert reference is not None
     assert runtime is not None
     assert derived is not None
+    assert traffic is not None
     assert len(reference.critical_facilities) == 2
     assert {item.category for item in reference.critical_facilities} == {"hospital", "fire_station"}
     assert len(reference.network_nodes) == 3
     assert len(reference.network_edges) == 3
     assert len(runtime.source_statuses) == 1
     assert len(derived.records) == 3
+    assert len(traffic.disruptions) == 1
+    assert traffic.disruptions[0].is_full_closure is True
+    assert traffic.freshness is FreshnessStatus.VALID
     assert {record.id for record in derived.records} == {
         "derived:acceptance:mobility-delay-share",
         "derived:context:heat-air-quality:current",
@@ -65,7 +74,7 @@ def test_acceptance_fixture_cli_persists_all_expected_state_files(tmp_path: Path
 def test_runtime_acceptance_fixture_exposes_explicit_source_failure_semantics(
     tmp_path: Path,
 ) -> None:
-    _, runtime_path, _ = _write_acceptance_state(tmp_path)
+    _, runtime_path, _, _ = _write_acceptance_state(tmp_path)
     runtime = RuntimeStateStore(runtime_path).load()
     assert runtime is not None
 
@@ -81,7 +90,7 @@ def test_runtime_acceptance_fixture_exposes_explicit_source_failure_semantics(
 def test_derived_acceptance_fixture_exposes_lineage_without_production_fallback(
     tmp_path: Path,
 ) -> None:
-    _, _, derived_path = _write_acceptance_state(tmp_path)
+    _, _, derived_path, _ = _write_acceptance_state(tmp_path)
     derived = DerivedStateStore(derived_path).load()
     assert derived is not None
 

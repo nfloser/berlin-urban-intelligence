@@ -20,6 +20,8 @@ import {
   type RouteComparisonResponse,
   type RouteResponse,
   type SystemResponse,
+  type TrafficDisruption,
+  type TrafficDisruptionResponse,
   type UrbanEntity,
   type WorkflowKind,
   displayValue,
@@ -31,6 +33,7 @@ import {
   toFeatureCollection,
 } from "./api";
 import MapEntityInspector, { type MapSelection } from "./MapEntityInspector";
+import MapRoutePlanner, { type RouteEndpointKind } from "./MapRoutePlanner";
 import {
   ReferenceMapRequestTracker,
   buildReferenceDetailPath,
@@ -107,7 +110,9 @@ function App() {
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
   const [routeOrigin, setRouteOrigin] = useState<NetworkNodePick | null>(null);
+  const [routeOriginLabel, setRouteOriginLabel] = useState("");
   const [routeDestination, setRouteDestination] = useState<NetworkNodePick | null>(null);
+  const [routeDestinationLabel, setRouteDestinationLabel] = useState("");
   const [routeSelectionMode, setRouteSelectionMode] = useState<"origin" | "destination" | null>(null);
   const [routeBaseline, setRouteBaseline] = useState<RouteResponse | null>(null);
   const [closedEdge, setClosedEdge] = useState("");
@@ -118,11 +123,19 @@ function App() {
   const [criticalRoutesError, setCriticalRoutesError] = useState<string | null>(null);
   const [criticalRoutesVisible, setCriticalRoutesVisible] = useState(true);
   const [selectedCriticalRouteId, setSelectedCriticalRouteId] = useState<string | null>(null);
+  const [trafficDisruptions, setTrafficDisruptions] =
+    useState<TrafficDisruptionResponse | null>(null);
+  const [trafficDisruptionsError, setTrafficDisruptionsError] = useState<string | null>(null);
+  const [trafficDisruptionsVisible, setTrafficDisruptionsVisible] = useState(true);
+  const [trafficLayerReady, setTrafficLayerReady] = useState(false);
+  const [selectedTrafficDisruptionId, setSelectedTrafficDisruptionId] = useState<string | null>(null);
 
   const selectedCriticalRoute =
     criticalRoutes?.routes.find((item) => item.id === selectedCriticalRouteId) ?? null;
   const selectedObservation =
     observations.find((item) => item.id === selectedObservationId) ?? null;
+  const selectedTrafficDisruption =
+    trafficDisruptions?.disruptions.find((item) => item.id === selectedTrafficDisruptionId) ?? null;
   const layerSummaries = referenceMap ? referenceLayerSummaries(referenceMap.metadata) : [];
   const referenceMapTruncated = layerSummaries.some((layer) => layer.truncated);
 
@@ -181,6 +194,40 @@ function App() {
     void loadCriticalRoutes();
     const interval = window.setInterval(() => {
       void loadCriticalRoutes();
+    }, CRITICAL_ROUTE_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTrafficDisruptions = async () => {
+      try {
+        const result = await fetchJson<TrafficDisruptionResponse>(
+          "/api/v1/traffic/disruptions?active_only=true&limit=1000",
+        );
+        if (cancelled) return;
+        setTrafficDisruptions(result);
+        setTrafficDisruptionsError(null);
+        setSelectedTrafficDisruptionId((current) => {
+          if (current && result.disruptions.some((item) => item.id === current)) return current;
+          return null;
+        });
+      } catch (reason) {
+        if (cancelled) return;
+        setTrafficDisruptionsError(
+          reason instanceof Error ? reason.message : "Road disruptions unavailable.",
+        );
+      }
+    };
+
+    void loadTrafficDisruptions();
+    const interval = window.setInterval(() => {
+      void loadTrafficDisruptions();
     }, CRITICAL_ROUTE_POLL_INTERVAL_MS);
 
     return () => {
@@ -282,12 +329,35 @@ function App() {
     const inspectionData: FeatureCollection = mapSelection
       ? toFeatureCollection([mapSelection.item])
       : EMPTY_FEATURE_COLLECTION;
+    const trafficData: FeatureCollection = {
+      type: "FeatureCollection",
+      features: (trafficDisruptions?.disruptions ?? []).flatMap((item) =>
+        item.spatial?.geometry
+          ? [
+              {
+                type: "Feature" as const,
+                id: item.id,
+                properties: {
+                  disruption_id: item.id,
+                  severity: item.severity ?? "",
+                  subtype: item.subtype,
+                  is_full_closure: item.is_full_closure,
+                },
+                geometry: item.spatial.geometry,
+              },
+            ]
+          : [],
+      ),
+    };
     const routeData = (geometry: RouteComparisonResponse["baseline_geometry"]): FeatureCollection => ({
       type: "FeatureCollection",
       features: geometry ? [{ type: "Feature", properties: {}, geometry }] : [],
     });
     const baselineRouteData = routeData(
-      routeComparison?.baseline_geometry ?? routeBaseline?.geometry ?? null,
+      routeComparison?.baseline_geometry ??
+        routeBaseline?.effective_geometry ??
+        routeBaseline?.geometry ??
+        null,
     );
     const selectionData: FeatureCollection = {
       type: "FeatureCollection",
@@ -319,6 +389,7 @@ function App() {
       upsert("route-baseline", baselineRouteData);
       upsert("route-scenario", scenarioRouteData);
       upsert("route-selection", selectionData);
+      upsert("traffic-disruptions", trafficData);
       if (!map.getSource("critical-routes")) {
         map.addSource("critical-routes", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
       }
@@ -392,15 +463,71 @@ function App() {
           },
         });
       }
+      if (!map.getLayer("traffic-disruptions-line")) {
+        map.addLayer({
+          id: "traffic-disruptions-line",
+          type: "line",
+          source: "traffic-disruptions",
+          paint: {
+            "line-color": [
+              "case",
+              ["==", ["get", "is_full_closure"], true],
+              "#d93025",
+              "#f9ab00",
+            ],
+            "line-width": [
+              "case",
+              ["==", ["get", "is_full_closure"], true],
+              6,
+              4,
+            ],
+            "line-opacity": 0.88,
+          },
+        });
+      }
+      if (!map.getLayer("traffic-disruptions-circle")) {
+        map.addLayer({
+          id: "traffic-disruptions-circle",
+          type: "circle",
+          source: "traffic-disruptions",
+          paint: {
+            "circle-radius": [
+              "case",
+              ["==", ["get", "is_full_closure"], true],
+              7,
+              5,
+            ],
+            "circle-color": [
+              "case",
+              ["==", ["get", "is_full_closure"], true],
+              "#d93025",
+              "#f9ab00",
+            ],
+            "circle-stroke-color": "#ffffff",
+            "circle-stroke-width": 1.5,
+            "circle-opacity": 0.92,
+          },
+        });
+      }
       if (!map.getLayer("critical-routes-line")) {
         map.addLayer({
           id: "critical-routes-line",
           type: "line",
           source: "critical-routes",
           paint: {
-            "line-color": "#4ea5d9",
+            "line-color": [
+              "match",
+              ["get", "route_state"],
+              "blocked",
+              "#d93025",
+              "rerouted",
+              "#188038",
+              "disrupted",
+              "#f9ab00",
+              "#4285f4",
+            ],
             "line-width": 5,
-            "line-opacity": 0.78,
+            "line-opacity": 0.82,
           },
         });
       }
@@ -434,7 +561,7 @@ function App() {
           id: "route-baseline-line",
           type: "line",
           source: "route-baseline",
-          paint: { "line-color": "#dfe8f0", "line-width": 4, "line-opacity": 0.72 },
+          paint: { "line-color": "#4285f4", "line-width": 7, "line-opacity": 0.92 },
         });
       }
       if (!map.getLayer("route-scenario-line")) {
@@ -448,6 +575,20 @@ function App() {
       setVisibility("facilities-circle", visibleLayers.facilities);
       setVisibility("stops-circle", visibleLayers.stops);
       setVisibility("climate-fill", visibleLayers.climate);
+      setVisibility("traffic-disruptions-line", trafficDisruptionsVisible);
+      setVisibility("traffic-disruptions-circle", trafficDisruptionsVisible);
+      if (map.getLayer("route-baseline-line")) {
+        const routeColor =
+          routeBaseline?.route_state === "blocked"
+            ? "#d93025"
+            : routeBaseline?.route_state === "rerouted"
+              ? "#188038"
+              : routeBaseline?.route_state === "disrupted"
+                ? "#f9ab00"
+                : "#4285f4";
+        map.setPaintProperty("route-baseline-line", "line-color", routeColor);
+      }
+      setTrafficLayerReady(true);
       setMapLayersReady(true);
     };
 
@@ -481,6 +622,8 @@ function App() {
     routeBaseline,
     routeOrigin,
     routeDestination,
+    trafficDisruptions,
+    trafficDisruptionsVisible,
   ]);
 
   useEffect(() => {
@@ -504,8 +647,11 @@ function App() {
       features: (criticalRoutes?.routes ?? []).map((route) => ({
         type: "Feature",
         id: route.id,
-        properties: { route_id: route.id },
-        geometry: route.geometry,
+        properties: { route_id: route.id, route_state: route.route_state },
+        geometry:
+          route.route_state === "rerouted" && route.disruption_aware_geometry
+            ? route.disruption_aware_geometry
+            : route.geometry,
       })),
     };
     const selectedCriticalRouteData: FeatureCollection = {
@@ -515,8 +661,15 @@ function App() {
             {
               type: "Feature",
               id: selectedCriticalRoute.id,
-              properties: { route_id: selectedCriticalRoute.id },
-              geometry: selectedCriticalRoute.geometry,
+              properties: {
+                route_id: selectedCriticalRoute.id,
+                route_state: selectedCriticalRoute.route_state,
+              },
+              geometry:
+                selectedCriticalRoute.route_state === "rerouted" &&
+                selectedCriticalRoute.disruption_aware_geometry
+                  ? selectedCriticalRoute.disruption_aware_geometry
+                  : selectedCriticalRoute.geometry,
             },
           ]
         : [],
@@ -524,11 +677,6 @@ function App() {
 
     routeSource.setData(criticalRouteData);
     selectedSource.setData(selectedCriticalRouteData);
-    map.setPaintProperty(
-      "critical-routes-line",
-      "line-color",
-      criticalRoutes?.status === "degraded" ? "#e3bd71" : "#4ea5d9",
-    );
     map.setLayoutProperty(
       "critical-routes-line",
       "visibility",
@@ -570,6 +718,29 @@ function App() {
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || loadState !== "ready" || routeSelectionMode !== null) return;
+
+    const inspectTrafficDisruption = (event: maplibregl.MapMouseEvent) => {
+      if (!trafficDisruptionsVisible) return;
+      const layers = ["traffic-disruptions-line", "traffic-disruptions-circle"].filter(
+        (layerId) => map.getLayer(layerId) !== undefined,
+      );
+      if (layers.length === 0) return;
+      const hit = map.queryRenderedFeatures(referenceHitTestBox(event.point), { layers })[0];
+      const disruptionId = hit?.properties?.disruption_id;
+      if (disruptionId !== null && disruptionId !== undefined) {
+        setSelectedTrafficDisruptionId(String(disruptionId));
+      }
+    };
+
+    map.on("click", inspectTrafficDisruption);
+    return () => {
+      map.off("click", inspectTrafficDisruption);
+    };
+  }, [loadState, routeSelectionMode, trafficDisruptionsVisible]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || routeSelectionMode === null) return;
     const selectNearestNode = async (event: maplibregl.MapMouseEvent) => {
       setRouteError(null);
@@ -578,8 +749,14 @@ function App() {
         const node = await fetchJson<NetworkNodePick>(
           `/api/v1/network/nearest?longitude=${point.lng}&latitude=${point.lat}`,
         );
-        if (routeSelectionMode === "origin") setRouteOrigin(node);
-        else setRouteDestination(node);
+        const label = `Map point · ${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
+        if (routeSelectionMode === "origin") {
+          setRouteOrigin(node);
+          setRouteOriginLabel(label);
+        } else {
+          setRouteDestination(node);
+          setRouteDestinationLabel(label);
+        }
         setRouteBaseline(null);
         setRouteComparison(null);
         setClosedEdge("");
@@ -688,6 +865,47 @@ function App() {
     setRouteSelectionMode(mode);
   };
 
+  const resolveRouteEndpoint = (
+    kind: RouteEndpointKind,
+    node: NetworkNodePick,
+    label: string,
+  ) => {
+    if (kind === "origin") {
+      setRouteOrigin(node);
+      setRouteOriginLabel(label);
+    } else {
+      setRouteDestination(node);
+      setRouteDestinationLabel(label);
+    }
+    setRouteBaseline(null);
+    setRouteComparison(null);
+    setClosedEdge("");
+    setRouteError(null);
+  };
+
+  const swapRouteEndpoints = () => {
+    setRouteOrigin(routeDestination);
+    setRouteOriginLabel(routeDestinationLabel);
+    setRouteDestination(routeOrigin);
+    setRouteDestinationLabel(routeOriginLabel);
+    setRouteBaseline(null);
+    setRouteComparison(null);
+    setClosedEdge("");
+    setRouteError(null);
+  };
+
+  const clearRouteEndpoints = () => {
+    setRouteOrigin(null);
+    setRouteOriginLabel("");
+    setRouteDestination(null);
+    setRouteDestinationLabel("");
+    setRouteSelectionMode(null);
+    setRouteBaseline(null);
+    setRouteComparison(null);
+    setClosedEdge("");
+    setRouteError(null);
+  };
+
   const runWorkflow = async () => {
     setWorkflowState("running");
     setWorkflowError(null);
@@ -722,6 +940,36 @@ function App() {
       setRouteState("error");
     }
   };
+
+  useEffect(() => {
+    if (!routeOrigin || !routeDestination) return;
+    void runRouteBaseline();
+  }, [routeOrigin?.node_id, routeDestination?.node_id]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const geometry =
+      routeComparison?.scenario_geometry ??
+      routeBaseline?.effective_geometry ??
+      routeBaseline?.geometry ??
+      null;
+    if (!map || !geometry || geometry.type !== "LineString" || geometry.coordinates.length < 2) {
+      return;
+    }
+    const bounds = new maplibregl.LngLatBounds();
+    for (const coordinate of geometry.coordinates) {
+      if (coordinate.length >= 2) {
+        bounds.extend([coordinate[0], coordinate[1]]);
+      }
+    }
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, {
+        padding: { top: 140, right: 390, bottom: 80, left: 390 },
+        maxZoom: 15,
+        duration: 650,
+      });
+    }
+  }, [routeBaseline, routeComparison]);
 
   const runRouteComparison = async () => {
     setRouteError(null);
@@ -823,7 +1071,46 @@ function App() {
             data-reference-map-truncated={referenceMapTruncated ? "true" : "false"}
             data-critical-routes-ready={criticalRouteLayerReady ? "true" : "false"}
             data-critical-routes-count={criticalRoutes?.returned ?? 0}
+            data-traffic-disruptions-ready={trafficLayerReady ? "true" : "false"}
+            data-traffic-disruptions-count={trafficDisruptions?.returned ?? 0}
+            data-user-route-state={routeBaseline?.route_state ?? "none"}
           />
+          <MapRoutePlanner
+            origin={routeOrigin}
+            originLabel={routeOriginLabel}
+            destination={routeDestination}
+            destinationLabel={routeDestinationLabel}
+            route={routeBaseline}
+            routeState={routeState}
+            routeError={routeError}
+            selectionMode={routeSelectionMode}
+            onResolve={resolveRouteEndpoint}
+            onPickOnMap={startRouteSelection}
+            onSwap={swapRouteEndpoints}
+            onClear={clearRouteEndpoints}
+          />
+          {selectedTrafficDisruption && (
+            <article className="traffic-detail-card" aria-label="Road disruption detail">
+              <button
+                aria-label="Close road disruption detail"
+                className="traffic-detail-close"
+                onClick={() => setSelectedTrafficDisruptionId(null)}
+                type="button"
+              >
+                ×
+              </button>
+              <p className="eyebrow">Official VIZ disruption</p>
+              <strong>{selectedTrafficDisruption.street ?? selectedTrafficDisruption.subtype}</strong>
+              {selectedTrafficDisruption.section && <span>{selectedTrafficDisruption.section}</span>}
+              <span className={`traffic-severity${selectedTrafficDisruption.is_full_closure ? " closure" : ""}`}>
+                {selectedTrafficDisruption.severity ?? selectedTrafficDisruption.subtype}
+              </span>
+              <p>{selectedTrafficDisruption.description}</p>
+              <small>
+                Valid {selectedTrafficDisruption.valid_from} → {selectedTrafficDisruption.valid_to}
+              </small>
+            </article>
+          )}
           <div className="legend">
             <strong>Reference layers</strong>
             <p>Viewport projection of persisted reference data; simulated changes stay separate.</p>
@@ -849,6 +1136,36 @@ function App() {
             ))}
             <label className="layer-toggle">
               <input
+                checked={trafficDisruptionsVisible}
+                onChange={(event) => setTrafficDisruptionsVisible(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="layer-swatch traffic-disruptions" />
+              <span>
+                VIZ road disruptions · {trafficDisruptions?.returned ?? 0} active ·{" "}
+                {trafficDisruptions?.freshness ?? "unavailable"}
+              </span>
+            </label>
+            {trafficDisruptions && trafficDisruptions.disruptions.length > 0 && (
+              <details className="traffic-list">
+                <summary>Inspect active disruptions</summary>
+                <div>
+                  {trafficDisruptions.disruptions.slice(0, 5).map((item) => (
+                    <button
+                      aria-label={`Inspect disruption ${item.street ?? item.subtype}`}
+                      key={item.id}
+                      onClick={() => setSelectedTrafficDisruptionId(item.id)}
+                      type="button"
+                    >
+                      <strong>{item.street ?? item.subtype}</strong>
+                      <span>{item.severity ?? item.subtype}</span>
+                    </button>
+                  ))}
+                </div>
+              </details>
+            )}
+            <label className="layer-toggle">
+              <input
                 checked={criticalRoutesVisible}
                 onChange={(event) => setCriticalRoutesVisible(event.target.checked)}
                 type="checkbox"
@@ -860,8 +1177,11 @@ function App() {
               </span>
             </label>
             <p className="critical-route-traffic-note">
-              Baseline road weights only · live road traffic telemetry: not integrated
+              VIZ closures can reroute paths · congestion-speed telemetry is not integrated
             </p>
+            {trafficDisruptionsError && (
+              <p className="inline-error">Road disruptions unavailable: {trafficDisruptionsError}</p>
+            )}
             {referenceMap === null && <span>No reference viewport has been loaded yet.</span>}
             {mapDataError && (
               <p className="inline-error">Reference map data unavailable: {mapDataError}</p>
@@ -887,7 +1207,13 @@ function App() {
               <dd>{criticalRoutes?.route_count_total ?? "Unavailable"}</dd>
               <dt>Reference snapshot</dt>
               <dd>{criticalRoutes?.reference_generated_at ?? "Unavailable"}</dd>
-              <dt>Road traffic telemetry</dt>
+              <dt>Road disruptions</dt>
+              <dd>
+                {criticalRoutes?.disruption_data_available
+                  ? `Available · ${criticalRoutes.disruption_freshness}`
+                  : "Unavailable"}
+              </dd>
+              <dt>Congestion-speed telemetry</dt>
               <dd>{criticalRoutes?.traffic_data_available ? "Available" : "Not integrated"}</dd>
             </dl>
             {criticalRoutes && criticalRoutes.routes.length > 0 && (
@@ -914,9 +1240,39 @@ function App() {
                 <span>
                   {selectedCriticalRoute.origin_category} → {selectedCriticalRoute.destination_category}
                 </span>
-                <span>Baseline travel time: {(selectedCriticalRoute.travel_time_s / 60).toFixed(1)} min</span>
-                <span>Road distance: {(selectedCriticalRoute.length_m / 1000).toFixed(2)} km</span>
-                <span>Edges: {selectedCriticalRoute.edge_ids.length}</span>
+                <span className={`critical-route-state route-state-${selectedCriticalRoute.route_state}`}>
+                  State: {selectedCriticalRoute.route_state}
+                </span>
+                <span>
+                  Baseline: {(selectedCriticalRoute.travel_time_s / 60).toFixed(1)} min ·{" "}
+                  {(selectedCriticalRoute.length_m / 1000).toFixed(2)} km
+                </span>
+                {selectedCriticalRoute.disruption_aware_travel_time_s !== null && (
+                  <span>
+                    Effective:{" "}
+                    {(selectedCriticalRoute.disruption_aware_travel_time_s / 60).toFixed(1)} min ·{" "}
+                    {selectedCriticalRoute.disruption_aware_length_m !== null
+                      ? `${(selectedCriticalRoute.disruption_aware_length_m / 1000).toFixed(2)} km`
+                      : "distance unavailable"}
+                  </span>
+                )}
+                {selectedCriticalRoute.travel_time_delta_s !== null &&
+                  selectedCriticalRoute.travel_time_delta_s > 0 && (
+                    <span>
+                      Added travel time:{" "}
+                      {(selectedCriticalRoute.travel_time_delta_s / 60).toFixed(1)} min
+                    </span>
+                  )}
+                {selectedCriticalRoute.active_disruption_ids.length > 0 && (
+                  <span>
+                    Active disruptions: {selectedCriticalRoute.active_disruption_ids.length}
+                  </span>
+                )}
+                <span>
+                  Edges:{" "}
+                  {selectedCriticalRoute.disruption_aware_edge_ids.length ||
+                    selectedCriticalRoute.edge_ids.length}
+                </span>
                 <span>
                   Providers:{" "}
                   {selectedCriticalRoute.provenance.source_providers.length > 0
@@ -1096,14 +1452,14 @@ function App() {
               onClick={() => startRouteSelection("origin")}
               type="button"
             >
-              {routeOrigin ? "Origin selected" : "Select origin on map"}
+              {routeOrigin ? "Scenario origin selected" : "Select scenario origin on map"}
             </button>
             <button
               className={`secondary-action${routeSelectionMode === "destination" ? " active" : ""}`}
               onClick={() => startRouteSelection("destination")}
               type="button"
             >
-              {routeDestination ? "Destination selected" : "Select destination on map"}
+              {routeDestination ? "Scenario destination selected" : "Select scenario destination on map"}
             </button>
           </div>
           {routeSelectionMode && (

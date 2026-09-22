@@ -12,6 +12,7 @@
 | Berlin hospitals WFS | critical-facility identity/location | authoritative reference, not live availability | DL-DE-Zero-2.0 |
 | Berlin fire-stations WFS | critical-facility identity/location | authoritative reference, not live availability | DL-DE-Zero-2.0 |
 | OpenStreetMap | road-network reference | community-maintained/derived topology | ODbL 1.0, © OpenStreetMap contributors |
+| Berlin VIZ editorial road-disruption feed | current/scheduled roadworks and disruptions | observed publisher state; explicit source severity controls closure semantics | Datenlizenz Deutschland – Namensnennung 2.0 |
 | Stromnetz Berlin grid-load publication | Berlin distribution-grid load input | source/reference; forecasts require validated chronological evaluation | source terms/URL retained with artefact |
 | UCI Individual Household Electric Power Consumption | forecasting methodology reference only | never Berlin operational state | CC BY 4.0 |
 
@@ -32,6 +33,14 @@ GTFS-Realtime and static GTFS have different semantics and cadences. Missing rea
 ### Climate and facilities
 
 The reference acquisition workflow ingests the official Climate Analysis WFS plus hospitals and fire-station WFS data. Climate features stay `official_modelled`; facility identity/location does not assert live operational availability.
+
+### Berlin VIZ road disruptions
+
+The map and routing path use the current VIZ editorial feed at `/daten/baustellen_sperrungen_viz.json` because the live-deployed Berlin Masterportal identifies it as the VIZ editorial layer and it carries explicit severity values. The concurrently published Landesmeldestelle feed is broader context but currently does not provide equivalent severity semantics.
+
+Only an active, fresh source record with severity `Vollsperrung` can remove matched routing edges. `Fahrtrichtungssperrung`, `keine Sperrung` and other incident types remain visible without an inferred travel-time multiplier. Source `tstore`, validity interval, licence and provenance are persisted.
+
+This is incident/closure information, **not** measured congestion-speed telemetry.
 
 ### OpenStreetMap
 

@@ -85,7 +85,7 @@ test("populated derived and platform inspectors expose persisted lineage and run
   await expect(reloadCard.getByText("reference", { exact: true })).toBeVisible();
   await expect(reloadCard.getByText("derived", { exact: true })).toBeVisible();
   await expect(reloadCard.getByText("energy", { exact: true })).toBeVisible();
-  await expect(reloadCard.getByText("current", { exact: true })).toHaveCount(3);
+  await expect(reloadCard.getByText("current", { exact: true })).toHaveCount(4);
   await expect(reloadCard.getByText("missing", { exact: true })).toHaveCount(1);
 });
 
@@ -190,13 +190,13 @@ test("map-selected routing compares a baseline with an explicit closed-edge scen
   expect(box).not.toBeNull();
   const center = { x: box!.width / 2, y: box!.height / 2 };
 
-  await page.getByRole("button", { name: "Select origin on map" }).click();
+  await page.getByRole("button", { name: "Select scenario origin on map" }).click();
   await map.click({ position: center });
-  await expect(page.getByRole("button", { name: "Origin selected" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Scenario origin selected" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Select destination on map" }).click();
+  await page.getByRole("button", { name: "Select scenario destination on map" }).click();
   await map.click({ position: { x: center.x + 35, y: center.y } });
-  await expect(page.getByRole("button", { name: "Destination selected" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Scenario destination selected" })).toBeVisible();
 
   await page.getByRole("button", { name: "Show baseline route" }).click();
   await expect(page.getByLabel("Disrupted route segment")).toBeVisible();

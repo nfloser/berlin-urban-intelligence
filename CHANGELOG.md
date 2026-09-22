@@ -11,11 +11,17 @@ All notable project changes are documented in this file. The project follows Sem
 - bounded `/api/v1/resilience/critical-routes` API with geometry, travel time, distance, edge IDs, source/licence provenance and explicit unavailable/degraded states;
 - persistent MapLibre critical-route layer with automatic 15-second dashboard refresh, visibility control, route highlighting and keyboard-accessible inspection;
 - explicit `traffic_data_available=false` semantics so persisted road weights are never presented as real-time congestion data;
-- deterministic backend and composed Playwright coverage for automatic routing, reload invalidation, source degradation, unreachable facilities and map rendering.
+- deterministic backend and composed Playwright coverage for automatic routing, reload invalidation, source degradation, unreachable facilities and map rendering;
+- official Berlin VIZ editorial road-disruption ingestion with atomic persisted state, source-content freshness, last-known-good semantics and bounded API exposure;
+- disruption-aware normal and monitored routing where active fresh `Vollsperrung` records can trigger deterministic rerouting or blocked state while other restrictions remain visible without invented speed penalties;
+- map-first navigation with floating origin/destination search, arbitrary map-point selection, automatic nearest-road-node resolution, automatic route calculation/fit, effective ETA/distance, Swap/Clear and state-colored routes;
+- inspectable VIZ road-disruption map layers plus persisted-place search for critical facilities and VBB stops;
+- browser acceptance for the complete search → VIZ closure → automatic reroute workflow.
 
 ### Limitations
 
-- real-time road traffic/congestion telemetry is not integrated; dynamic route refresh currently reflects persisted network/reference changes, not a Google Maps traffic feed;
+- real-time congestion-speed telemetry is not integrated; VIZ provides source-backed incidents/closures, not Google Maps-equivalent floating-car speeds;
+- text search currently covers persisted facilities/stops rather than arbitrary-address geocoding; arbitrary locations can still be selected directly on the map;
 - monitored routes require a routable persisted road network and critical facilities in at least two categories.
 
 ## [1.0.0] - 2026-09-16
