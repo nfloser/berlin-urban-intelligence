@@ -24,13 +24,17 @@ test("map-first navigation searches places, inspects a VIZ closure and reroutes 
 
   const origin = page.getByLabel("Origin search");
   await origin.fill("Acceptance Hospital");
-  const originResult = page.getByRole("option", { name: /Acceptance Hospital/ });
+  const originResult = planner
+    .getByRole("listbox", { name: "Place suggestions" })
+    .getByRole("option", { name: /Acceptance Hospital/ });
   await expect(originResult).toBeVisible();
   await originResult.click();
 
   const destination = page.getByLabel("Destination search");
   await destination.fill("Acceptance Fire Station");
-  const destinationResult = page.getByRole("option", { name: /Acceptance Fire Station/ });
+  const destinationResult = planner
+    .getByRole("listbox", { name: "Place suggestions" })
+    .getByRole("option", { name: /Acceptance Fire Station/ });
   await expect(destinationResult).toBeVisible();
   await destinationResult.click();
 
