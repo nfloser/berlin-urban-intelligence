@@ -104,6 +104,7 @@ export type SystemResponse = {
   reference_generated_at: string | null;
   energy_generated_at: string | null;
   derived_generated_at: string | null;
+  traffic_disruption_generated_at: string | null;
   snapshot_reload: Record<string, SnapshotReloadDiagnostic>;
   synthetic_production_fallback: boolean;
 };
@@ -183,6 +184,52 @@ export type OrchestrationResponse = {
   };
 };
 
+export type MapSearchResult = {
+  id: string;
+  layer: "facilities" | "stops";
+  name: string;
+  subtitle: string;
+  longitude: number;
+  latitude: number;
+};
+
+export type TrafficDisruption = {
+  id: string;
+  subtype: string;
+  severity?: string | null;
+  street?: string | null;
+  section?: string | null;
+  description: string;
+  direction?: string | null;
+  valid_from: string;
+  valid_to: string;
+  source_updated_at: string;
+  is_future?: boolean | null;
+  network_reference_ids: string[];
+  is_full_closure: boolean;
+  speed_penalty_factor?: number | null;
+  spatial: Spatial;
+  provenance: Provenance;
+};
+
+export type TrafficDisruptionResponse = {
+  generated_at: string | null;
+  source_id: string;
+  last_success_at: string | null;
+  latest_source_update_at: string | null;
+  source_error: string | null;
+  freshness: string;
+  routing_eligible: boolean;
+  evaluated_at: string | null;
+  disruption_count_total: number;
+  active_count_total: number;
+  returned: number;
+  truncated: boolean;
+  disruptions: TrafficDisruption[];
+};
+
+export type RouteState = "baseline" | "disrupted" | "rerouted" | "blocked";
+
 export type NetworkNodePick = {
   node_id: string;
   longitude: number;
@@ -197,6 +244,19 @@ export type RouteResponse = {
   travel_time_s: number;
   scenario_name: string | null;
   geometry: Geometry | null;
+  length_m: number;
+  route_state: RouteState;
+  active_disruption_ids: string[];
+  closed_edge_ids: string[];
+  effective_node_path: string[];
+  effective_edge_ids: string[];
+  effective_travel_time_s: number | null;
+  effective_length_m: number | null;
+  effective_geometry: Geometry | null;
+  travel_time_delta_s: number | null;
+  disruption_data_available: boolean;
+  disruption_freshness: string;
+  disruption_source_error: string | null;
 };
 
 export type RouteComparisonResponse = {
@@ -223,6 +283,8 @@ export type CriticalRouteProvenance = {
   source_licences: string[];
   processing_method: string;
   traffic_data_available: false;
+  disruption_source_providers: string[];
+  disruption_source_licences: string[];
 };
 
 export type CriticalRoute = {
@@ -240,7 +302,15 @@ export type CriticalRoute = {
   geometry: Geometry;
   quality: string;
   freshness: string;
-  route_state: "baseline";
+  route_state: RouteState;
+  active_disruption_ids: string[];
+  closed_edge_ids: string[];
+  disruption_aware_travel_time_s: number | null;
+  disruption_aware_length_m: number | null;
+  disruption_aware_node_path: string[];
+  disruption_aware_edge_ids: string[];
+  disruption_aware_geometry: Geometry | null;
+  travel_time_delta_s: number | null;
   provenance: CriticalRouteProvenance;
 };
 
@@ -254,6 +324,10 @@ export type CriticalRouteSnapshotResponse = {
   unreachable_facility_ids: string[];
   source_errors: Record<string, string>;
   traffic_data_available: false;
+  disruption_data_available: boolean;
+  disruption_generated_at: string | null;
+  disruption_freshness: string;
+  disruption_source_error: string | null;
   note: string;
   route_count_total: number;
   returned: number;
@@ -272,6 +346,18 @@ export type AssessmentResponse = {
   composite_score: null;
   note: string;
 };
+
+export function mapSearchPath(query: string, limit = 8): string {
+  const normalized = query.trim();
+  if (normalized.length < 2) {
+    throw new Error("Search query must contain at least two characters.");
+  }
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+    throw new Error("Search result limit must be between 1 and 50.");
+  }
+  const params = new URLSearchParams({ q: normalized, limit: String(limit) });
+  return `/api/v1/map/search?${params.toString()}`;
+}
 
 export async function fetchJson<T>(path: string): Promise<T> {
   const response = await fetch(path, { headers: { Accept: "application/json" } });
@@ -384,5 +470,6 @@ export function systemSnapshotToken(system: SystemResponse): string {
     system.reference_generated_at ?? "missing",
     system.energy_generated_at ?? "missing",
     system.derived_generated_at ?? "missing",
+    system.traffic_disruption_generated_at ?? "missing",
   ].join("|");
 }
