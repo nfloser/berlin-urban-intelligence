@@ -29,15 +29,16 @@ Responses include total/returned/truncated metadata. The hard API limit is 250 r
 
 Critical-route calculation is tied to the persisted `ReferenceState`, not to individual HTTP requests.
 
-When `reference.json` is loaded or replaced with a newer valid snapshot, the API state controller recomputes the critical-route snapshot. Changes only to runtime, energy or derived state do **not** rerun road routing.
+When `reference.json` **or** `traffic-disruptions.json` is loaded or replaced with a newer valid snapshot, the API state controller recomputes the critical-route snapshot. Changes only to runtime, energy or derived state do **not** rerun road routing.
 
 The dashboard polls the already-computed critical-route API every 15 seconds. This makes map refresh cheap while still reflecting a changed persisted reference/network snapshot without restarting the application.
 
 The MapLibre dashboard:
 
 - displays monitored routes automatically; no manual origin/destination click is required;
-- renders available routes as a persistent line layer;
-- renders a degraded monitor in an amber state;
+- renders routes by state: baseline, disrupted, rerouted or blocked;
+- uses an official VIZ disruption layer for current source-backed incidents/closures;
+- preserves the baseline and separately exposes effective rerouted travel time, distance and geometry;
 - highlights the selected route separately;
 - provides a layer visibility checkbox;
 - supports route inspection through a keyboard-accessible select control;
@@ -49,17 +50,18 @@ Manual baseline/disruption routing remains a separate analytical workflow and is
 
 The monitor is **live with respect to the platform's current persisted reference/network state**. It is not a Google Maps traffic feed.
 
-The current road-network edge weights originate from the persisted source-backed road snapshot and its documented speed/travel-time processing. No verified real-time road congestion/incident telemetry source is currently integrated.
+The current road-network edge weights originate from the persisted source-backed road snapshot and its documented speed/travel-time processing. Official Berlin VIZ road-disruption data is now persisted separately and can change route availability when the source explicitly classifies an active disruption as `Vollsperrung`.
 
-For that reason every critical-route snapshot and route provenance explicitly exposes:
+This still does **not** provide live congestion speeds. Therefore:
 
 ```text
+disruption_data_available = true|false
 traffic_data_available = false
 ```
 
-The dashboard also states that live road traffic telemetry is not integrated. Baseline edge weights are never relabelled as current congestion data.
+have deliberately different meanings. A fresh VIZ snapshot can mark a route `disrupted`, `rerouted` or `blocked`, but partial closures and other incidents do not receive an invented speed penalty. Baseline edge weights are never relabelled as current congestion data.
 
-A future verified traffic adapter can update road costs while reusing the same critical-route monitoring/API/UI contract, but it must carry its own source timestamps, quality, freshness and provenance.
+Provider-content freshness is derived from VIZ `tstore`. A stale last-known-good disruption snapshot remains inspectable but is not allowed to alter routing.
 
 ## Selection algorithm
 
@@ -69,7 +71,7 @@ For each origin facility category, the monitor treats all snapped facilities in 
 
 Route reconstruction then uses the same deterministic minimum-`travel_time_s` parallel-edge selection semantics as the resilience router.
 
-The monitor is recalculated only when the reference snapshot changes, so expensive graph work is not repeated by 15-second dashboard polling.
+The monitor is recalculated only when the reference or persisted traffic-disruption snapshot changes, so expensive graph work is not repeated by 15-second dashboard polling.
 
 ## Failure and degradation semantics
 
@@ -95,7 +97,11 @@ Deterministic backend tests cover:
 - automatic nearest cross-category route derivation;
 - travel time, distance, edge IDs and exact GeoJSON geometry;
 - source/licence provenance;
-- explicit `traffic_data_available=false`;
+- explicit separation of VIZ disruption availability from `traffic_data_available=false`;
+- full-closure rerouting and blocked-route fallback;
+- no inferred penalty for non-full restrictions;
+- stale disruption state remaining visible but unable to alter routes;
+- shared-node spatial false-positive prevention;
 - reference-source error degradation;
 - missing-input unavailability;
 - isolated/unreachable facility degradation;
