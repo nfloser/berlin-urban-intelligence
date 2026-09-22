@@ -20,6 +20,8 @@ import {
   type RouteComparisonResponse,
   type RouteResponse,
   type SystemResponse,
+  type TrafficDisruption,
+  type TrafficDisruptionResponse,
   type UrbanEntity,
   type WorkflowKind,
   displayValue,
@@ -31,6 +33,7 @@ import {
   toFeatureCollection,
 } from "./api";
 import MapEntityInspector, { type MapSelection } from "./MapEntityInspector";
+import MapRoutePlanner, { type RouteEndpointKind } from "./MapRoutePlanner";
 import {
   ReferenceMapRequestTracker,
   buildReferenceDetailPath,
@@ -107,7 +110,9 @@ function App() {
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
   const [routeOrigin, setRouteOrigin] = useState<NetworkNodePick | null>(null);
+  const [routeOriginLabel, setRouteOriginLabel] = useState("");
   const [routeDestination, setRouteDestination] = useState<NetworkNodePick | null>(null);
+  const [routeDestinationLabel, setRouteDestinationLabel] = useState("");
   const [routeSelectionMode, setRouteSelectionMode] = useState<"origin" | "destination" | null>(null);
   const [routeBaseline, setRouteBaseline] = useState<RouteResponse | null>(null);
   const [closedEdge, setClosedEdge] = useState("");
@@ -118,11 +123,19 @@ function App() {
   const [criticalRoutesError, setCriticalRoutesError] = useState<string | null>(null);
   const [criticalRoutesVisible, setCriticalRoutesVisible] = useState(true);
   const [selectedCriticalRouteId, setSelectedCriticalRouteId] = useState<string | null>(null);
+  const [trafficDisruptions, setTrafficDisruptions] =
+    useState<TrafficDisruptionResponse | null>(null);
+  const [trafficDisruptionsError, setTrafficDisruptionsError] = useState<string | null>(null);
+  const [trafficDisruptionsVisible, setTrafficDisruptionsVisible] = useState(true);
+  const [trafficLayerReady, setTrafficLayerReady] = useState(false);
+  const [selectedTrafficDisruptionId, setSelectedTrafficDisruptionId] = useState<string | null>(null);
 
   const selectedCriticalRoute =
     criticalRoutes?.routes.find((item) => item.id === selectedCriticalRouteId) ?? null;
   const selectedObservation =
     observations.find((item) => item.id === selectedObservationId) ?? null;
+  const selectedTrafficDisruption =
+    trafficDisruptions?.disruptions.find((item) => item.id === selectedTrafficDisruptionId) ?? null;
   const layerSummaries = referenceMap ? referenceLayerSummaries(referenceMap.metadata) : [];
   const referenceMapTruncated = layerSummaries.some((layer) => layer.truncated);
 
@@ -181,6 +194,40 @@ function App() {
     void loadCriticalRoutes();
     const interval = window.setInterval(() => {
       void loadCriticalRoutes();
+    }, CRITICAL_ROUTE_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTrafficDisruptions = async () => {
+      try {
+        const result = await fetchJson<TrafficDisruptionResponse>(
+          "/api/v1/traffic/disruptions?active_only=true&limit=1000",
+        );
+        if (cancelled) return;
+        setTrafficDisruptions(result);
+        setTrafficDisruptionsError(null);
+        setSelectedTrafficDisruptionId((current) => {
+          if (current && result.disruptions.some((item) => item.id === current)) return current;
+          return null;
+        });
+      } catch (reason) {
+        if (cancelled) return;
+        setTrafficDisruptionsError(
+          reason instanceof Error ? reason.message : "Road disruptions unavailable.",
+        );
+      }
+    };
+
+    void loadTrafficDisruptions();
+    const interval = window.setInterval(() => {
+      void loadTrafficDisruptions();
     }, CRITICAL_ROUTE_POLL_INTERVAL_MS);
 
     return () => {
@@ -578,8 +625,14 @@ function App() {
         const node = await fetchJson<NetworkNodePick>(
           `/api/v1/network/nearest?longitude=${point.lng}&latitude=${point.lat}`,
         );
-        if (routeSelectionMode === "origin") setRouteOrigin(node);
-        else setRouteDestination(node);
+        const label = `Map point · ${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
+        if (routeSelectionMode === "origin") {
+          setRouteOrigin(node);
+          setRouteOriginLabel(label);
+        } else {
+          setRouteDestination(node);
+          setRouteDestinationLabel(label);
+        }
         setRouteBaseline(null);
         setRouteComparison(null);
         setClosedEdge("");
@@ -686,6 +739,47 @@ function App() {
     setMapSelection(null);
     setMapSelectionError(null);
     setRouteSelectionMode(mode);
+  };
+
+  const resolveRouteEndpoint = (
+    kind: RouteEndpointKind,
+    node: NetworkNodePick,
+    label: string,
+  ) => {
+    if (kind === "origin") {
+      setRouteOrigin(node);
+      setRouteOriginLabel(label);
+    } else {
+      setRouteDestination(node);
+      setRouteDestinationLabel(label);
+    }
+    setRouteBaseline(null);
+    setRouteComparison(null);
+    setClosedEdge("");
+    setRouteError(null);
+  };
+
+  const swapRouteEndpoints = () => {
+    setRouteOrigin(routeDestination);
+    setRouteOriginLabel(routeDestinationLabel);
+    setRouteDestination(routeOrigin);
+    setRouteDestinationLabel(routeOriginLabel);
+    setRouteBaseline(null);
+    setRouteComparison(null);
+    setClosedEdge("");
+    setRouteError(null);
+  };
+
+  const clearRouteEndpoints = () => {
+    setRouteOrigin(null);
+    setRouteOriginLabel("");
+    setRouteDestination(null);
+    setRouteDestinationLabel("");
+    setRouteSelectionMode(null);
+    setRouteBaseline(null);
+    setRouteComparison(null);
+    setClosedEdge("");
+    setRouteError(null);
   };
 
   const runWorkflow = async () => {
