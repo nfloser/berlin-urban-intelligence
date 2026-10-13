@@ -2,15 +2,15 @@
 
 **Version 1.0.0**
 
-Berlin Urban Intelligence is a research-oriented, agent-extensible urban intelligence and digital-twin integration platform for Berlin. It integrates heterogeneous urban sources behind typed canonical contracts, preserves provenance, quality and freshness semantics, and supports deterministic cross-domain workflows and explicit hypothetical scenarios without fabricating missing production data.
+Berlin Urban Intelligence brings Berlin urban datasets into a research platform through typed, shared data contracts. Sources retain their provenance, quality and freshness metadata. The platform supports extensible agents, deterministic cross-domain workflows and explicitly marked hypothetical scenarios; missing production data is never invented.
 
-Version 1.0.0 is the first stable project release. The repository-wide v1 evidence gate is PASS; that means the documented v1 correctness and evidence criteria have been met, not that public data providers are permanently available or that the platform is a production municipal control system.
+Version 1.0.0 is the first stable release. The repository-wide v1 evidence gate passed its documented correctness and evidence checks. External data providers may still be unavailable, and the platform is not a production municipal control system.
 
 ## Overview
 
 The platform integrates mobility, environmental exposure, heat, energy and resilience capabilities around a shared canonical state model. Its central design requirement is semantic traceability: an observation, official model output, forecast, derived result and scenario value remain distinguishable throughout processing, persistence, analysis and presentation.
 
-The repository is the maintained integration layer. Historical standalone prototypes are reference or migration inputs, not runtime dependencies.
+This repository contains the maintained integration layer. Earlier standalone prototypes remain references and migration inputs; the runtime does not depend on them.
 
 Start with the [documentation index](docs/index.md), [project overview](docs/overview.md), [objectives and scope](docs/objectives-and-scope.md), [v1 verification matrix](docs/verification.md) and [v1.0.0 release notes](docs/releases/v1.0.0.md).
 
