@@ -4,13 +4,13 @@
 
 Berlin Urban Intelligence provides a common integration layer for heterogeneous Berlin urban data and analytical capabilities. The platform normalizes provider-specific data into versioned canonical contracts, preserves provenance and data-state semantics, exposes domain capabilities through independently testable agents, and supports explicit scenario analysis without rewriting the observed/reference baseline.
 
-The project is research-oriented. It is designed to make cross-domain urban analysis technically inspectable and reproducible rather than to present a continuously complete or authoritative representation of the city.
+This is research software for inspectable, reproducible cross-domain analysis. It does not claim to maintain a complete or authoritative real-time picture of Berlin.
 
 ## Problem domain
 
 Urban analysis commonly combines data that differ in provider, update cadence, spatial resolution, quality status and epistemic meaning. A current weather observation, an official climate-model feature, a timetable, a realtime transit update, a model forecast and a hypothetical disruption are all useful, but they cannot be treated as equivalent facts.
 
-The platform addresses this integration problem by carrying state, quality, time, space and provenance as part of the data contract rather than as implicit application context.
+Every canonical data contract records state, quality, time, space and provenance explicitly, so consumers do not have to infer them from application context.
 
 ## Intended users
 
